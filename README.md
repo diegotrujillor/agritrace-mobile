@@ -91,7 +91,7 @@ const earthBrown    = Color(0xFF6D4C3D);
 const harvestYellow = Color(0xFFF9A825);
 const certBlue      = Color(0xFF1976D2);
 
-// Tipografía: Inter (principal) · Poppins SemiBold 600 (logo)
+// Tipografía: Inter (Google Fonts) — mínimo 16px body, touch targets ≥44px
 // Espaciado base 8px: xs=4 · sm=8 · md=16 · lg=24 · xl=32
 // Dimensiones mobile-only: 375 × 812 px
 ```
@@ -102,6 +102,7 @@ const certBlue      = Color(0xFF1976D2);
 - Flutter SDK 3.x (`flutter --version`)
 - Android Studio o Xcode
 - Emulador o dispositivo físico
+- **[agritrace-backend](https://github.com/diegotrujillor/agritrace-backend) corriendo en `localhost:3000`** — el login y la sincronización requieren la API. Levanta el backend primero.
 
 ### 1. Clonar y configurar
 
