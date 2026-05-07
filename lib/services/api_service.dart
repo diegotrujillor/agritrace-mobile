@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../models/user.dart';
 import 'storage_service.dart';
 
 const _baseUrl = String.fromEnvironment(
@@ -61,11 +62,15 @@ class _AuthInterceptor extends Interceptor {
           data: {'refreshToken': refreshToken},
           options: Options(headers: {'Authorization': null}),
         );
-        final newAccess  = response.data['data']['accessToken']  as String;
-        final newRefresh = (response.data['data']['refreshToken'] as String?) ?? refreshToken;
-        await _storage.saveTokens(accessToken: newAccess, refreshToken: newRefresh);
+        final auth = AuthResponse.fromJson(
+          response.data as Map<String, dynamic>,
+        );
+        await _storage.saveTokens(
+          accessToken: auth.accessToken,
+          refreshToken: auth.refreshToken,
+        );
         final retryOptions = err.requestOptions
-          ..headers['Authorization'] = 'Bearer $newAccess';
+          ..headers['Authorization'] = 'Bearer ${auth.accessToken}';
         handler.resolve(await _dio.fetch(retryOptions));
       } catch (_) {
         await _storage.deleteTokens();

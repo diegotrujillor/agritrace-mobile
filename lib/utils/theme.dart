@@ -44,7 +44,7 @@ ThemeData buildAppTheme() {
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primaryGreen,
         foregroundColor: AppColors.white,
-        disabledBackgroundColor: AppColors.primaryGreen.withOpacity(0.6),
+        disabledBackgroundColor: AppColors.primaryGreen.withValues(alpha: 0.6),
         minimumSize: const Size(double.infinity, 52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),

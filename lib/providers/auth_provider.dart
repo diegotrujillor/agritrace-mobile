@@ -38,7 +38,11 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   Future<AuthState> build() async {
     final token = await ref.read(storageServiceProvider).getAccessToken();
     if (token == null) return const AuthUnauthenticated();
-    // Token present — full profile fetch deferred to Sprint 2
+    // Token present — full profile fetch deferred to Sprint 2.
+    // The empty-string fields below are an intentional placeholder so the
+    // router can treat the session as authenticated on cold start without
+    // an extra round-trip; the real profile arrives from /auth/me.
+    // TODO(sprint-2): replace with GET /auth/me
     return const AuthAuthenticated(
       User(id: '', email: '', fullName: '', phone: '', role: UserRole.producer),
     );

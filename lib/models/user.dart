@@ -62,7 +62,12 @@ class AuthResponse {
   final User user;
 
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
-    final data = (json['data'] as Map<String, dynamic>?) ?? json;
+    if (json['success'] != true || json['data'] == null) {
+      throw const FormatException(
+        'Invalid API response: missing data envelope',
+      );
+    }
+    final data = json['data'] as Map<String, dynamic>;
     return AuthResponse(
       accessToken: data['accessToken'] as String,
       refreshToken: data['refreshToken'] as String,

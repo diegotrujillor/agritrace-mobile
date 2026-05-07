@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../navigation/route_names.dart';
 import '../../utils/constants.dart';
 import '../../widgets/common/app_button.dart';
 
-class WelcomeScreen extends ConsumerWidget {
+class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryGreen,
       body: SafeArea(
@@ -37,13 +36,16 @@ class WelcomeScreen extends ConsumerWidget {
                 onPressed: () => context.go(Routes.login),
               ),
               const SizedBox(height: AppSpacing.md),
-              GestureDetector(
-                onTap: () => context.go(Routes.register),
+              TextButton(
+                onPressed: () => context.go(Routes.register),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.white,
+                ),
                 child: const Text(
                   '¿No tienes cuenta? Regístrate',
                   style: TextStyle(
                     color: AppColors.white,
-                    fontSize: 14,
+                    fontSize: 16,
                     decoration: TextDecoration.underline,
                     decorationColor: AppColors.white,
                   ),
@@ -69,7 +71,7 @@ class _Logo extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         Text(
           'AgriTrace',
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.inter(
             color: AppColors.white,
             fontSize: 40,
             fontWeight: FontWeight.w600,

@@ -17,6 +17,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: notifier,
     redirect: (context, state) {
       final authState = ref.read(authProvider);
+      if (authState.isLoading) return null;
       final isAuthenticated = authState.valueOrNull is AuthAuthenticated;
       final isAuthRoute = {
         Routes.welcome,
@@ -50,7 +51,7 @@ class _AuthListenable extends ChangeNotifier {
     });
   }
 
-  late final dynamic _sub;
+  late final ProviderSubscription<AsyncValue<AuthState>> _sub;
 
   @override
   void dispose() {

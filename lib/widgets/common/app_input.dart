@@ -44,7 +44,7 @@ class _AppInputState extends State<AppInput> {
         Text(
           widget.label,
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 16,
             fontWeight: FontWeight.w500,
             color: AppColors.darkGreen,
           ),

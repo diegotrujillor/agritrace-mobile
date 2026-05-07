@@ -5,8 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../navigation/route_names.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/constants.dart';
+import '../../utils/error_parser.dart';
 import '../../utils/validators.dart';
 import '../../widgets/common/app_button.dart';
+import '../../widgets/common/app_error_banner.dart';
 import '../../widgets/common/app_input.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -40,7 +42,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState    = ref.watch(authProvider);
     final isLoading    = authState.isLoading;
-    final errorMessage = authState.hasError ? _parseError(authState.error) : null;
+    final errorMessage =
+        authState.hasError ? parseAuthError(authState.error) : null;
 
     return Scaffold(
       backgroundColor: AppColors.white,
@@ -55,7 +58,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: AppSpacing.xl),
                 Text(
                   'AgriTrace',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.inter(
                     color: AppColors.primaryGreen,
                     fontSize: 28,
                     fontWeight: FontWeight.w600,
@@ -66,7 +69,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'Iniciar sesión',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.inter(
                       color: AppColors.darkGreen,
                       fontSize: 22,
                       fontWeight: FontWeight.w600,
@@ -94,7 +97,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 if (errorMessage != null) ...[
                   const SizedBox(height: AppSpacing.md),
-                  _ErrorBanner(message: errorMessage),
+                  AppErrorBanner(message: errorMessage),
                 ],
                 const SizedBox(height: AppSpacing.lg),
                 AppButton(
@@ -103,13 +106,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   isLoading: isLoading,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                GestureDetector(
-                  onTap: () => context.go(Routes.register),
+                TextButton(
+                  onPressed: () => context.go(Routes.register),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primaryGreen,
+                  ),
                   child: const Text(
                     '¿No tienes cuenta? Regístrate',
                     style: TextStyle(
                       color: AppColors.primaryGreen,
-                      fontSize: 14,
+                      fontSize: 16,
                       decoration: TextDecoration.underline,
                     ),
                   ),
@@ -118,31 +124,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  String _parseError(Object? error) =>
-      'Credenciales incorrectas. Intenta de nuevo.';
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.error.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.error.withOpacity(0.3)),
-      ),
-      child: Text(
-        message,
-        style: const TextStyle(color: AppColors.error, fontSize: 14),
       ),
     );
   }

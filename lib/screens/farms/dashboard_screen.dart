@@ -19,7 +19,7 @@ class DashboardScreen extends ConsumerWidget {
         elevation: 0,
         title: Text(
           'AgriTrace',
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.inter(
             color: AppColors.white,
             fontSize: 20,
             fontWeight: FontWeight.w600,
@@ -68,7 +68,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             Text(
               'No tienes fincas aún',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.inter(
                 color: AppColors.darkGreen,
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
@@ -80,7 +80,7 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.grey,
-                fontSize: 15,
+                fontSize: 16,
                 height: 1.5,
               ),
             ),
