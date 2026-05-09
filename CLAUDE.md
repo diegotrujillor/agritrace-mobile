@@ -133,4 +133,4 @@ New feature screens go in `lib/screens/<domain>/`, providers in `lib/providers/<
 
 ## Business context
 
-Pilot region: **Eje Cafetero, Colombia**. Target users: small/medium farmers (5–50 ha). Primary crops: cacao, café, exotic fruits. App must work offline for ≥14 days; buyers verify traceability via QR codes. Ley 1581 (Colombian data-protection law) requires minimizing personal data and logging access.
+Pilot region: **Valle del Cauca, Colombia** (Phase 1 exclusive). Target users: small/medium farmers (5–50 ha). Primary crops: cacao, caña panelera, hortalizas/frutas. Pricing model under validation: Mes 1 free with commitment contract → Mes 2 onwards $29.990 COP/mes per producer. App must work offline for ≥14 days; buyers verify traceability via QR codes (Phase 2). Ley 1581 (Colombian data-protection law) requires minimizing personal data and logging access. Commercial validation track: see `agritrace-docs/01-preparacion-mvp/10-comercial-gtm/`.
