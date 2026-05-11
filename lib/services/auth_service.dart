@@ -14,12 +14,14 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    // `role` is intentionally NOT sent — the server assigns it based on
+    // the endpoint (public /auth/register always yields 'producer').
+    // Sending a client-chosen role would be an authz bypass attempt.
     final response = await _api.client.post('/auth/register', data: {
       'fullName': fullName,
       'phone': phone,
       'email': email,
       'password': password,
-      'role': 'producer',
     });
     final auth = AuthResponse.fromJson(response.data as Map<String, dynamic>);
     await _storage.saveTokens(
@@ -46,12 +48,20 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    try {
-      await _api.client.post('/auth/logout');
-    } catch (_) {
-      // best-effort server logout; always clear local tokens
-    } finally {
-      await _storage.deleteTokens();
+    final refreshToken = await _storage.getRefreshToken();
+    // Skip the network call entirely when there is nothing to revoke
+    // server-side; this keeps the request log clean and matches the
+    // backend's `logoutSchema` which requires a non-empty refreshToken.
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      try {
+        await _api.client.post(
+          '/auth/logout',
+          data: {'refreshToken': refreshToken},
+        );
+      } catch (_) {
+        // best-effort server logout; always clear local tokens
+      }
     }
+    await _storage.deleteTokens();
   }
 }

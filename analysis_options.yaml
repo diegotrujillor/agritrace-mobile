@@ -9,3 +9,9 @@ linter:
     - use_key_in_widget_constructors
     - prefer_single_quotes
     - always_declare_return_types
+    # Security / correctness hardening
+    - unawaited_futures
+    - cancel_subscriptions
+    - close_sinks
+    - use_build_context_synchronously
+    - avoid_dynamic_calls

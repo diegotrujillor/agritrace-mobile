@@ -23,6 +23,16 @@ const _testAuth = AuthResponse(
   user: _testUser,
 );
 
+// JWT with `{"exp": 9999999999}` (year 2286). The signature is irrelevant
+// because cold-start validation only checks shape + `exp` claim.
+const _futureJwt =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTl9.sig';
+
+// JWT with `{"exp": 1}` (1970). Used to verify the cold-start path rejects
+// expired tokens.
+const _expiredJwt =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjF9.sig';
+
 void main() {
   late MockAuthService mockAuth;
   late MockStorageService mockStorage;
@@ -30,6 +40,9 @@ void main() {
   setUp(() {
     mockAuth    = MockAuthService();
     mockStorage = MockStorageService();
+    // deleteTokens() is called whenever the cold-start validator rejects
+    // a stored token. Always stub it to a no-op so mocktail does not throw.
+    when(() => mockStorage.deleteTokens()).thenAnswer((_) async {});
   });
 
   ProviderContainer makeContainer() => ProviderContainer(
@@ -48,13 +61,33 @@ void main() {
     expect(container.read(authProvider).value, isA<AuthUnauthenticated>());
   });
 
-  test('initial state is authenticated when token exists', () async {
-    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => 'token');
+  test('initial state is authenticated when a valid JWT is stored', () async {
+    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => _futureJwt);
     final container = makeContainer();
     addTearDown(container.dispose);
 
     await container.read(authProvider.future);
     expect(container.read(authProvider).value, isA<AuthAuthenticated>());
+  });
+
+  test('initial state is unauthenticated when stored token is malformed', () async {
+    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => 'not-a-jwt');
+    final container = makeContainer();
+    addTearDown(container.dispose);
+
+    await container.read(authProvider.future);
+    expect(container.read(authProvider).value, isA<AuthUnauthenticated>());
+    verify(() => mockStorage.deleteTokens()).called(1);
+  });
+
+  test('initial state is unauthenticated when stored token has expired', () async {
+    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => _expiredJwt);
+    final container = makeContainer();
+    addTearDown(container.dispose);
+
+    await container.read(authProvider.future);
+    expect(container.read(authProvider).value, isA<AuthUnauthenticated>());
+    verify(() => mockStorage.deleteTokens()).called(1);
   });
 
   test('login sets authenticated state on success', () async {
@@ -79,7 +112,7 @@ void main() {
   });
 
   test('logout sets unauthenticated state', () async {
-    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => 'token');
+    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => _futureJwt);
     when(() => mockAuth.logout()).thenAnswer((_) async {});
 
     final container = makeContainer();

@@ -21,17 +21,26 @@ void main() {
   });
 
   group('validatePassword', () {
-    test('returns null for valid password', () {
+    test('returns null for valid password (mixed case + digit)', () {
       expect(validatePassword('SecurePass123'), isNull);
     });
     test('returns error for empty password', () {
       expect(validatePassword(''), isNotNull);
     });
     test('returns error for password shorter than 8 chars', () {
-      expect(validatePassword('short'), isNotNull);
+      expect(validatePassword('Short1a'), isNotNull);
     });
-    test('returns null for exactly 8 chars', () {
-      expect(validatePassword('12345678'), isNull);
+    test('returns error for 8 digits only (no letters)', () {
+      expect(validatePassword('12345678'), isNotNull);
+    });
+    test('returns error for missing uppercase', () {
+      expect(validatePassword('lowercase123'), isNotNull);
+    });
+    test('returns error for missing digit', () {
+      expect(validatePassword('NoDigitsHere'), isNotNull);
+    });
+    test('returns null for exactly 8 chars when complexity is satisfied', () {
+      expect(validatePassword('Abcdef12'), isNull);
     });
   });
 
