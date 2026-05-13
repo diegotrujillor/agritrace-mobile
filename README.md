@@ -2,9 +2,9 @@
 
 App móvil del MVP de **AgriTrace** — plataforma de trazabilidad agrícola para pequeños y medianos productores en Colombia.
 
-> Estrategia MVP: **Farmer-First · Mobile-Only · Offline-First**. El agricultor registra actividades sin conexión durante 14+ días. Marketplace con compradores internacionales es Phase 2.
+> Estrategia MVP: **Farmer-First · Mobile-Only · Offline-First**. El agricultor registra actividades sin conexión durante 14+ días. Marketplace con compradores internacionales es later release.
 >
-> **Validación comercial Phase 1**: Valle del Cauca, modelo híbrido Mes 1 gratis + $29.990 COP/mes Mes 2. Demo navegable: [`agritrace-demo`](https://github.com/diegotrujillor/agritrace-demo). Estrategia: [`agritrace-docs/01-preparacion-mvp/10-comercial-gtm/`](https://github.com/diegotrujillor/agritrace-docs/tree/main/01-preparacion-mvp/10-comercial-gtm).
+> **Validación comercial MVP**: Valle del Cauca, modelo híbrido Mes 1 gratis + $29.990 COP/mes Mes 2. Demo navegable: [`agritrace-demo`](https://github.com/diegotrujillor/agritrace-demo). Estrategia: [`agritrace-docs/01-preparacion-mvp/10-comercial-gtm/`](https://github.com/diegotrujillor/agritrace-docs/tree/main/01-preparacion-mvp/10-comercial-gtm).
 
 ## Stack Técnico
 
@@ -35,7 +35,7 @@ App móvil del MVP de **AgriTrace** — plataforma de trazabilidad agrícola par
 | 9 | **Vista lote + timeline actividades** ⭐ | 3 |
 | 10 | **Registrar actividad** ⭐ | 3 |
 
-> Pantallas Phase 2 (Generar QR, Trazabilidad pública) diferidas hasta validar demanda con compradores.
+> Pantallas later release (Generar QR, Trazabilidad pública) diferidas hasta validar demanda con compradores.
 
 ## Flujo de Navegación
 
@@ -165,4 +165,4 @@ flutter test test/widget/
 
 ---
 
-*AgriTrace — Trazabilidad que conecta · MVP Phase 1 · Mayo 2026*
+*AgriTrace — Trazabilidad que conecta · MVP · Mayo 2026*
