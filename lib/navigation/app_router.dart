@@ -12,7 +12,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final notifier = _AuthListenable(ref);
   ref.onDispose(notifier.dispose);
 
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: Routes.welcome,
     refreshListenable: notifier,
     redirect: (context, state) {
@@ -42,6 +42,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+
+  // Dispose GoRouter when the provider is torn down to free its internal
+  // RouteInformationProvider and RouterDelegate.
+  ref.onDispose(router.dispose);
+  return router;
 });
 
 class _AuthListenable extends ChangeNotifier {

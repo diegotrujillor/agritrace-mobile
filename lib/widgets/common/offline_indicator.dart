@@ -3,10 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/constants.dart';
 
-final connectivityProvider = StreamProvider<bool>((ref) {
-  return Connectivity().onConnectivityChanged.map(
-        (results) => results.any((r) => r != ConnectivityResult.none),
-      );
+// Single Connectivity instance per provider lifecycle.
+// connectivity_plus's onConnectivityChanged does NOT emit an initial event,
+// so we synchronously seed the stream with checkConnectivity() to avoid a
+// false "no banner" state when the app starts offline.
+final connectivityProvider = StreamProvider<bool>((ref) async* {
+  final connectivity = Connectivity();
+  final initial = await connectivity.checkConnectivity();
+  yield initial.any((r) => r != ConnectivityResult.none);
+  yield* connectivity.onConnectivityChanged.map(
+    (results) => results.any((r) => r != ConnectivityResult.none),
+  );
 });
 
 class OfflineIndicator extends ConsumerWidget {

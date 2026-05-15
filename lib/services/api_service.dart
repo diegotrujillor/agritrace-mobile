@@ -21,14 +21,19 @@ bool _isAllowedScheme(String url) {
 
 class ApiService {
   ApiService(this._storage) {
-    assert(
-      _baseUrl.isNotEmpty,
-      'API_BASE_URL must be set via --dart-define=API_BASE_URL=<https-url>',
-    );
-    assert(
-      _isAllowedScheme(_baseUrl),
-      'API_BASE_URL must use HTTPS in non-local builds. Got: $_baseUrl',
-    );
+    // Runtime checks (not asserts): asserts are stripped from release builds.
+    // A misconfigured release would otherwise silently ship with an empty
+    // baseUrl or an insecure scheme and fail only at the first network call.
+    if (_baseUrl.isEmpty) {
+      throw StateError(
+        'API_BASE_URL must be set via --dart-define=API_BASE_URL=<https-url>',
+      );
+    }
+    if (!_isAllowedScheme(_baseUrl)) {
+      throw StateError(
+        'API_BASE_URL must use HTTPS in non-local builds. Got: $_baseUrl',
+      );
+    }
     _dio = Dio(
       BaseOptions(
         baseUrl: _baseUrl,
@@ -126,12 +131,15 @@ class _AuthInterceptor extends Interceptor {
 
       final retried = await _retryWithToken(err.requestOptions, auth.accessToken);
       handler.resolve(retried);
-    } catch (_) {
+    } catch (refreshErr) {
       await _storage.deleteTokens();
       if (!lock.isCompleted) {
         lock.complete(null);
       }
-      handler.next(err);
+      // Propagate the refresh failure rather than the original 401 so callers
+      // can distinguish "wrong credentials at login" from "auth flow collapsed
+      // during refresh". parseAuthError can then surface the actual cause.
+      handler.next(refreshErr is DioException ? refreshErr : err);
     } finally {
       _refreshLock = null;
     }
