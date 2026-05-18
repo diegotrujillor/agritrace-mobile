@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../navigation/route_names.dart';
@@ -67,7 +68,12 @@ class _Logo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const Icon(Icons.eco_rounded, color: AppColors.white, size: 72),
+        SvgPicture.asset(
+          'assets/brand/agritrace-logo-white.svg',
+          width: 96,
+          height: 96,
+          semanticsLabel: 'AgriTrace',
+        ),
         const SizedBox(height: AppSpacing.md),
         Text(
           'AgriTrace',

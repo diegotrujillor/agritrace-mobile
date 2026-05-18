@@ -15,12 +15,27 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   google_fonts: ^6.2.1
   connectivity_plus: ^6.0.3
+  flutter_svg: ^2.0.10
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   mocktail: ^1.0.3
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/
+
+# App launcher icon generation (output dirs are git-ignored Flutter
+# platform folders; run after `flutter pub get`):
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/brand/icon-1024.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  adaptive_icon_background: "#E8F5E9"
+  adaptive_icon_foreground: "assets/brand/icon-1024.png"
