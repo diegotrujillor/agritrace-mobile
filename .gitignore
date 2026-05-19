@@ -52,3 +52,11 @@ coverage/
 **/*.keystore
 **/*.jks
 android/agritrace-release.keystore
+
+# OS
+.DS_Store
+
+# Out-of-scope Flutter platforms (MVP is Android-first)
+macos/
+web/
+.metadata
