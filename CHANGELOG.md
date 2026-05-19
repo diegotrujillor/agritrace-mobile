@@ -4,6 +4,17 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-19 — branding ícono + nombre de APK
+- **chore (marca):** ícono de launcher regenerado desde el logo oficial
+  `agritrace-logo-mark.svg` (rasterizado a `assets/brand/icon-1024.png`
+  1024², `flutter_launcher_icons`; iconos adaptativos + `colors.xml`).
+  `ios: false` en config (proyecto Android-only).
+- **ci:** `build-apk.yml` renombra el APK resultante a `AgriTrace.apk`
+  (artifact + asset del GitHub Release).
+- Dónde: `assets/brand/icon-1024.png`, `pubspec.yaml`,
+  `android/app/src/main/res/{mipmap-*,drawable-*,mipmap-anydpi-v26,values/colors.xml}`,
+  `.github/workflows/build-apk.yml`.
+
 ## [Unreleased] - 2026-05-19 — refactor de seams compartidos + fixes
 ### Added
 - **refactor:** `lib/services/api_envelope.dart` (`unwrapEnvelope`,
