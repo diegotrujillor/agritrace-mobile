@@ -33,8 +33,8 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Column(
-        children: const [
+      body: const Column(
+        children: [
           OfflineIndicator(),
           Expanded(child: _EmptyState()),
         ],

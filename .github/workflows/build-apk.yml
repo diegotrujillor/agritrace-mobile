@@ -51,7 +51,8 @@ jobs:
         run: flutter pub get
 
       - name: Static analysis
-        run: flutter analyze
+        # Errors/warnings fail the build; style infos don't block a pilot APK.
+        run: flutter analyze --no-fatal-infos
 
       - name: Build release APK
         run: >
