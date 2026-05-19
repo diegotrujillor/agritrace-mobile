@@ -4,6 +4,18 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-19 — fix: sin red en APK release (login/registro)
+### Fixed
+- **bug (red):** login y registro mostraban "Sin conexión, verifica tu
+  internet" en el APK release aunque el backend estaba arriba. Causa:
+  el permiso `android.permission.INTERNET` solo estaba en los manifests
+  `debug/` y `profile/` (scaffold Flutter), no en `main/`; el APK
+  firmado se construye solo con `main/` → sin acceso a red → toda
+  llamada HTTP fallaba sin respuesta (`error.response == null` →
+  mensaje genérico de offline). Añadidos `INTERNET` y
+  `ACCESS_NETWORK_STATE` a `main/AndroidManifest.xml`.
+- Dónde: `android/app/src/main/AndroidManifest.xml`.
+
 ## [Unreleased] - 2026-05-19 — fix: crash al abrir + nombre de la app
 ### Fixed
 - **bug (crash):** la app cerraba al abrir en Android. Causa:
