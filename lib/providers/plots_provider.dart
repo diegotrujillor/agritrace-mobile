@@ -49,7 +49,7 @@ class PlotsNotifier extends FamilyAsyncNotifier<List<Plot>, String> {
     await _refresh();
   }
 
-  Future<void> update({
+  Future<void> updatePlot({
     required String id,
     required String name,
     required String cropType,

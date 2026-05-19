@@ -41,7 +41,7 @@ class FarmsNotifier extends AsyncNotifier<List<Farm>> {
     await _refresh();
   }
 
-  Future<void> update({
+  Future<void> updateFarm({
     required String id,
     required String name,
     required String cropType,

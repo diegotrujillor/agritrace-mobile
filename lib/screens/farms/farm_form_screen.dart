@@ -71,7 +71,7 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
 
     try {
       if (_isEdit) {
-        await notifier.update(
+        await notifier.updateFarm(
           id: widget.farm!.id,
           name: name,
           cropType: _cropType,
