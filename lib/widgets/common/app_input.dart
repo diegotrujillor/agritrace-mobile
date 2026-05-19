@@ -12,6 +12,7 @@ class AppInput extends StatefulWidget {
     this.obscureText      = false,
     this.textInputAction,
     this.onFieldSubmitted,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final String label;
@@ -22,6 +23,7 @@ class AppInput extends StatefulWidget {
   final bool obscureText;
   final TextInputAction? textInputAction;
   final void Function(String)? onFieldSubmitted;
+  final TextCapitalization textCapitalization;
 
   @override
   State<AppInput> createState() => _AppInputState();
@@ -55,6 +57,7 @@ class _AppInputState extends State<AppInput> {
           validator: widget.validator,
           keyboardType: widget.keyboardType,
           obscureText: _obscure,
+          textCapitalization: widget.textCapitalization,
           textInputAction: widget.textInputAction,
           onFieldSubmitted: widget.onFieldSubmitted,
           decoration: InputDecoration(
@@ -63,8 +66,8 @@ class _AppInputState extends State<AppInput> {
                 ? IconButton(
                     icon: Icon(
                       _obscure
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                     ),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   )
