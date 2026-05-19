@@ -46,3 +46,9 @@ ios/Pods/
 
 # Coverage
 coverage/
+
+# Android signing secrets — NEVER commit
+**/key.properties
+**/*.keystore
+**/*.jks
+android/agritrace-release.keystore

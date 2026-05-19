@@ -112,22 +112,46 @@ const certBlue      = Color(0xFF1976D2);
 git clone https://github.com/diegotrujillor/agritrace-mobile.git
 cd agritrace-mobile
 flutter pub get
-cp .env.example .env
 ```
 
 ### 2. Ejecutar
 
+La configuración se pasa por `--dart-define` (no hay archivo `.env`):
+
 ```bash
-flutter run                  # Dispositivo/emulador conectado
-flutter run -d emulator-5554
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/v1   # emulador Android → localhost
+flutter run --dart-define=API_BASE_URL=http://localhost:3000/v1   # simulador iOS
 ```
 
-## Variables de Entorno
+## Variables de configuración
 
-```env
-API_BASE_URL=http://10.0.2.2:3000/v1   # Android emulator → localhost
-# API_BASE_URL=http://localhost:3000/v1  # iOS simulator
+Se inyectan en build/run vía `--dart-define` (default en código: `http://10.0.2.2:3000/v1`):
+
+| Variable | Ejemplo | Uso |
+|----------|---------|-----|
+| `API_BASE_URL` | `https://api.agritrace.co/v1` | Backend del piloto (dispositivo real) |
+| `API_BASE_URL` | `http://10.0.2.2:3000/v1` | Emulador Android → backend local |
+
+## Build distribuible (APK Android, piloto)
+
+Requiere Android SDK (`ANDROID_HOME`). Firma release vía
+`android/key.properties` + keystore (ambos git-ignored — ver
+"Firma / keystore" abajo).
+
+```bash
+flutter build apk --release --dart-define=API_BASE_URL=https://api.agritrace.co/v1
+# salida: build/app/outputs/flutter-apk/app-release.apk  (instalación directa / sideload)
 ```
+
+### Firma / keystore (secreto — NO se versiona)
+
+`android/agritrace-release.keystore` + `android/key.properties` están en
+`.gitignore`. Para reconstruir en otra máquina/CI: generar con
+`keytool -genkeypair -keystore agritrace-release.keystore -alias agritrace
+-keyalg RSA -keysize 2048 -validity 10000` y crear `android/key.properties`
+con `storePassword/keyPassword/keyAlias=agritrace/storeFile=agritrace-release.keystore`.
+**Resguardar keystore + passwords en gestor de contraseñas** — perderlo
+impide publicar actualizaciones de la app.
 
 ## Offline-First
 
