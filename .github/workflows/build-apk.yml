@@ -11,6 +11,10 @@ on:
         required: false
         default: "https://api.agritrace.co/v1"
 
+# action-gh-release needs write access to create/update the Release.
+permissions:
+  contents: write
+
 env:
   FLUTTER_VERSION: "3.41.9"
 
