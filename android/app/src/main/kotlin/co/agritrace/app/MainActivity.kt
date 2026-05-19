@@ -1,4 +1,4 @@
-package com.example.agritrace_mobile
+package co.agritrace.app
 
 import io.flutter.embedding.android.FlutterActivity
 

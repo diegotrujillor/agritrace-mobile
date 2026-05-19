@@ -4,6 +4,20 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-19 — fix: crash al abrir + nombre de la app
+### Fixed
+- **bug (crash):** la app cerraba al abrir en Android. Causa:
+  `applicationId`/`namespace` = `co.agritrace.app` pero `MainActivity.kt`
+  seguía en el paquete `com.example.agritrace_mobile`; el manifest
+  (`android:name=".MainActivity"`) resolvía a una clase inexistente →
+  `ClassNotFoundException`. Movido a `co/agritrace/app/MainActivity.kt`
+  (`package co.agritrace.app`); eliminado el paquete viejo.
+- **bug (marca):** la app se instalaba como "agritrace_mobile".
+  `android:label` → "AgriTrace".
+- Dónde: `android/app/src/main/AndroidManifest.xml`,
+  `android/app/src/main/kotlin/co/agritrace/app/MainActivity.kt`
+  (eliminado `kotlin/com/example/agritrace_mobile/`).
+
 ## [Unreleased] - 2026-05-19 — branding ícono + nombre de APK
 - **chore (marca):** ícono de launcher regenerado desde el logo oficial
   `agritrace-logo-mark.svg` (rasterizado a `assets/brand/icon-1024.png`
