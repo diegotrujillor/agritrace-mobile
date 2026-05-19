@@ -4,6 +4,17 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-19 — directrices de desarrollo en CLAUDE.md
+- **docs:** se incorpora a `CLAUDE.md` el contenido relevante de
+  `agritrace-docs/.../04-desarrollo/01-directrices-desarrollo.md`
+  (principios, checklist de widgets/providers, seguridad, anti-patterns,
+  testing, pre-commit).
+- **chore:** instrucción obligatoria — usar el plugin `everything-claude-code`
+  y sus skills para toda codificación, y anexar los cambios a este
+  `CHANGELOG.md` al final de cada implementación.
+- Dónde: `CLAUDE.md` (secciones "Development guidelines (MANDATORY)" y
+  "Codification workflow (MANDATORY)").
+
 ## [1.2.0] - 2026-05-19 — Sprint 4: alertas + estado de sync
 - **feat:** alertas (clima + recordatorios), indicador de estado de
   sincronización y entrada de alertas desde el dashboard.

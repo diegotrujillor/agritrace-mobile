@@ -136,3 +136,58 @@ New feature screens go in `lib/screens/<domain>/`, providers in `lib/providers/<
 ## Business context
 
 Pilot region: **Valle del Cauca, Colombia** (MVP exclusive). Target users: small/medium farmers (5–50 ha). Primary crops: cacao, caña panelera, hortalizas/frutas. Pricing model under validation: Mes 1 free with commitment contract → Mes 2 onwards $29.990 COP/mes per producer. App must work offline for ≥14 days; buyers verify traceability via QR codes (later release). Ley 1581 (Colombian data-protection law) requires minimizing personal data and logging access. Commercial validation track: see `agritrace-docs/01-preparacion-mvp/10-comercial-gtm/`.
+
+## Development guidelines (MANDATORY)
+
+Source of truth: `agritrace-docs/02-documentacion-tecnica/04-desarrollo/01-directrices-desarrollo.md`. These rules apply to **every** implementation in this repo.
+
+### Fundamental principles
+
+1. **Mobile-First** — Flutter/Dart only. No web app, no React Native.
+2. **Offline-First** — app must work without connectivity, sync when online (WatermelonDB, 14-day guarantee).
+3. **Security by Default** — tokens in `FlutterSecureStorage`, never plain storage.
+4. **Simplicity** — simple code over clever code.
+5. **Documentation** — `///` doc comments where needed.
+6. **Testing** — everything must be testable.
+
+### Widgets
+
+- `PascalCase` naming; prefer `StatelessWidget` when possible.
+- Typed constructor params; no `dynamic`.
+- No complex logic in `build()` — extract to providers.
+- Document with `///` comments.
+
+### Providers (Riverpod)
+
+- One provider per domain.
+- Business logic lives in the notifier, not the widget (keeps it testable/reusable).
+- Handle all three states: loading, data, error.
+- Document dependencies.
+
+### Security
+
+- JWT access + refresh; never store tokens in plain storage — `FlutterSecureStorage` only.
+- Never expose secrets in the client.
+- Validate input before sending to the API.
+
+### Anti-patterns (prohibited)
+
+Business logic inside widgets, untyped (`dynamic`) props, God widgets, magic numbers (use named constants), `print()` in production, swallowed errors.
+
+### Testing
+
+- `flutter test`, coverage target ≥ 70% (project rule: aim 80%+).
+- AAA structure, descriptive test names per behavior. Unit + widget tests.
+
+### Pre-commit checklist
+
+- [ ] `flutter analyze` passes
+- [ ] `dart format` applied
+- [ ] `flutter test` passes
+- [ ] No `print()`, no credentials in code
+- [ ] Descriptive commit message
+
+## Codification workflow (MANDATORY)
+
+1. **Use the `everything-claude-code` plugin and its skills for all codification.** Before/while implementing, drive work through its relevant skills — e.g. `everything-claude-code:plan`, `everything-claude-code:flutter-test`, `everything-claude-code:dart-flutter-patterns`, `everything-claude-code:flutter-review`, `everything-claude-code:flutter-build`, `everything-claude-code:code-review`, `everything-claude-code:security-review`, `everything-claude-code:accessibility`, `everything-claude-code:frontend-patterns`. Pick the skills that match the task; do not hand-roll work a skill already covers.
+2. **At the end of every implementation, append the changes to `CHANGELOG.md`** (Keep a Changelog format: `Added` / `Changed` / `Fixed` / etc., under the current unreleased/version heading).
