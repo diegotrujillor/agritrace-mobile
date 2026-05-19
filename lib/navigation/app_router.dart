@@ -11,6 +11,8 @@ import '../screens/farms/farm_detail_screen.dart';
 import '../screens/farms/farm_form_screen.dart';
 import '../screens/plots/plot_detail_screen.dart';
 import '../screens/plots/plot_form_screen.dart';
+import '../screens/activities/activity_form_screen.dart';
+import '../screens/activities/activity_timeline_screen.dart';
 import 'route_names.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -50,6 +52,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.plotNewPath,
         builder: (_, state) => PlotFormScreen(
           farmId: state.pathParameters['farmId']!,
+        ),
+      ),
+      // Activity routes use a `:plotId` segment and are declared before
+      // `/plots/:id` so the static `/activities` / `/activities/new` tails
+      // are matched as activity routes, never as a plot id.
+      GoRoute(
+        path: Routes.activityNewPath,
+        builder: (_, state) => ActivityFormScreen(
+          plotId: state.pathParameters['plotId']!,
+        ),
+      ),
+      GoRoute(
+        path: Routes.activityTimelinePath,
+        builder: (_, state) => ActivityTimelineScreen(
+          plotId: state.pathParameters['plotId']!,
         ),
       ),
       GoRoute(

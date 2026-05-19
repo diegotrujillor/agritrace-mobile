@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../models/activity.dart';
 import '../../models/plot.dart';
+import '../../navigation/route_names.dart';
+import '../../providers/activities_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/farms_provider.dart';
 import '../../providers/plots_provider.dart';
+import '../../services/pdf_traceability_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/error_parser.dart';
 import '../../widgets/common/app_card.dart';
+import '../../widgets/domain/activity_list_item.dart';
 
-/// Plot summary. The activity timeline is Sprint 3 — shown here as a labelled
-/// placeholder section so the navigation target exists now.
+/// Plot summary + its activity timeline. Offers registering a new activity
+/// and exporting a client-side traceability PDF (Pantalla 9).
 class PlotDetailScreen extends ConsumerWidget {
   const PlotDetailScreen({super.key, required this.plotId});
 
@@ -17,6 +25,7 @@ class PlotDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final plotAsync = ref.watch(plotProvider(plotId));
+    final activitiesAsync = ref.watch(activitiesProvider(plotId));
 
     return Scaffold(
       backgroundColor: AppColors.lightGreen,
@@ -33,13 +42,43 @@ class PlotDetailScreen extends ConsumerWidget {
         ),
       ),
       body: plotAsync.when(
-        data: (plot) => ListView(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          children: [
-            _PlotSummary(plot: plot),
-            const SizedBox(height: AppSpacing.lg),
-            const _ActivityPlaceholder(),
-          ],
+        data: (plot) => RefreshIndicator(
+          onRefresh: () => ref.refresh(activitiesProvider(plotId).future),
+          child: ListView(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            children: [
+              _PlotSummary(plot: plot),
+              const SizedBox(height: AppSpacing.md),
+              _ExportPdfButton(plot: plot),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                'Actividades',
+                style: GoogleFonts.inter(
+                  color: AppColors.darkGreen,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              activitiesAsync.when(
+                data: (activities) => activities.isEmpty
+                    ? const _NoActivities()
+                    : Column(
+                        children: [
+                          for (final activity in _sorted(activities)) ...[
+                            ActivityListItem(activity: activity),
+                            const SizedBox(height: AppSpacing.sm),
+                          ],
+                        ],
+                      ),
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(AppSpacing.lg),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => _InlineError(message: parseAuthError(e)),
+              ),
+            ],
+          ),
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -53,6 +92,92 @@ class PlotDetailScreen extends ConsumerWidget {
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.primaryGreen,
+        onPressed: () => context.go(Routes.activityNew(plotId)),
+        icon: const Icon(Icons.add, color: AppColors.white),
+        label: const Text(
+          'Registrar actividad',
+          style: TextStyle(color: AppColors.white),
+        ),
+      ),
+    );
+  }
+}
+
+/// Newest first. Copies before sorting so the provider's immutable state is
+/// never mutated in place.
+List<Activity> _sorted(List<Activity> activities) {
+  final copy = [...activities];
+  copy.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+  return copy;
+}
+
+/// "Exportar PDF de trazabilidad". Pulls the parent farm + producer name and
+/// generates the client-side PDF, then opens the share/print sheet. Disabled
+/// while exporting so a double-tap cannot launch two share sheets.
+class _ExportPdfButton extends ConsumerStatefulWidget {
+  const _ExportPdfButton({required this.plot});
+
+  final Plot plot;
+
+  @override
+  ConsumerState<_ExportPdfButton> createState() => _ExportPdfButtonState();
+}
+
+class _ExportPdfButtonState extends ConsumerState<_ExportPdfButton> {
+  bool _busy = false;
+
+  Future<void> _export() async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final farm =
+          await ref.read(farmProvider(widget.plot.farmId).future);
+      final activities =
+          await ref.read(activitiesProvider(widget.plot.id).future);
+      final auth = ref.read(authProvider).valueOrNull;
+      final producerName =
+          auth is AuthAuthenticated ? auth.user.fullName : null;
+
+      await const PdfTraceabilityService().buildAndShare(
+        farm: farm,
+        plot: widget.plot,
+        activities: activities,
+        producerName: producerName,
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(parseAuthError(error))),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: _busy ? null : _export,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.primaryGreen,
+        side: const BorderSide(color: AppColors.primaryGreen, width: 2),
+        minimumSize: const Size(double.infinity, 52),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      icon: _busy
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
+              ),
+            )
+          : const Icon(Icons.picture_as_pdf_outlined),
+      label: const Text('Exportar PDF de trazabilidad'),
     );
   }
 }
@@ -125,30 +250,39 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _ActivityPlaceholder extends StatelessWidget {
-  const _ActivityPlaceholder();
+class _NoActivities extends StatelessWidget {
+  const _NoActivities();
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Actividades',
-            style: GoogleFonts.inter(
-              color: AppColors.darkGreen,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          const Text(
-            'La línea de tiempo de actividades estará disponible en una '
-            'próxima versión.',
-            style: TextStyle(color: AppColors.grey, fontSize: 14, height: 1.5),
-          ),
-        ],
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+      child: Center(
+        child: Text(
+          'Este lote aún no tiene actividades registradas',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.grey, fontSize: 16),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineError extends StatelessWidget {
+  const _InlineError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+      child: Center(
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: AppColors.error, fontSize: 16),
+        ),
       ),
     );
   }

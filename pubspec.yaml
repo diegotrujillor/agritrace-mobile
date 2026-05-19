@@ -17,6 +17,8 @@ dependencies:
   connectivity_plus: ^6.0.3
   flutter_svg: ^2.0.10
   url_launcher: ^6.3.0
+  pdf: ^3.11.0
+  printing: ^5.13.0
 
 dev_dependencies:
   flutter_test:
