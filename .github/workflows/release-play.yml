@@ -1,0 +1,110 @@
+name: Release to Google Play
+
+# Builds a signed AAB and uploads it to a Google Play track.
+# Pilot default = internal testing (no review wait, no Play Protect warning,
+# exempt from the new-personal-account closed-test gate).
+#
+# Required repository secrets:
+#   KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD, KEY_ALIAS  (upload key)
+#   PLAY_SERVICE_ACCOUNT_JSON  (Play Console service-account JSON, raw contents)
+#
+# versionCode = github.run_number. This workflow OWNS the Play versionCode
+# sequence; do not also publish AABs built elsewhere or codes will collide.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Play track"
+        required: true
+        default: "internal"
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+      api_base_url:
+        description: "API base URL to bake into the build"
+        required: false
+        default: "https://api.agritrace.co/v1"
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.41.9"
+  PACKAGE_NAME: "co.agritrace.app"
+
+jobs:
+  release-play:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Restore signing keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/agritrace-release.keystore
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=agritrace-release.keystore
+          EOF
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build signed AAB
+        run: >
+          flutter build appbundle --release
+          --build-number=${{ github.run_number }}
+          --dart-define=API_BASE_URL=${{ github.event.inputs.api_base_url || 'https://api.agritrace.co/v1' }}
+          -PreleaseSigningRequired=true
+
+      - name: Clean up secrets
+        if: always()
+        run: rm -f android/key.properties android/agritrace-release.keystore
+
+      - name: Upload AAB to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ env.PACKAGE_NAME }}
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: ${{ github.event.inputs.track || 'internal' }}
+          status: completed
+
+      - name: Archive AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agritrace-app-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30

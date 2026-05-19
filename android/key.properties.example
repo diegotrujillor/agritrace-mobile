@@ -1,0 +1,7 @@
+# Copy to android/key.properties (git-ignored) for release/AAB signing.
+# storeFile is resolved relative to the android/ directory.
+# CI writes this file from repository secrets, then deletes it post-build.
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=agritrace
+storeFile=agritrace-release.keystore
