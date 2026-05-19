@@ -22,12 +22,12 @@ void main() {
     when(() => mockStorage.getAccessToken()).thenAnswer((_) async => null);
   });
 
-  List<Override> _overrides() => [
+  List<Override> overrides() => [
         authServiceProvider.overrideWithValue(mockAuth),
         storageServiceProvider.overrideWithValue(mockStorage),
       ];
 
-  GoRouter _router() => GoRouter(
+  GoRouter router() => GoRouter(
         initialLocation: Routes.login,
         routes: [
           GoRoute(path: Routes.login,    builder: (_, __) => const LoginScreen()),
@@ -36,13 +36,13 @@ void main() {
         ],
       );
 
-  Widget _wrap() => ProviderScope(
-        overrides: _overrides(),
-        child: MaterialApp.router(routerConfig: _router()),
+  Widget wrap() => ProviderScope(
+        overrides: overrides(),
+        child: MaterialApp.router(routerConfig: router()),
       );
 
   testWidgets('shows email and password fields', (tester) async {
-    await tester.pumpWidget(_wrap());
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
     expect(find.text('Email'), findsOneWidget);
     expect(find.text('Contraseña'), findsOneWidget);
@@ -50,7 +50,7 @@ void main() {
 
   testWidgets('shows validation errors when submitting empty form',
       (tester) async {
-    await tester.pumpWidget(_wrap());
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'Iniciar sesión'));
@@ -61,7 +61,7 @@ void main() {
   });
 
   testWidgets('navigates to register on link tap', (tester) async {
-    await tester.pumpWidget(_wrap());
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('¿No tienes cuenta? Regístrate'));
