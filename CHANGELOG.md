@@ -4,6 +4,56 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-19 — refactor de seams compartidos + fixes
+### Added
+- **refactor:** `lib/services/api_envelope.dart` (`unwrapEnvelope`,
+  `unwrapOne`, `unwrapList`), `lib/utils/date_format.dart`
+  (`formatLocalDate`), `lib/models/model_utils.dart` (`toDoubleOrNull`).
+- **refactor:** widgets compartidos en `lib/widgets/common/`:
+  `app_date_field.dart` (`AppDateField`), `app_labeled_dropdown.dart`
+  (`AppLabeledDropdown<T>`), `info_row.dart` (`InfoRow`),
+  `inline_error.dart` (`InlineError`), `error_state.dart` (`ErrorState`),
+  `empty_state.dart` (`EmptyState`).
+- **feat (gap):** `PlotService.delete` (`DELETE /plots/:id`) y
+  `PlotsNotifier.deletePlot` — espejo de `FarmService`/`FarmsNotifier`.
+- **test:** cobertura unitaria para los 5 providers (farms/plots/
+  activities/alerts/sync) y 5 services de dominio + `test/unit/_helpers.dart`.
+  73 tests nuevos (114 total); targets ≥80 % línea (services 88.9–100 %,
+  providers 90.9–96 %).
+### Changed
+- **refactor:** activity/farm/plot/alert services usan los helpers de
+  `api_envelope`; eliminados los 4 trios privados
+  `_envelope/_unwrapOne/_unwrapList`.
+- **refactor:** `farm.dart`/`plot.dart` usan `toDoubleOrNull`; eliminados
+  los `_toDouble` privados duplicados.
+- **refactor:** 5 copias de formato de fecha reemplazadas por
+  `formatLocalDate` (activity/alert list item, pdf_traceability_service,
+  activity/alert form screens).
+- **refactor:** `_DateField`/`_LabeledDropdown`/`_CropTypeDropdown`/
+  `_InfoRow`/`_InlineError`/`_ErrorState`/`_NoActivities`/`_NoPlots`/
+  `_EmptyState` reemplazados por los widgets compartidos.
+- **chore:** `appBarTheme` global en `buildAppTheme()`; eliminado el
+  estilado redundante de `AppBar` en 9 pantallas (color/elevación/estilo
+  de título ahora vienen del tema).
+- **refactor:** `Alert.copyWith` ahora cubre todos los campos
+  (id, type, severity, title, status, createdAt, plotId, body,
+  scheduledFor), igual que `Farm`/`Plot`.
+- **refactor:** `parseAuthError` → `parseApiError` (declaración + todos
+  los call sites).
+### Fixed
+- **perf (bug):** `activity_timeline_screen` ordenaba las actividades
+  dentro de `itemBuilder` (O(n²) al hacer scroll). Ahora se ordena una
+  vez por emisión de datos; mismo patrón aplicado a
+  `plot_detail_screen`.
+- Dónde: `lib/services/{activity,farm,plot,alert}_service.dart`,
+  `lib/services/api_envelope.dart`, `lib/services/pdf_traceability_service.dart`,
+  `lib/models/{farm,plot,alert,model_utils}.dart`,
+  `lib/utils/{date_format,theme,error_parser}.dart`,
+  `lib/providers/plots_provider.dart`,
+  `lib/widgets/common/{app_date_field,app_labeled_dropdown,info_row,inline_error,error_state,empty_state}.dart`,
+  `lib/widgets/domain/{activity,alert}_list_item.dart`,
+  `lib/screens/**` (forms, detalles, dashboard, alertas, timeline).
+
 ## [Unreleased] - 2026-05-19 — directrices de desarrollo en CLAUDE.md
 - **docs:** se incorpora a `CLAUDE.md` el contenido relevante de
   `agritrace-docs/.../04-desarrollo/01-directrices-desarrollo.md`

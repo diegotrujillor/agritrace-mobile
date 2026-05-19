@@ -1,4 +1,5 @@
 import '../models/alert.dart';
+import 'api_envelope.dart';
 import 'api_service.dart';
 
 /// Result of `POST /alerts/weather/check`. `alert` is null when the
@@ -28,7 +29,7 @@ class AlertService {
       if (status != null) 'status': status.wire,
       if (type != null) 'type': type.wire,
     });
-    return _unwrapList(response.data);
+    return unwrapList(response.data, Alert.fromJson);
   }
 
   /// `POST /alerts` — create a scheduled reminder.
@@ -45,7 +46,7 @@ class AlertService {
       if (body != null && body.isNotEmpty) 'body': body,
       if (plotId != null && plotId.isNotEmpty) 'plotId': plotId,
     });
-    return _unwrapOne(response.data);
+    return unwrapOne(response.data, Alert.fromJson);
   }
 
   /// `PATCH /alerts/:id` — partial update (dismiss, edit reminder).
@@ -60,7 +61,7 @@ class AlertService {
       if (title != null) 'title': title,
       if (body != null) 'body': body,
     });
-    return _unwrapOne(response.data);
+    return unwrapOne(response.data, Alert.fromJson);
   }
 
   /// `DELETE /alerts/:id` — soft-delete.
@@ -75,7 +76,8 @@ class AlertService {
       '/alerts/weather/check',
       data: {'plotId': plotId},
     );
-    final data = _envelope(response.data)['data'] as Map<String, dynamic>;
+    final data =
+        unwrapEnvelope(response.data)['data'] as Map<String, dynamic>;
     final rawAlert = data['alert'];
     return WeatherCheckResult(
       provider: data['provider'] as String? ?? 'none',
@@ -85,27 +87,4 @@ class AlertService {
     );
   }
 
-  Alert _unwrapOne(Object? body) {
-    final json = _envelope(body);
-    return Alert.fromJson(json['data'] as Map<String, dynamic>);
-  }
-
-  List<Alert> _unwrapList(Object? body) {
-    final json = _envelope(body);
-    final data = json['data'] as List<dynamic>;
-    return data
-        .map((e) => Alert.fromJson(e as Map<String, dynamic>))
-        .toList(growable: false);
-  }
-
-  Map<String, dynamic> _envelope(Object? body) {
-    if (body is! Map<String, dynamic> ||
-        body['success'] != true ||
-        body['data'] == null) {
-      throw const FormatException(
-        'Invalid API response: missing data envelope',
-      );
-    }
-    return body;
-  }
 }

@@ -1,4 +1,5 @@
 import '../models/plot.dart';
+import 'api_envelope.dart';
 import 'api_service.dart';
 
 /// Thin wrapper over [ApiService] for the `/plots` endpoints.
@@ -14,13 +15,13 @@ class PlotService {
   /// `GET /farms/:farmId/plots` — plots belonging to a farm.
   Future<List<Plot>> listByFarm(String farmId) async {
     final response = await _api.client.get('/farms/$farmId/plots');
-    return _unwrapList(response.data);
+    return unwrapList(response.data, Plot.fromJson);
   }
 
   /// `GET /plots/:id`.
   Future<Plot> get(String id) async {
     final response = await _api.client.get('/plots/$id');
-    return _unwrapOne(response.data);
+    return unwrapOne(response.data, Plot.fromJson);
   }
 
   /// `POST /plots`.
@@ -40,7 +41,7 @@ class PlotService {
       if (variety != null && variety.isNotEmpty) 'variety': variety,
       if (areaHectares != null) 'areaHectares': areaHectares,
     });
-    return _unwrapOne(response.data);
+    return unwrapOne(response.data, Plot.fromJson);
   }
 
   /// `PUT /plots/:id`.
@@ -61,30 +62,11 @@ class PlotService {
       if (variety != null && variety.isNotEmpty) 'variety': variety,
       if (areaHectares != null) 'areaHectares': areaHectares,
     });
-    return _unwrapOne(response.data);
+    return unwrapOne(response.data, Plot.fromJson);
   }
 
-  Plot _unwrapOne(Object? body) {
-    final json = _envelope(body);
-    return Plot.fromJson(json['data'] as Map<String, dynamic>);
-  }
-
-  List<Plot> _unwrapList(Object? body) {
-    final json = _envelope(body);
-    final data = json['data'] as List<dynamic>;
-    return data
-        .map((e) => Plot.fromJson(e as Map<String, dynamic>))
-        .toList(growable: false);
-  }
-
-  Map<String, dynamic> _envelope(Object? body) {
-    if (body is! Map<String, dynamic> ||
-        body['success'] != true ||
-        body['data'] == null) {
-      throw const FormatException(
-        'Invalid API response: missing data envelope',
-      );
-    }
-    return body;
+  /// `DELETE /plots/:id`.
+  Future<void> delete(String id) async {
+    await _api.client.delete('/plots/$id');
   }
 }

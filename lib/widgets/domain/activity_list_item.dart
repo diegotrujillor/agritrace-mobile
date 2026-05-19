@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/activity.dart';
 import '../../utils/constants.dart';
+import '../../utils/date_format.dart';
 import '../common/app_card.dart';
 
 /// List tile for a single [Activity] in a plot's timeline. Shows the activity
@@ -48,7 +49,7 @@ class ActivityListItem extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  formatActivityDate(activity.occurredAt),
+                  formatLocalDate(activity.occurredAt),
                   style: const TextStyle(
                     color: AppColors.grey,
                     fontSize: 14,
@@ -84,13 +85,3 @@ IconData _iconFor(ActivityType type) => switch (type) {
       ActivityType.harvest => Icons.agriculture_outlined,
       ActivityType.other => Icons.event_note_outlined,
     };
-
-/// `dd/mm/yyyy` in the local time zone — the format Colombian farmers expect.
-/// Kept here (rather than a date package) to avoid a new dependency this
-/// sprint.
-String formatActivityDate(DateTime date) {
-  final local = date.toLocal();
-  final d = local.day.toString().padLeft(2, '0');
-  final m = local.month.toString().padLeft(2, '0');
-  return '$d/$m/${local.year}';
-}

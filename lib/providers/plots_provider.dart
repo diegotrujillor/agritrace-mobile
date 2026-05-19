@@ -68,6 +68,11 @@ class PlotsNotifier extends FamilyAsyncNotifier<List<Plot>, String> {
         );
     await _refresh();
   }
+
+  Future<void> deletePlot(String id) async {
+    await ref.read(plotServiceProvider).delete(id);
+    await _refresh();
+  }
 }
 
 final plotsProvider =

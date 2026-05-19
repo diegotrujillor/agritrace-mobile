@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../models/activity.dart';
 import '../../providers/activities_provider.dart';
 import '../../utils/constants.dart';
+import '../../utils/date_format.dart';
 import '../../utils/error_parser.dart';
 import '../../widgets/common/app_button.dart';
+import '../../widgets/common/app_date_field.dart';
 import '../../widgets/common/app_error_banner.dart';
 import '../../widgets/common/app_input.dart';
+import '../../widgets/common/app_labeled_dropdown.dart';
 
 /// Register an activity for [plotId]. Type + occurred-on date are required;
 /// description and a photo URL are optional. Photo upload is a stub this
@@ -38,12 +40,6 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
     _descriptionController.dispose();
     _photoUrlController.dispose();
     super.dispose();
-  }
-
-  String _formatDate(DateTime date) {
-    final d = date.day.toString().padLeft(2, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    return '$d/$m/${date.year}';
   }
 
   Future<void> _pickDate() async {
@@ -91,7 +87,7 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _errorMessage = parseAuthError(error);
+        _errorMessage = parseApiError(error);
       });
     }
   }
@@ -101,16 +97,7 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
     return Scaffold(
       backgroundColor: AppColors.white,
       appBar: AppBar(
-        backgroundColor: AppColors.primaryGreen,
-        elevation: 0,
-        title: Text(
-          'Registrar actividad',
-          style: GoogleFonts.inter(
-            color: AppColors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: const Text('Registrar actividad'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -120,7 +107,7 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _LabeledDropdown<ActivityType>(
+                AppLabeledDropdown<ActivityType>(
                   label: 'Tipo de actividad',
                   value: _type,
                   items: [
@@ -130,9 +117,9 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
                   onChanged: (v) => setState(() => _type = v),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                _DateField(
+                AppDateField(
                   label: 'Fecha de la actividad',
-                  value: _formatDate(_occurredAt),
+                  value: formatLocalDate(_occurredAt),
                   onTap: _pickDate,
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -171,84 +158,3 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
   }
 }
 
-class _DateField extends StatelessWidget {
-  const _DateField({
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
-
-  final String label;
-  final String value;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: AppColors.darkGreen,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: InputDecorator(
-            decoration: const InputDecoration(
-              suffixIcon: Icon(Icons.calendar_today_outlined),
-            ),
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 16, color: AppColors.darkGreen),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LabeledDropdown<T> extends StatelessWidget {
-  const _LabeledDropdown({
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  final String label;
-  final T value;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: AppColors.darkGreen,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        DropdownButtonFormField<T>(
-          initialValue: value,
-          items: items,
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
-        ),
-      ],
-    );
-  }
-}

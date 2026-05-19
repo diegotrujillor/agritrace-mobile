@@ -1,4 +1,5 @@
 import '../models/farm.dart';
+import 'api_envelope.dart';
 import 'api_service.dart';
 
 /// Thin wrapper over [ApiService] for the `/farms` endpoints.
@@ -15,13 +16,13 @@ class FarmService {
   /// `GET /farms` — the authenticated producer's own farms.
   Future<List<Farm>> list() async {
     final response = await _api.client.get('/farms');
-    return _unwrapList(response.data);
+    return unwrapList(response.data, Farm.fromJson);
   }
 
   /// `GET /farms/:id`.
   Future<Farm> get(String id) async {
     final response = await _api.client.get('/farms/$id');
-    return _unwrapOne(response.data);
+    return unwrapOne(response.data, Farm.fromJson);
   }
 
   /// `POST /farms`.
@@ -41,7 +42,7 @@ class FarmService {
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
     });
-    return _unwrapOne(response.data);
+    return unwrapOne(response.data, Farm.fromJson);
   }
 
   /// `PUT /farms/:id`.
@@ -62,35 +63,11 @@ class FarmService {
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
     });
-    return _unwrapOne(response.data);
+    return unwrapOne(response.data, Farm.fromJson);
   }
 
   /// `DELETE /farms/:id`.
   Future<void> delete(String id) async {
     await _api.client.delete('/farms/$id');
-  }
-
-  Farm _unwrapOne(Object? body) {
-    final json = _envelope(body);
-    return Farm.fromJson(json['data'] as Map<String, dynamic>);
-  }
-
-  List<Farm> _unwrapList(Object? body) {
-    final json = _envelope(body);
-    final data = json['data'] as List<dynamic>;
-    return data
-        .map((e) => Farm.fromJson(e as Map<String, dynamic>))
-        .toList(growable: false);
-  }
-
-  Map<String, dynamic> _envelope(Object? body) {
-    if (body is! Map<String, dynamic> ||
-        body['success'] != true ||
-        body['data'] == null) {
-      throw const FormatException(
-        'Invalid API response: missing data envelope',
-      );
-    }
-    return body;
   }
 }

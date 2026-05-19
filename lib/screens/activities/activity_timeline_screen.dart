@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../models/activity.dart';
 import '../../navigation/route_names.dart';
 import '../../providers/activities_provider.dart';
 import '../../providers/plots_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/error_parser.dart';
+import '../../widgets/common/empty_state.dart';
 import '../../widgets/domain/activity_list_item.dart';
 
 /// Full-screen chronological timeline of a plot's activities (newest first).
@@ -25,36 +25,41 @@ class ActivityTimelineScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.lightGreen,
       appBar: AppBar(
-        backgroundColor: AppColors.primaryGreen,
-        elevation: 0,
-        title: Text(
-          plotAsync.valueOrNull?.name ?? 'Actividades',
-          style: GoogleFonts.inter(
-            color: AppColors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: Text(plotAsync.valueOrNull?.name ?? 'Actividades'),
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(activitiesProvider(plotId).future),
         child: activitiesAsync.when(
-          data: (activities) => activities.isEmpty
-              ? ListView(
-                  children: const [
-                    SizedBox(height: AppSpacing.xl),
-                    _NoActivities(),
-                  ],
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  itemCount: activities.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(height: AppSpacing.sm),
-                  itemBuilder: (_, index) => ActivityListItem(
-                    activity: _sorted(activities)[index],
+          data: (activities) {
+            if (activities.isEmpty) {
+              return ListView(
+                children: const [
+                  SizedBox(height: AppSpacing.xl),
+                  EmptyState(
+                    subtitle:
+                        'Este lote aún no tiene actividades registradas',
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xl,
+                      vertical: AppSpacing.lg,
+                    ),
                   ),
-                ),
+                ],
+              );
+            }
+            // Sort once per data emission, not per itemBuilder call (the
+            // builder runs on every frame while scrolling — sorting there
+            // was O(n²)).
+            final sorted = _sorted(activities);
+            return ListView.separated(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              itemCount: sorted.length,
+              separatorBuilder: (_, __) =>
+                  const SizedBox(height: AppSpacing.sm),
+              itemBuilder: (_, index) => ActivityListItem(
+                activity: sorted[index],
+              ),
+            );
+          },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => ListView(
             children: [
@@ -63,7 +68,7 @@ class ActivityTimelineScreen extends ConsumerWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.xl),
                   child: Text(
-                    parseAuthError(e),
+                    parseApiError(e),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppColors.error,
@@ -97,23 +102,3 @@ List<Activity> _sorted(List<Activity> activities) {
   return copy;
 }
 
-class _NoActivities extends StatelessWidget {
-  const _NoActivities();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppSpacing.xl,
-          vertical: AppSpacing.lg,
-        ),
-        child: Text(
-          'Este lote aún no tiene actividades registradas',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.grey, fontSize: 16),
-        ),
-      ),
-    );
-  }
-}

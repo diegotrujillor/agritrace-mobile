@@ -138,7 +138,7 @@ class _AuthInterceptor extends Interceptor {
       }
       // Propagate the refresh failure rather than the original 401 so callers
       // can distinguish "wrong credentials at login" from "auth flow collapsed
-      // during refresh". parseAuthError can then surface the actual cause.
+      // during refresh". parseApiError can then surface the actual cause.
       handler.next(refreshErr is DioException ? refreshErr : err);
     } finally {
       _refreshLock = null;

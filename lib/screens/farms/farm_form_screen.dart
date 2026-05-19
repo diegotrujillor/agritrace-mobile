@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../models/farm.dart';
 import '../../providers/farms_provider.dart';
 import '../../utils/constants.dart';
@@ -10,6 +9,7 @@ import '../../utils/validators.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_error_banner.dart';
 import '../../widgets/common/app_input.dart';
+import '../../widgets/common/app_labeled_dropdown.dart';
 
 /// Create / edit a farm. When [farm] is null this is a create form; otherwise
 /// the fields are pre-filled and submit issues a `PUT`.
@@ -92,7 +92,7 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _errorMessage = parseAuthError(error);
+        _errorMessage = parseApiError(error);
       });
     }
   }
@@ -102,16 +102,7 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
     return Scaffold(
       backgroundColor: AppColors.white,
       appBar: AppBar(
-        backgroundColor: AppColors.primaryGreen,
-        elevation: 0,
-        title: Text(
-          _isEdit ? 'Editar finca' : 'Registrar finca',
-          style: GoogleFonts.inter(
-            color: AppColors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: Text(_isEdit ? 'Editar finca' : 'Registrar finca'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -129,8 +120,13 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                _CropTypeDropdown(
+                AppLabeledDropdown<String>(
+                  label: 'Tipo de cultivo',
                   value: _cropType,
+                  items: [
+                    for (final crop in kCropTypes)
+                      DropdownMenuItem(value: crop, child: Text(crop)),
+                  ],
                   onChanged: (v) => setState(() => _cropType = v),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -171,37 +167,3 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
   }
 }
 
-class _CropTypeDropdown extends StatelessWidget {
-  const _CropTypeDropdown({required this.value, required this.onChanged});
-
-  final String value;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Tipo de cultivo',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: AppColors.darkGreen,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        DropdownButtonFormField<String>(
-          initialValue: value,
-          items: [
-            for (final crop in kCropTypes)
-              DropdownMenuItem(value: crop, child: Text(crop)),
-          ],
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
-        ),
-      ],
-    );
-  }
-}

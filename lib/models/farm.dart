@@ -1,3 +1,5 @@
+import 'model_utils.dart';
+
 /// Immutable farm entity.
 ///
 /// Mirrors the backend `/v1/farms` resource. The API wraps every payload in
@@ -28,10 +30,10 @@ class Farm {
         id: json['id'] as String,
         name: json['name'] as String,
         cropType: json['cropType'] as String,
-        areaHectares: _toDouble(json['areaHectares']) ?? 0,
+        areaHectares: toDoubleOrNull(json['areaHectares']) ?? 0,
         createdAt: DateTime.parse(json['createdAt'] as String),
-        latitude: _toDouble(json['latitude']),
-        longitude: _toDouble(json['longitude']),
+        latitude: toDoubleOrNull(json['latitude']),
+        longitude: toDoubleOrNull(json['longitude']),
         address: json['address'] as String?,
       );
 
@@ -66,14 +68,4 @@ class Farm {
         longitude: longitude ?? this.longitude,
         address: address ?? this.address,
       );
-}
-
-/// Accepts the numeric value whether the API serialises it as a JSON number
-/// or a string (some backends emit decimals as strings). Returns null for
-/// missing/unparseable input rather than throwing.
-double? _toDouble(Object? value) {
-  if (value == null) return null;
-  if (value is num) return value.toDouble();
-  if (value is String) return double.tryParse(value);
-  return null;
 }

@@ -5,7 +5,7 @@ import 'package:dio/dio.dart';
 /// Centralizing this avoids drift between login and register screens and
 /// surfaces the actual failure mode (auth vs. network vs. server) instead
 /// of a single catch-all string.
-String parseAuthError(Object? error) {
+String parseApiError(Object? error) {
   if (error is DioException) {
     final status = error.response?.statusCode;
     if (status == 401) return 'Credenciales incorrectas';

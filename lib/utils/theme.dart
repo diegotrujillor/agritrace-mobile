@@ -12,6 +12,17 @@ ThemeData buildAppTheme() {
       surface: AppColors.white,
     ),
     textTheme: GoogleFonts.interTextTheme(),
+    appBarTheme: AppBarTheme(
+      backgroundColor: AppColors.primaryGreen,
+      foregroundColor: AppColors.white,
+      elevation: 0,
+      titleTextStyle: GoogleFonts.inter(
+        color: AppColors.white,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+      ),
+      iconTheme: const IconThemeData(color: AppColors.white),
+    ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.lightGrey,
