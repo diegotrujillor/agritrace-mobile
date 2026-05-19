@@ -13,6 +13,8 @@ class AuthService {
     required String phone,
     required String email,
     required String password,
+    required bool privacyConsent,
+    String privacyConsentVersion = '1.0',
   }) async {
     // `role` is intentionally NOT sent — the server assigns it based on
     // the endpoint (public /auth/register always yields 'producer').
@@ -22,6 +24,8 @@ class AuthService {
       'phone': phone,
       'email': email,
       'password': password,
+      'privacyConsent': privacyConsent,
+      'privacyConsentVersion': privacyConsentVersion,
     });
     final auth = AuthResponse.fromJson(response.data as Map<String, dynamic>);
     await _storage.saveTokens(

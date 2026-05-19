@@ -94,6 +94,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     required String phone,
     required String email,
     required String password,
+    required bool privacyConsent,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
@@ -102,6 +103,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
             phone: phone,
             email: email,
             password: password,
+            privacyConsent: privacyConsent,
           );
       return AuthAuthenticated(auth.user);
     });
