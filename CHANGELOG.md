@@ -4,6 +4,22 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.2.0] - 2026-05-19 — Sprint 4: alertas + estado de sync
+- **feat:** alertas (clima + recordatorios), indicador de estado de
+  sincronización y entrada de alertas desde el dashboard.
+- Dónde: `lib/models/alert.dart`, `lib/services/alert_service.dart`,
+  `lib/providers/alerts_provider.dart`,
+  `lib/screens/alerts/{alerts_screen,alert_form_screen}.dart`,
+  `lib/widgets/domain/alert_list_item.dart`,
+  `lib/widgets/common/sync_status_badge.dart`,
+  `lib/navigation/{route_names,app_router}.dart`,
+  `lib/screens/farms/dashboard_screen.dart` (acción "Alertas").
+- Lista de alertas con descartar/eliminar + pull-to-refresh; formulario
+  de recordatorio (título/fecha/nota); `SyncStatusBadge` toca para
+  sincronizar y muestra sincronizados/conflictos; consume
+  `/v1/alerts` y `/v1/alerts/weather/check`. 41 tests verdes;
+  `flutter analyze` sin nuevos hallazgos.
+
 ## [1.1.0] - 2026-05-19 — Sprint 3: actividades + sync + PDF
 - **feat:** registro/timeline de actividades, sincronización y reporte
   PDF de trazabilidad (W1c).

@@ -5,6 +5,12 @@ abstract final class Routes {
   static const dashboard = '/dashboard';
   static const farmsNew  = '/farms/new';
 
+  // Alerts (Sprint 4): producer-wide list + reminder form. Static `/new`
+  // is declared before the list route in the router, consistent with the
+  // farms/plots `/new`-before-`:id` ordering.
+  static const alerts    = '/alerts';
+  static const alertNew  = '/alerts/new';
+
   // Parameterised paths registered on the GoRouter. Use the builder helpers
   // below to construct concrete locations rather than string-concatenating
   // at call sites.

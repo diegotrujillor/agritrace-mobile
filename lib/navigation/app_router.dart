@@ -13,6 +13,8 @@ import '../screens/plots/plot_detail_screen.dart';
 import '../screens/plots/plot_form_screen.dart';
 import '../screens/activities/activity_form_screen.dart';
 import '../screens/activities/activity_timeline_screen.dart';
+import '../screens/alerts/alerts_screen.dart';
+import '../screens/alerts/alert_form_screen.dart';
 import 'route_names.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -41,6 +43,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.login,     builder: (_, __) => const LoginScreen()),
       GoRoute(path: Routes.register,  builder: (_, __) => const RegisterScreen()),
       GoRoute(path: Routes.dashboard, builder: (_, __) => const DashboardScreen()),
+      // Static `/alerts/new` before `/alerts` for consistency with the
+      // `/new`-before-`:id` ordering used elsewhere.
+      GoRoute(path: Routes.alertNew, builder: (_, __) => const AlertFormScreen()),
+      GoRoute(path: Routes.alerts,   builder: (_, __) => const AlertsScreen()),
       // Static / more-specific paths are declared before `/farms/:id` so the
       // `:id` segment never captures `new` or the nested plots paths.
       GoRoute(

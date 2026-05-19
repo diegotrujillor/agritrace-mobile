@@ -125,9 +125,11 @@ WatermelonDB sync fields on every model: `_status` (`'created'`|`'updated'`|`'sy
 ## Sprint context
 
 - **Sprint 1 (done):** Auth screens (welcome, login, register), GoRouter, Riverpod auth state, ApiService + token interceptor, StorageService, OfflineIndicator widget, design tokens
-- **Sprint 2 (next):** Farm + plot screens (`/farms/new`, `/plots`), WatermelonDB local schema for farms/plots
-- **Sprint 3:** Activity timeline screen, WatermelonDB sync implementation
-- **Sprint 4:** QR scan/display, push notifications, SMS
+- **Sprint 2 (done):** Farm + plot screens (`/farms/new`, `/plots`)
+- **Sprint 3 (done):** Activity timeline screen, sync service, PDF traceability
+- **Sprint 4 (done):** Alerts (`/alerts`, weather + reminders), sync status
+  badge, alerts entry on dashboard; consumes `/v1/alerts` +
+  `/v1/alerts/weather/check`
 
 New feature screens go in `lib/screens/<domain>/`, providers in `lib/providers/<domain>_provider.dart`, services in `lib/services/<domain>_service.dart`.
 
