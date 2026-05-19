@@ -38,7 +38,7 @@ flutter:
 flutter_launcher_icons:
   image_path: "assets/brand/icon-1024.png"
   android: true
-  ios: true
+  ios: false # Android-only project (no iOS asset catalog); see CLAUDE.md
   remove_alpha_ios: true
   adaptive_icon_background: "#E8F5E9"
   adaptive_icon_foreground: "assets/brand/icon-1024.png"
