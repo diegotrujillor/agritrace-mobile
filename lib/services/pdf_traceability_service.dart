@@ -92,7 +92,7 @@ class PdfTraceabilityService {
           style: pw.TextStyle(
             fontSize: 22,
             fontWeight: pw.FontWeight.bold,
-            color: PdfColor.fromInt(0xFF1B5028),
+            color: const PdfColor.fromInt(0xFF1B5028),
           ),
         ),
         pw.Text(
@@ -111,7 +111,7 @@ class PdfTraceabilityService {
     return pw.Container(
       padding: const pw.EdgeInsets.all(12),
       decoration: pw.BoxDecoration(
-        color: PdfColor.fromInt(0xFFE8F5E9),
+        color: const PdfColor.fromInt(0xFFE8F5E9),
         borderRadius: pw.BorderRadius.circular(6),
       ),
       child: pw.Column(

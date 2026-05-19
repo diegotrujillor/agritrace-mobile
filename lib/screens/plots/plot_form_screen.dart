@@ -194,7 +194,7 @@ class _LabeledDropdown<T> extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         DropdownButtonFormField<T>(
-          value: value,
+          initialValue: value,
           items: items,
           onChanged: (v) {
             if (v != null) onChanged(v);

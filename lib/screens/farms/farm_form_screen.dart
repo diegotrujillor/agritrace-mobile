@@ -192,7 +192,7 @@ class _CropTypeDropdown extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           items: [
             for (final crop in kCropTypes)
               DropdownMenuItem(value: crop, child: Text(crop)),
