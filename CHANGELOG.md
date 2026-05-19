@@ -4,6 +4,18 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-19 — fix: UX inputs auth
+### Fixed
+- **bug (ux):** ícono del ojo en campo Contraseña invertido — con texto
+  oculto mostraba el ojo abierto (parecía visible). Ahora oculto =
+  ojo tachado, visible = ojo abierto (login + registro).
+- **bug (ux):** campo "Nombre completo" no capitalizaba la primera
+  letra de cada palabra. `AppInput` gana parámetro opcional
+  `textCapitalization` (default `none`); registro usa
+  `TextCapitalization.words` solo en ese campo.
+- Dónde: `lib/widgets/common/app_input.dart`,
+  `lib/screens/auth/register_screen.dart`.
+
 ## [Unreleased] - 2026-05-19 — fix: sin red en APK release (login/registro)
 ### Fixed
 - **bug (red):** login y registro mostraban "Sin conexión, verifica tu

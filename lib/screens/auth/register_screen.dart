@@ -96,6 +96,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   controller: _nameController,
                   validator: validateFullName,
                   keyboardType: TextInputType.name,
+                  textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: AppSpacing.md),
