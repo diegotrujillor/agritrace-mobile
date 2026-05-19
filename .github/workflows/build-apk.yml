@@ -59,6 +59,12 @@ jobs:
           flutter build apk --release
           --dart-define=API_BASE_URL=${{ github.event.inputs.api_base_url || 'https://api.agritrace.co/v1' }}
 
+      - name: Verify APK signature (v2/v3)
+        run: |
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          APKSIGNER=$(find "$ANDROID_HOME"/build-tools -name apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+
       - name: Clean up secrets
         if: always()
         run: rm -f android/key.properties android/agritrace-release.keystore
