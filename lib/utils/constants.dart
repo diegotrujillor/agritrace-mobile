@@ -21,3 +21,14 @@ abstract final class AppSpacing {
   static const double lg = 24;
   static const double xl = 32;
 }
+
+/// Crop types offered in the farm/plot forms. Constrained to the MVP pilot
+/// region (Valle del Cauca) primary crops plus an `otro` escape hatch. The
+/// value is sent verbatim to the backend `cropType` field.
+const List<String> kCropTypes = <String>[
+  'cacao',
+  'caña',
+  'hortalizas',
+  'frutas',
+  'otro',
+];

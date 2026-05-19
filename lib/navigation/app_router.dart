@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/farm.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/welcome_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/farms/dashboard_screen.dart';
+import '../screens/farms/farm_detail_screen.dart';
+import '../screens/farms/farm_form_screen.dart';
+import '../screens/plots/plot_detail_screen.dart';
+import '../screens/plots/plot_form_screen.dart';
 import 'route_names.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -34,10 +39,29 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.login,     builder: (_, __) => const LoginScreen()),
       GoRoute(path: Routes.register,  builder: (_, __) => const RegisterScreen()),
       GoRoute(path: Routes.dashboard, builder: (_, __) => const DashboardScreen()),
+      // Static / more-specific paths are declared before `/farms/:id` so the
+      // `:id` segment never captures `new` or the nested plots paths.
       GoRoute(
         path: Routes.farmsNew,
-        builder: (_, __) => const Scaffold(
-          body: Center(child: Text('Sprint 2 — Registrar finca')),
+        // `extra` carries a Farm when navigating in edit mode; null = create.
+        builder: (_, state) => FarmFormScreen(farm: state.extra as Farm?),
+      ),
+      GoRoute(
+        path: Routes.plotNewPath,
+        builder: (_, state) => PlotFormScreen(
+          farmId: state.pathParameters['farmId']!,
+        ),
+      ),
+      GoRoute(
+        path: Routes.plotDetailPath,
+        builder: (_, state) => PlotDetailScreen(
+          plotId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: Routes.farmDetailPath,
+        builder: (_, state) => FarmDetailScreen(
+          farmId: state.pathParameters['id']!,
         ),
       ),
     ],

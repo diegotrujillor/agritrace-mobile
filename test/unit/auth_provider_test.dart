@@ -131,6 +131,7 @@ void main() {
               phone: any(named: 'phone'),
               email: any(named: 'email'),
               password: any(named: 'password'),
+              privacyConsent: any(named: 'privacyConsent'),
             ))
         .thenAnswer((_) async => _testAuth);
 
@@ -143,6 +144,7 @@ void main() {
           phone: '+57 300 000 0000',
           email: 'test@test.com',
           password: 'password123',
+          privacyConsent: true,
         );
 
     expect(container.read(authProvider).value, isA<AuthAuthenticated>());

@@ -41,3 +41,25 @@ String? validatePhone(String? value) {
   if (!phoneRegex.hasMatch(trimmed)) return 'Ingresa un teléfono válido';
   return null;
 }
+
+/// Generic non-empty text validator for short free-text fields (farm name,
+/// plot name). Server is authoritative; this is a UX-only filter.
+String? validateRequiredText(String? value) {
+  if (value == null || value.trim().isEmpty) return 'Este campo es requerido';
+  final trimmed = value.trim();
+  if (trimmed.length < 2) return 'Debe tener al menos 2 caracteres';
+  if (trimmed.length > 120) return 'Es demasiado largo';
+  return null;
+}
+
+/// Area in hectares: required, parseable, and positive. Capped generously at
+/// 100 000 ha to reject obvious typos (extra zeros) while not constraining
+/// legitimate input; the server enforces the authoritative business bounds.
+String? validateArea(String? value) {
+  if (value == null || value.trim().isEmpty) return 'El área es requerida';
+  final parsed = double.tryParse(value.trim().replaceAll(',', '.'));
+  if (parsed == null) return 'Ingresa un número válido';
+  if (parsed <= 0) return 'El área debe ser mayor a 0';
+  if (parsed > 100000) return 'El área es demasiado grande';
+  return null;
+}
