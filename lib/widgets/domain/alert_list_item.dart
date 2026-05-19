@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/alert.dart';
 import '../../utils/constants.dart';
+import '../../utils/date_format.dart';
 import '../common/app_card.dart';
 
 /// List tile for a single [Alert]. Severity drives the accent colour;
-/// pending alerts expose dismiss/delete actions. Reuses
-/// `formatActivityDate`-style local date formatting kept inline to avoid a
-/// date package dependency.
+/// pending alerts expose dismiss/delete actions.
 class AlertListItem extends StatelessWidget {
   const AlertListItem({
     super.key,
@@ -58,7 +57,7 @@ class AlertListItem extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  '${alert.type.label} · ${_formatDate(when)}',
+                  '${alert.type.label} · ${formatLocalDate(when)}',
                   style: const TextStyle(
                     color: AppColors.grey,
                     fontSize: 13,
@@ -108,12 +107,3 @@ IconData _iconFor(AlertType type) => switch (type) {
       AlertType.weather => Icons.cloud_outlined,
       AlertType.reminder => Icons.notifications_active_outlined,
     };
-
-/// `dd/mm/yyyy` in the local time zone — the format Colombian farmers
-/// expect. Inline (no date package) for parity with `activity_list_item`.
-String _formatDate(DateTime date) {
-  final local = date.toLocal();
-  final d = local.day.toString().padLeft(2, '0');
-  final m = local.month.toString().padLeft(2, '0');
-  return '$d/$m/${local.year}';
-}

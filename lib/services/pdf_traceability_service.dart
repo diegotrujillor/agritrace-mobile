@@ -6,6 +6,7 @@ import 'package:printing/printing.dart';
 import '../models/activity.dart';
 import '../models/farm.dart';
 import '../models/plot.dart';
+import '../utils/date_format.dart';
 
 /// Client-side traceability PDF (W1c).
 ///
@@ -171,7 +172,7 @@ class PdfTraceabilityService {
       data: [
         for (final a in activities)
           [
-            _formatDate(a.occurredAt),
+            formatLocalDate(a.occurredAt),
             a.type.label,
             (a.description == null || a.description!.isEmpty)
                 ? '—'
@@ -179,12 +180,5 @@ class PdfTraceabilityService {
           ],
       ],
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final local = date.toLocal();
-    final d = local.day.toString().padLeft(2, '0');
-    final m = local.month.toString().padLeft(2, '0');
-    return '$d/$m/${local.year}';
   }
 }

@@ -1,3 +1,5 @@
+import 'model_utils.dart';
+
 /// Lifecycle status of a plot. Matches the backend `status` enum exactly:
 /// `planning` | `growing` | `ready` | `harvested`.
 enum PlotStatus {
@@ -53,7 +55,7 @@ class Plot {
         status: PlotStatus.fromName(json['status']),
         createdAt: DateTime.parse(json['createdAt'] as String),
         variety: json['variety'] as String?,
-        areaHectares: _toDouble(json['areaHectares']),
+        areaHectares: toDoubleOrNull(json['areaHectares']),
       );
 
   Map<String, dynamic> toJson() => {
@@ -87,11 +89,4 @@ class Plot {
         variety: variety ?? this.variety,
         areaHectares: areaHectares ?? this.areaHectares,
       );
-}
-
-double? _toDouble(Object? value) {
-  if (value == null) return null;
-  if (value is num) return value.toDouble();
-  if (value is String) return double.tryParse(value);
-  return null;
 }

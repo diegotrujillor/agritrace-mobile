@@ -63,7 +63,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final authState    = ref.watch(authProvider);
     final isLoading    = authState.isLoading;
     final errorMessage =
-        authState.hasError ? parseAuthError(authState.error) : null;
+        authState.hasError ? parseApiError(authState.error) : null;
 
     return Scaffold(
       backgroundColor: AppColors.white,

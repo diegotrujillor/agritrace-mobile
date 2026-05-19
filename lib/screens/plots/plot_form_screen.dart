@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../models/plot.dart';
 import '../../providers/plots_provider.dart';
 import '../../utils/constants.dart';
@@ -10,6 +9,7 @@ import '../../utils/validators.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_error_banner.dart';
 import '../../widgets/common/app_input.dart';
+import '../../widgets/common/app_labeled_dropdown.dart';
 
 /// Create a plot under [farmId]. Area is optional for plots (a farmer may
 /// register a lot before measuring it).
@@ -72,7 +72,7 @@ class _PlotFormScreenState extends ConsumerState<PlotFormScreen> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _errorMessage = parseAuthError(error);
+        _errorMessage = parseApiError(error);
       });
     }
   }
@@ -82,16 +82,7 @@ class _PlotFormScreenState extends ConsumerState<PlotFormScreen> {
     return Scaffold(
       backgroundColor: AppColors.white,
       appBar: AppBar(
-        backgroundColor: AppColors.primaryGreen,
-        elevation: 0,
-        title: Text(
-          'Agregar lote',
-          style: GoogleFonts.inter(
-            color: AppColors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: const Text('Agregar lote'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -109,7 +100,7 @@ class _PlotFormScreenState extends ConsumerState<PlotFormScreen> {
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                _LabeledDropdown<String>(
+                AppLabeledDropdown<String>(
                   label: 'Tipo de cultivo',
                   value: _cropType,
                   items: [
@@ -138,7 +129,7 @@ class _PlotFormScreenState extends ConsumerState<PlotFormScreen> {
                   onFieldSubmitted: (_) => _submit(),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                _LabeledDropdown<PlotStatus>(
+                AppLabeledDropdown<PlotStatus>(
                   label: 'Estado',
                   value: _status,
                   items: [
@@ -166,41 +157,3 @@ class _PlotFormScreenState extends ConsumerState<PlotFormScreen> {
   }
 }
 
-class _LabeledDropdown<T> extends StatelessWidget {
-  const _LabeledDropdown({
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  final String label;
-  final T value;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: AppColors.darkGreen,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        DropdownButtonFormField<T>(
-          initialValue: value,
-          items: items,
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
-        ),
-      ],
-    );
-  }
-}

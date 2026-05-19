@@ -1,4 +1,5 @@
 import '../models/activity.dart';
+import 'api_envelope.dart';
 import 'api_service.dart';
 
 /// Thin wrapper over [ApiService] for the `/activities` endpoints.
@@ -17,13 +18,13 @@ class ActivityService {
   /// `GET /plots/:plotId/activities` — activities recorded on a plot.
   Future<List<Activity>> listByPlot(String plotId) async {
     final response = await _api.client.get('/plots/$plotId/activities');
-    return _unwrapList(response.data);
+    return unwrapList(response.data, Activity.fromJson);
   }
 
   /// `GET /activities/:id`.
   Future<Activity> get(String id) async {
     final response = await _api.client.get('/activities/$id');
-    return _unwrapOne(response.data);
+    return unwrapOne(response.data, Activity.fromJson);
   }
 
   /// `POST /activities`.
@@ -42,7 +43,7 @@ class ActivityService {
         'description': description,
       if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
     });
-    return _unwrapOne(response.data);
+    return unwrapOne(response.data, Activity.fromJson);
   }
 
   /// `PUT /activities/:id`.
@@ -62,35 +63,11 @@ class ActivityService {
         'description': description,
       if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
     });
-    return _unwrapOne(response.data);
+    return unwrapOne(response.data, Activity.fromJson);
   }
 
   /// `DELETE /activities/:id`.
   Future<void> delete(String id) async {
     await _api.client.delete('/activities/$id');
-  }
-
-  Activity _unwrapOne(Object? body) {
-    final json = _envelope(body);
-    return Activity.fromJson(json['data'] as Map<String, dynamic>);
-  }
-
-  List<Activity> _unwrapList(Object? body) {
-    final json = _envelope(body);
-    final data = json['data'] as List<dynamic>;
-    return data
-        .map((e) => Activity.fromJson(e as Map<String, dynamic>))
-        .toList(growable: false);
-  }
-
-  Map<String, dynamic> _envelope(Object? body) {
-    if (body is! Map<String, dynamic> ||
-        body['success'] != true ||
-        body['data'] == null) {
-      throw const FormatException(
-        'Invalid API response: missing data envelope',
-      );
-    }
-    return body;
   }
 }

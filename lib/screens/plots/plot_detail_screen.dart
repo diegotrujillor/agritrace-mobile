@@ -13,6 +13,9 @@ import '../../services/pdf_traceability_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/error_parser.dart';
 import '../../widgets/common/app_card.dart';
+import '../../widgets/common/empty_state.dart';
+import '../../widgets/common/info_row.dart';
+import '../../widgets/common/inline_error.dart';
 import '../../widgets/domain/activity_list_item.dart';
 
 /// Plot summary + its activity timeline. Offers registering a new activity
@@ -30,16 +33,7 @@ class PlotDetailScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.lightGreen,
       appBar: AppBar(
-        backgroundColor: AppColors.primaryGreen,
-        elevation: 0,
-        title: Text(
-          plotAsync.valueOrNull?.name ?? 'Lote',
-          style: GoogleFonts.inter(
-            color: AppColors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: Text(plotAsync.valueOrNull?.name ?? 'Lote'),
       ),
       body: plotAsync.when(
         data: (plot) => RefreshIndicator(
@@ -61,21 +55,32 @@ class PlotDetailScreen extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               activitiesAsync.when(
-                data: (activities) => activities.isEmpty
-                    ? const _NoActivities()
-                    : Column(
-                        children: [
-                          for (final activity in _sorted(activities)) ...[
-                            ActivityListItem(activity: activity),
-                            const SizedBox(height: AppSpacing.sm),
-                          ],
-                        ],
-                      ),
+                data: (activities) {
+                  if (activities.isEmpty) {
+                    return const EmptyState(
+                      subtitle:
+                          'Este lote aún no tiene actividades registradas',
+                      padding:
+                          EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                    );
+                  }
+                  // Sort once per data emission (mirrors the timeline
+                  // screen's corrected pattern).
+                  final sorted = _sorted(activities);
+                  return Column(
+                    children: [
+                      for (final activity in sorted) ...[
+                        ActivityListItem(activity: activity),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                    ],
+                  );
+                },
                 loading: () => const Padding(
                   padding: EdgeInsets.all(AppSpacing.lg),
                   child: Center(child: CircularProgressIndicator()),
                 ),
-                error: (e, _) => _InlineError(message: parseAuthError(e)),
+                error: (e, _) => InlineError(message: parseApiError(e)),
               ),
             ],
           ),
@@ -85,7 +90,7 @@ class PlotDetailScreen extends ConsumerWidget {
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.xl),
             child: Text(
-              parseAuthError(e),
+              parseApiError(e),
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.error, fontSize: 16),
             ),
@@ -148,7 +153,7 @@ class _ExportPdfButtonState extends ConsumerState<_ExportPdfButton> {
       );
     } catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text(parseAuthError(error))),
+        SnackBar(content: Text(parseApiError(error))),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -202,88 +207,15 @@ class _PlotSummary extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          _InfoRow(label: 'Cultivo', value: plot.cropType),
+          InfoRow(label: 'Cultivo', value: plot.cropType),
           if (plot.variety != null && plot.variety!.isNotEmpty)
-            _InfoRow(label: 'Variedad', value: plot.variety!),
+            InfoRow(label: 'Variedad', value: plot.variety!),
           if (plot.areaHectares != null)
-            _InfoRow(label: 'Área', value: '${plot.areaHectares} ha'),
-          _InfoRow(label: 'Estado', value: plot.status.label),
+            InfoRow(label: 'Área', value: '${plot.areaHectares} ha'),
+          InfoRow(label: 'Estado', value: plot.status.label),
         ],
       ),
     );
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.xs),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 90,
-            child: Text(
-              label,
-              style: const TextStyle(color: AppColors.grey, fontSize: 14),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.darkGreen,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NoActivities extends StatelessWidget {
-  const _NoActivities();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
-      child: Center(
-        child: Text(
-          'Este lote aún no tiene actividades registradas',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.grey, fontSize: 16),
-        ),
-      ),
-    );
-  }
-}
-
-class _InlineError extends StatelessWidget {
-  const _InlineError({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-      child: Center(
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.error, fontSize: 16),
-        ),
-      ),
-    );
-  }
-}

@@ -104,15 +104,26 @@ class Alert {
         scheduledFor: _parseNullableDate(json['scheduledFor']),
       );
 
-  Alert copyWith({AlertStatus? status}) => Alert(
-        id: id,
-        type: type,
-        severity: severity,
-        title: title,
+  Alert copyWith({
+    String? id,
+    AlertType? type,
+    AlertSeverity? severity,
+    String? title,
+    AlertStatus? status,
+    DateTime? createdAt,
+    String? plotId,
+    String? body,
+    DateTime? scheduledFor,
+  }) =>
+      Alert(
+        id: id ?? this.id,
+        type: type ?? this.type,
+        severity: severity ?? this.severity,
+        title: title ?? this.title,
         status: status ?? this.status,
-        createdAt: createdAt,
-        plotId: plotId,
-        body: body,
-        scheduledFor: scheduledFor,
+        createdAt: createdAt ?? this.createdAt,
+        plotId: plotId ?? this.plotId,
+        body: body ?? this.body,
+        scheduledFor: scheduledFor ?? this.scheduledFor,
       );
 }
