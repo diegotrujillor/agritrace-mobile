@@ -64,6 +64,16 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
   `CHANGELOG.md` al final de cada implementación.
 - Dónde: `CLAUDE.md` (secciones "Development guidelines (MANDATORY)" y
   "Codification workflow (MANDATORY)").
+- **chore (release):** firma release + AAB para Google Play.
+  `versionCode`/`versionName` overridables por CI
+  (`-PversionCode`/`VERSION_CODE`); `-PreleaseSigningRequired=true` falla
+  el build si falta `key.properties` (evita AAB firmado en debug).
+- **ci:** workflow `release-play.yml` — build AAB firmado + subida a
+  Google Play (track `internal` por defecto) vía
+  `r0adkll/upload-google-play`; `versionCode = github.run_number`.
+- Dónde: `android/app/build.gradle.kts`, `android/key.properties.example`,
+  `.github/workflows/release-play.yml`. Requiere secrets
+  `PLAY_SERVICE_ACCOUNT_JSON` + keystore (`KEYSTORE_BASE64`, etc.).
 
 ## [1.2.0] - 2026-05-19 — Sprint 4: alertas + estado de sync
 - **feat:** alertas (clima + recordatorios), indicador de estado de
