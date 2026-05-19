@@ -22,7 +22,7 @@ void main() {
     when(() => mockStorage.getAccessToken()).thenAnswer((_) async => null);
   });
 
-  List<Override> get _overrides => [
+  List<Override> _overrides() => [
         authServiceProvider.overrideWithValue(mockAuth),
         storageServiceProvider.overrideWithValue(mockStorage),
       ];
@@ -37,7 +37,7 @@ void main() {
       );
 
   Widget _wrap() => ProviderScope(
-        overrides: _overrides,
+        overrides: _overrides(),
         child: MaterialApp.router(routerConfig: _router()),
       );
 
