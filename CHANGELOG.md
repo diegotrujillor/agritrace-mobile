@@ -4,6 +4,32 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-20 — feat(cu-01-readiness): error_parser 409/429 + widget tests para Registro
+
+### Fixed
+- **fix (ux):** `parseApiError` mapea explícitamente `409 → "Ese email ya
+  está registrado"` (único endpoint con 409 hoy: `POST /v1/auth/register`)
+  y `429 → "Muchos intentos, intenta de nuevo en unos minutos"` (rate
+  limiter de auth + general). Antes ambos caían al fallback genérico
+  ("Ocurrió un error, intenta de nuevo"), ocultando la causa real al
+  productor en CU-01 Flujo A y Flujo D. Dónde:
+  `lib/utils/error_parser.dart`.
+
+### Tests
+- **test (cu-01):** `test/widget/cu_01_register_test.dart` (nuevo) —
+  10 widget tests que cubren el Escenario principal + los 5 flujos
+  alternos (A email-duplicado / B password-débil / C sin-consentimiento
+  / D rate-limit / E sin-conexión) de
+  [`CU-01-registro-productor.md`](../agritrace-docs/01-preparacion-mvp/03-mapeo-funcional/casos-de-uso/CU-01-registro-productor.md).
+  Mockea `authServiceProvider` vía Riverpod override; el happy-path
+  captura los named args y verifica que el payload incluye
+  `privacyConsent: true` + `privacyConsentVersion: "1.0"` y **nunca**
+  `role` (el rol lo asigna el servidor — defensa contra authz bypass).
+- **test (unit):** `test/unit/error_parser_test.dart` — +2 branches
+  (409 + 429). `error_parser.dart` mantiene 100 % de cobertura (8/8).
+- **coverage:** global pasa de **84.6 %** a **85.6 %** (699/817).
+  Cumple Criterio Técnico `09-scope-mvp.md §6` (≥80 %).
+
 ## [Unreleased] - 2026-05-20 — test: cobertura global a 84.6 % (meta ≥80 %)
 - **test:** +70 tests nuevos (184 total). Cobertura global pasa de
   65.0 % a **84.6 %** (633/748 líneas) — cumple el Criterio Técnico

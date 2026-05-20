@@ -22,6 +22,28 @@ void main() {
       expect(parseApiError(_httpError(401)), 'Credenciales incorrectas');
     });
 
+    test('returns email-duplicado message on 409 (register conflict)', () {
+      // Arrange
+      final err = _httpError(409);
+
+      // Act
+      final message = parseApiError(err);
+
+      // Assert
+      expect(message, 'Ese email ya está registrado');
+    });
+
+    test('returns rate-limit message on 429', () {
+      // Arrange
+      final err = _httpError(429);
+
+      // Act
+      final message = parseApiError(err);
+
+      // Assert
+      expect(message, 'Muchos intentos, intenta de nuevo en unos minutos');
+    });
+
     test('returns server-error message on 500', () {
       expect(parseApiError(_httpError(500)),
           'Error del servidor, intenta más tarde');
