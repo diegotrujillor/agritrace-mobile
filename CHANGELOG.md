@@ -4,6 +4,12 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-20 — feat(weather): trigger manual de chequeo de clima (CU-19)
+- **feat:** acción "Actualizar clima" en AppBar de `alerts_screen`. Llama `POST /v1/alerts/weather/check` (provider `WEATHER_PROVIDER=stub` en prod) y refresca la lista de alertas con el resultado.
+- **UX:** spinner inline durante la llamada + snackbar con resumen ("N alertas nuevas") o mensaje de error.
+- 207 tests verdes (3 widget tests nuevos: happy + error + per-plot call). `flutter analyze` limpio.
+- **pendiente:** cron backend / wiring de `WEATHER_PROVIDER=openweathermap` real → decisión post-pilot.
+
 ## [Unreleased] - 2026-05-20 — feat(activities): editar + eliminar actividad (CU-16 + CU-17)
 - **feat:** pantalla `activity_edit_screen` con prefill, ruta `/activities/:id/edit`, entrada vía long-press en el timeline (bottom sheet "Editar / Eliminar"). Cierra CU-16.
 - **feat:** acción "Eliminar" con `AlertDialog` de confirmación + refresh inmediato del timeline. Cierra CU-17.
