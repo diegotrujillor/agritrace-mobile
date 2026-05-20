@@ -99,7 +99,8 @@ class PlotDetailScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.primaryGreen,
-        onPressed: () => context.go(Routes.activityNew(plotId)),
+        // push so the activity form can `context.pop()` back to this detail.
+        onPressed: () => context.push(Routes.activityNew(plotId)),
         icon: const Icon(Icons.add, color: AppColors.white),
         label: const Text(
           'Registrar actividad',

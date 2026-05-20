@@ -4,6 +4,24 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-20 — fix(crud): P1 navegación post-create silent error
+- **fix (P1, bloqueador Sprint 5):** los FAB "+" (registrar finca / lote /
+  actividad / alerta) usaban `context.go(...)` (REPLACE en go_router 14)
+  para abrir el form, dejando la pila vacía. El form, tras un POST 201,
+  llamaba `context.pop()` para volver a la lista → go_router lanzaba
+  `GoError('There is nothing to pop')` que el catch del form rendía como
+  el banner genérico `"Ocurrió un error, intenta de nuevo"` — mientras
+  la fila SÍ se había creado en el backend (3 taps = 3 filas duplicadas).
+- **fix:** 6 sitios de navegación cambiados de `context.go` a `context.push`:
+  - `dashboard_screen.dart` FAB "Registrar finca"
+  - `farm_detail_screen.dart` FAB "Agregar lote" + AppBar "Editar finca"
+  - `plot_detail_screen.dart` FAB "Registrar actividad"
+  - `activity_timeline_screen.dart` FAB "Registrar actividad"
+  - `alerts_screen.dart` FAB "Recordatorio"
+- **test:** `test/widget/form_nav_regression_test.dart` ancla el patrón
+  push-then-pop para los 4 chains (farms / plots / activities / alerts).
+  200 tests verdes, `flutter analyze` clean.
+
 ## [Unreleased] - 2026-05-20 — feat(cu-01-readiness): error_parser 409/429 + widget tests para Registro
 
 ### Fixed

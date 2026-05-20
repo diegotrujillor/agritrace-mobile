@@ -63,7 +63,10 @@ class DashboardScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.primaryGreen,
         tooltip: 'Registrar finca',
-        onPressed: () => context.go(Routes.farmsNew),
+        // push (not go) so the form can `context.pop()` back to dashboard.
+        // `go` replaces the stack, leaving nothing to pop and surfacing as
+        // a silent GoError after a successful create.
+        onPressed: () => context.push(Routes.farmsNew),
         child: const Icon(Icons.add, color: AppColors.white),
       ),
     );

@@ -34,7 +34,10 @@ class FarmDetailScreen extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.edit_outlined, color: AppColors.white),
               tooltip: 'Editar finca',
-              onPressed: () => context.go(
+              // push (not go) so the edit form can `context.pop()` back to
+              // this detail screen; `go` replaces the stack and would surface
+              // a silent GoError after a successful update.
+              onPressed: () => context.push(
                 Routes.farmsNew,
                 extra: farmAsync.value,
               ),
@@ -89,7 +92,8 @@ class FarmDetailScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.primaryGreen,
-        onPressed: () => context.go(Routes.plotNew(farmId)),
+        // push so the plot form can `context.pop()` back to this detail.
+        onPressed: () => context.push(Routes.plotNew(farmId)),
         icon: const Icon(Icons.add, color: AppColors.white),
         label: const Text(
           'Agregar lote',

@@ -108,7 +108,8 @@ class AlertsScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.primaryGreen,
-        onPressed: () => context.go(Routes.alertNew),
+        // push so the alert form can `context.pop()` back to this list.
+        onPressed: () => context.push(Routes.alertNew),
         icon: const Icon(Icons.add, color: AppColors.white),
         label: Text(
           'Recordatorio',
