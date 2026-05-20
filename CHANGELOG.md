@@ -4,6 +4,17 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-19 — chore: intake del piloto (Sprint 5)
+- **chore (intake):** plantillas de GitHub Issues para el field test:
+  `field-test-bug.yml` (versión, dispositivo, conectividad, pasos,
+  esperado vs real, captura) y `field-test-feedback.yml`
+  (frecuencia de uso, fácil/difícil, qué falta, ¿recomendarías?).
+- **chore:** `.github/ISSUE_TEMPLATE/config.yml` desactiva issues en
+  blanco y deja un único contacto fuera de GitHub
+  (`mailto:diegotrujillor@gmail.com`) para dudas no-bug.
+- Etiquetas auto-aplicadas: `sprint-5`, `field-test`, + `bug`/
+  `feedback` según corresponda — filtran el board del piloto.
+
 ## [Unreleased] - 2026-05-19 — chore: Play Console setup (assets + runbook)
 - **chore (assets):** generados a partir del logo oficial y guardados
   en `assets/brand/play/`:
