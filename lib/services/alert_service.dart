@@ -42,7 +42,9 @@ class AlertService {
     final response = await _api.client.post('/alerts', data: {
       'type': AlertType.reminder.wire,
       'title': title,
-      'scheduledFor': scheduledFor.toIso8601String(),
+      // .toUtc() so the ISO string carries the 'Z' suffix the backend
+      // Zod `.datetime()` validator requires.
+      'scheduledFor': scheduledFor.toUtc().toIso8601String(),
       if (body != null && body.isNotEmpty) 'body': body,
       if (plotId != null && plotId.isNotEmpty) 'plotId': plotId,
     });

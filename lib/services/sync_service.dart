@@ -79,7 +79,9 @@ class SyncService {
     final pullResponse = await _api.client.get(
       '/sync/changes',
       queryParameters: {
-        if (since != null) 'since': since.toIso8601String(),
+        // .toUtc() so the ISO string carries the 'Z' suffix the backend
+        // expects for the `since` filter.
+        if (since != null) 'since': since.toUtc().toIso8601String(),
       },
     );
     final pull = _pullEnvelope(pullResponse.data);

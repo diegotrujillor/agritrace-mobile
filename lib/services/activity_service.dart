@@ -43,7 +43,9 @@ class ActivityService {
     final response = await _api.client.post('/activities', data: {
       'plotId': plotId,
       'type': type.wire,
-      'occurredAt': occurredAt.toIso8601String(),
+      // .toUtc() so the ISO string carries the 'Z' suffix the backend
+      // Zod `.datetime()` validator requires.
+      'occurredAt': occurredAt.toUtc().toIso8601String(),
       if (description != null && description.isNotEmpty)
         'description': description,
       if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
@@ -63,7 +65,9 @@ class ActivityService {
     final response = await _api.client.put('/activities/$id', data: {
       'plotId': plotId,
       'type': type.wire,
-      'occurredAt': occurredAt.toIso8601String(),
+      // .toUtc() so the ISO string carries the 'Z' suffix the backend
+      // Zod `.datetime()` validator requires.
+      'occurredAt': occurredAt.toUtc().toIso8601String(),
       if (description != null && description.isNotEmpty)
         'description': description,
       if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,

@@ -4,6 +4,19 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-20 — fix(iso utc): P1 datetimes sin Z fallaban Zod 400
+- **fix (P1):** `activity_service.dart` (`occurredAt` create/update),
+  `alert_service.dart` (`scheduledFor` createReminder) y
+  `sync_service.dart` (`since` query de `/sync/changes`) enviaban
+  `DateTime.now().toIso8601String()` que devuelve local-time **sin sufijo `Z`**.
+  Backend Zod `.datetime()` rechaza con 400 — "occurredAt must be an
+  ISO 8601 datetime". Resultado: CU-14 (Registrar actividad), CU-18
+  (Crear recordatorio) y CU-23 (sync pull) producían el banner
+  genérico "Ocurrió un error".
+- **fix:** todos los `.toIso8601String()` antes del envío al backend
+  ahora son `.toUtc().toIso8601String()` (sufijo `Z` garantizado).
+- 200 tests verdes, `flutter analyze` clean.
+
 ## [Unreleased] - 2026-05-20 — fix(api urls): P1 listar lotes/actividades 404
 - **fix (P1):** `PlotService.listByFarm` y `ActivityService.listByPlot`
   usaban paths sin el prefijo de su router. Backend monta `plots` en
