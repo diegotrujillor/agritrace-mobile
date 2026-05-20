@@ -51,6 +51,33 @@ class AuthService {
     return auth;
   }
 
+  /// Probes the backend with the stored refresh token. Returns the renewed
+  /// [AuthResponse] on success and persists the rotated tokens. Used by
+  /// [AuthNotifier.build] on cold start as an ACTIVE session probe — the
+  /// previous client-only `exp` heuristic could not detect server-side
+  /// rotation/revocation of the JWT secret or device clock skew, leading
+  /// to "zombie" sessions that crashed at the first API call.
+  ///
+  /// Throws `StateError` when no refresh token is stored. Propagates the
+  /// underlying [DioException] on network/HTTP failure so callers can
+  /// distinguish a real refresh failure from a missing-token state.
+  Future<AuthResponse> refresh() async {
+    final refreshToken = await _storage.getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      throw StateError('no refresh token in storage');
+    }
+    final response = await _api.client.post(
+      '/auth/refresh',
+      data: {'refreshToken': refreshToken},
+    );
+    final auth = AuthResponse.fromJson(response.data as Map<String, dynamic>);
+    await _storage.saveTokens(
+      accessToken: auth.accessToken,
+      refreshToken: auth.refreshToken,
+    );
+    return auth;
+  }
+
   Future<void> logout() async {
     final refreshToken = await _storage.getRefreshToken();
     // Skip the network call entirely when there is nothing to revoke

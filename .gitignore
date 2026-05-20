@@ -60,3 +60,6 @@ android/agritrace-release.keystore
 macos/
 web/
 .metadata
+
+# Local agent worktrees (Claude Code isolation mode)
+.claude/

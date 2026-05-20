@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -34,8 +33,20 @@ final storageServiceProvider = Provider<StorageService>((ref) {
   );
 });
 
+/// Wires [ApiService] with an `onLogout` callback so the interceptor can
+/// flip the auth state to [AuthUnauthenticated] when it detects an
+/// unrecoverable refresh failure (i.e. the session has collapsed and the
+/// router needs to bounce the user back to `/login`).
 final apiServiceProvider = Provider<ApiService>(
-  (ref) => ApiService(ref.read(storageServiceProvider)),
+  (ref) => ApiService(
+    ref.read(storageServiceProvider),
+    onLogout: () {
+      // The notifier may not have been built yet during very early cold-start
+      // refresh failures; reading the notifier is safe — it will be created
+      // lazily, and the state assignment is a no-op until the first read.
+      ref.read(authProvider.notifier).markUnauthenticated();
+    },
+  ),
 );
 
 final authServiceProvider = Provider<AuthService>(
@@ -62,21 +73,49 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   @override
   Future<AuthState> build() async {
     final storage = ref.read(storageServiceProvider);
-    final token = await storage.getAccessToken();
-    if (token == null) return const AuthUnauthenticated();
+    final accessToken = await storage.getAccessToken();
+    if (accessToken == null) return const AuthUnauthenticated();
+    final refreshToken = await storage.getRefreshToken();
+    if (refreshToken == null) return const AuthUnauthenticated();
 
-    // Client-side JWT shape + expiry check. Heuristic to avoid treating an
-    // expired or malformed token as a valid session on cold start. The
-    // authoritative validation is server-side; Sprint 2 replaces this with
-    // `GET /auth/me`.
-    if (!_isJwtStillValid(token)) {
+    // Active cold-start probe: hit `/auth/refresh` with the stored refresh
+    // token. This is the lightest authenticated endpoint that proves both
+    // (a) the refresh token is still alive server-side and (b) the JWT
+    // secret has not been rotated. The previous client-only `exp` check
+    // could not detect either condition, so a user could land on the
+    // dashboard with a session the server would reject on the first
+    // domain call — surfacing as "Credenciales incorrectas" banners.
+    //
+    // Backend has no `/auth/me` (see agritrace-backend/src/api/auth/auth.routes.ts);
+    // `refresh()` is the closest equivalent and is rate-limited (`authLimiter`).
+    try {
+      final auth = await ref.read(authServiceProvider).refresh();
+      return AuthAuthenticated(auth.user);
+    } on DioException catch (e) {
+      // 401/403 → refresh token rejected → unrecoverable. Any other status
+      // (5xx, network) → assume transient and treat as unauthenticated for
+      // this cold start; the user can retry. Either way: do not crash.
+      final status = e.response?.statusCode;
+      if (status == 401 || status == 403) {
+        await storage.deleteTokens();
+      }
+      return const AuthUnauthenticated();
+    } on StateError {
+      // refresh() guards on a missing token — should not happen here because
+      // we already null-checked above, but treat defensively.
+      return const AuthUnauthenticated();
+    } catch (_) {
+      // Malformed envelope, etc. Fail closed.
       await storage.deleteTokens();
       return const AuthUnauthenticated();
     }
+  }
 
-    return const AuthAuthenticated(
-      User(id: '', email: '', fullName: '', phone: '', role: UserRole.producer),
-    );
+  /// Flips the state to [AuthUnauthenticated] without going through
+  /// [logout()] — used by the [ApiService] `onLogout` callback when the
+  /// refresh interceptor detects an unrecoverable session collapse.
+  void markUnauthenticated() {
+    state = const AsyncData(AuthUnauthenticated());
   }
 
   Future<void> login({required String email, required String password}) async {
@@ -117,22 +156,3 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
 
 final authProvider =
     AsyncNotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
-
-/// Returns true if the token is well-formed and the `exp` claim is in the
-/// future. Returns false for malformed tokens, missing `exp`, or expired.
-bool _isJwtStillValid(String token) {
-  final parts = token.split('.');
-  if (parts.length != 3) return false;
-  try {
-    final payload = parts[1];
-    final normalized = base64Url.normalize(payload);
-    final decoded = utf8.decode(base64Url.decode(normalized));
-    final json = jsonDecode(decoded) as Map<String, dynamic>;
-    final exp = json['exp'];
-    if (exp is! int) return false;
-    final expiresAt = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
-    return expiresAt.isAfter(DateTime.now());
-  } catch (_) {
-    return false;
-  }
-}

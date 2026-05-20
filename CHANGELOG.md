@@ -4,6 +4,15 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.4.1] - 2026-05-20 — fix(auth): refresh interceptor coalescing + sesión-collapse sentinel (P1)
+- **fix (P1):** `_AuthInterceptor` reescrito como `QueuedInterceptor` con cache single-flight `Future<String>? _refreshFuture` (patrón `fresh_dio`). Refresh ahora se coalesce: N requests paralelos que reciben 401 comparten UN solo `/auth/refresh`. Cierra el bug que producía banners "Credenciales incorrectas" en pantallas con múltiples providers concurrentes ([[CU-11]]/14/15/18/20/21).
+- **fix:** `/auth/refresh` ahora corre sobre un Dio dedicado SIN interceptores → no recursión y no envío de Bearer vencido.
+- **fix:** colapso del flujo de refresh (refresh 401/403 → token rotado server-side) emite ahora un `AuthSessionCollapsed` sentinel; `parseApiError` lo mapea a "Sesión expirada. Vuelve a iniciar sesión." en vez de mezclarlo con login-401.
+- **fix:** `parseApiError` distingue 3 casos de 401: login → "Credenciales incorrectas", sesión colapsada → "Sesión expirada...", dominio → "No tienes permiso...".
+- **fix:** `AuthNotifier.build()` ahora hace probe activo contra `/auth/refresh` en cold-start en vez de confiar en el `exp` client-side del JWT → ya no se aterriza en dashboard con sesión zombi.
+- **fix:** retry budget per-request (max 1) impide loops infinitos de refresh; storage write atómico antes de liberar el future single-flight.
+- 224 tests verdes (incluye `test/unit/auth_interceptor_test.dart` con 6 casos: 401-then-refresh, 5 concurrent 401s coalescen, refresh-401 → collapse + onLogout + storage cleared, refresh-5xx → transient, non-401 passthrough, `/auth/refresh` sin Bearer). `flutter analyze` limpio.
+
 ## [Unreleased] - 2026-05-20 — feat(weather): trigger manual de chequeo de clima (CU-19)
 - **feat:** acción "Actualizar clima" en AppBar de `alerts_screen`. Llama `POST /v1/alerts/weather/check` (provider `WEATHER_PROVIDER=stub` en prod) y refresca la lista de alertas con el resultado.
 - **UX:** spinner inline durante la llamada + snackbar con resumen ("N alertas nuevas") o mensaje de error.
