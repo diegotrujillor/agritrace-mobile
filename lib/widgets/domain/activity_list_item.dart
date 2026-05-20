@@ -7,18 +7,26 @@ import '../common/app_card.dart';
 
 /// List tile for a single [Activity] in a plot's timeline. Shows the activity
 /// type, the date it occurred and an optional note. Tapping opens the edit
-/// form via [onTap] (optional).
+/// form via [onTap] (optional). [onLongPress] is used by the timeline to
+/// surface a "Editar / Eliminar" contextual bottom sheet (CU-16 + CU-17).
 class ActivityListItem extends StatelessWidget {
-  const ActivityListItem({super.key, required this.activity, this.onTap});
+  const ActivityListItem({
+    super.key,
+    required this.activity,
+    this.onTap,
+    this.onLongPress,
+  });
 
   final Activity activity;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final description = activity.description;
     return AppCard(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

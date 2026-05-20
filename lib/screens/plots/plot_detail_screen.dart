@@ -74,7 +74,18 @@ class PlotDetailScreen extends ConsumerWidget {
                   return Column(
                     children: [
                       for (final activity in sorted) ...[
-                        ActivityListItem(activity: activity),
+                        ActivityListItem(
+                          activity: activity,
+                          // Long-press surfaces the same "Editar / Eliminar"
+                          // bottom sheet as the dedicated timeline screen
+                          // (CU-16 + CU-17).
+                          onLongPress: () => _showActivityActionsSheet(
+                            context,
+                            ref,
+                            plot.id,
+                            activity,
+                          ),
+                        ),
                         const SizedBox(height: AppSpacing.sm),
                       ],
                     ],
@@ -121,6 +132,92 @@ List<Activity> _sorted(List<Activity> activities) {
   final copy = [...activities];
   copy.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
   return copy;
+}
+
+/// Opens the "Editar / Eliminar" contextual sheet for an activity row inside
+/// the plot detail's inline timeline. Mirrors the dedicated timeline screen's
+/// long-press flow (CU-16 + CU-17) so both surfaces behave the same.
+Future<void> _showActivityActionsSheet(
+  BuildContext context,
+  WidgetRef ref,
+  String plotId,
+  Activity activity,
+) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    builder: (sheetContext) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.edit),
+            title: const Text('Editar'),
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              context.push(Routes.activityEdit(activity.id));
+            },
+          ),
+          ListTile(
+            leading:
+                const Icon(Icons.delete_outline, color: AppColors.error),
+            title: const Text(
+              'Eliminar',
+              style: TextStyle(color: AppColors.error),
+            ),
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              _confirmDeleteActivity(context, ref, plotId, activity);
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Destructive confirmation dialog for an activity. Captures the messenger
+/// before the await so the `use_build_context_synchronously` lint stays
+/// satisfied across the delete call.
+Future<void> _confirmDeleteActivity(
+  BuildContext context,
+  WidgetRef ref,
+  String plotId,
+  Activity activity,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('¿Eliminar esta actividad?'),
+      content: const Text('Esta acción no se puede deshacer.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          style: TextButton.styleFrom(foregroundColor: AppColors.error),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Eliminar'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+
+  try {
+    await ref
+        .read(activitiesProvider(plotId).notifier)
+        .deleteActivity(activity.id);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Actividad eliminada')),
+    );
+  } catch (error) {
+    messenger.showSnackBar(
+      SnackBar(content: Text(parseApiError(error))),
+    );
+  }
 }
 
 /// "Exportar PDF de trazabilidad". Pulls the parent farm + producer name and

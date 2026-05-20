@@ -12,6 +12,7 @@ import '../screens/farms/farm_form_screen.dart';
 import '../screens/plots/plot_detail_screen.dart';
 import '../screens/plots/plot_edit_screen.dart';
 import '../screens/plots/plot_form_screen.dart';
+import '../screens/activities/activity_edit_screen.dart';
 import '../screens/activities/activity_form_screen.dart';
 import '../screens/activities/activity_timeline_screen.dart';
 import '../screens/alerts/alerts_screen.dart';
@@ -74,6 +75,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.activityTimelinePath,
         builder: (_, state) => ActivityTimelineScreen(
           plotId: state.pathParameters['plotId']!,
+        ),
+      ),
+      // Activity edit lives on the flat `/activities/:id/edit` collection.
+      // There is currently no other `/activities/:id` route, but the static
+      // `/edit` tail keeps the path unambiguous if we ever add one.
+      GoRoute(
+        path: Routes.activityEditPath,
+        builder: (_, state) => ActivityEditScreen(
+          activityId: state.pathParameters['id']!,
         ),
       ),
       // Static `/edit` segment declared before `/plots/:id` so it is matched

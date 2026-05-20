@@ -4,6 +4,14 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-20 — feat(activities): editar + eliminar actividad (CU-16 + CU-17)
+- **feat:** pantalla `activity_edit_screen` con prefill, ruta `/activities/:id/edit`, entrada vía long-press en el timeline (bottom sheet "Editar / Eliminar"). Cierra CU-16.
+- **feat:** acción "Eliminar" con `AlertDialog` de confirmación + refresh inmediato del timeline. Cierra CU-17.
+- **refactor:** `ActivityForm` extraído como widget compartido entre create y edit (DRY), reubicado a `lib/screens/activities/widgets/activity_form.dart` (mismo patrón que `PlotForm`).
+- **chore:** `AppCard` + `ActivityListItem` ganan `onLongPress` opcional (aditivo, no rompe call sites existentes); long-press espejado también en `plot_detail_screen` para que ambas superficies del timeline compartan el mismo flujo.
+- 210 tests verdes (incluye 5 widget tests nuevos: 2 edit + 3 timeline long-press/delete). `flutter analyze` limpio.
+- **nota trazabilidad:** edición destructiva sobre el registro original (no genera "nota correctiva"). Decisión a revisitar post-pilot si los productores piden auditoría inmutable.
+
 ## [Unreleased] - 2026-05-20 — feat(plots): editar + eliminar lote (CU-12 + CU-13)
 - **feat:** pantalla `plot_edit_screen` con prefill, ruta `/plots/:id/edit`, entrada vía menú overflow en `plot_detail_screen`. Cierra CU-12.
 - **feat:** acción "Eliminar lote" en `plot_detail_screen` con `AlertDialog` de confirmación + cascade visible (actividades del lote desaparecen). Cierra CU-13.

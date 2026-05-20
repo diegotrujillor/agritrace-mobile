@@ -17,6 +17,7 @@ void main() {
       Routes.plotEditPath,
       Routes.activityNewPath,
       Routes.activityTimelinePath,
+      Routes.activityEditPath,
     ];
 
     test('all static route constants are non-empty and start with /', () {
@@ -52,6 +53,10 @@ void main() {
 
     test('activityTimeline interpolates plotId', () {
       expect(Routes.activityTimeline('p1'), '/plots/p1/activities');
+    });
+
+    test('activityEdit interpolates id', () {
+      expect(Routes.activityEdit('a-99'), '/activities/a-99/edit');
     });
   });
 }
