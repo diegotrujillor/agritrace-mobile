@@ -4,6 +4,22 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-20 — test: cobertura global a 84.6 % (meta ≥80 %)
+- **test:** +70 tests nuevos (184 total). Cobertura global pasa de
+  65.0 % a **84.6 %** (633/748 líneas) — cumple el Criterio Técnico
+  de `09-scope-mvp.md §6`.
+- **test:** 9 archivos test creados: `error_parser_test.dart`,
+  `route_names_test.dart`, widget `app_error_banner_test.dart`,
+  `user_model_test.dart`, `plot_model_test.dart`, `farm_model_test.dart`,
+  `activity_model_test.dart`, `auth_service_test.dart`,
+  `storage_service_test.dart`.
+- **docs:** `docs/COVERAGE.md` — tabla por archivo, comando de repro,
+  HTML report opcional, gap explícito de `api_service.dart` (no
+  testeado por validación `String.fromEnvironment` + interceptor
+  privado), snippet de CI floor para Sprint 6.
+- 10 de 11 archivos target llegan a 88–100 %; `api_service.dart`
+  intencionalmente diferido (gap documentado).
+
 ## [Unreleased] - 2026-05-19 — chore: intake del piloto (Sprint 5)
 - **chore (intake):** plantillas de GitHub Issues para el field test:
   `field-test-bug.yml` (versión, dispositivo, conectividad, pasos,
