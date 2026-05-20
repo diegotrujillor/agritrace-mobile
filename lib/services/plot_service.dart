@@ -12,9 +12,13 @@ class PlotService {
 
   final ApiService _api;
 
-  /// `GET /farms/:farmId/plots` — plots belonging to a farm.
+  /// `GET /plots/farms/:farmId/plots` — plots belonging to a farm.
+  ///
+  /// Backend mounts the plots router at `/v1/plots`, so the nested list
+  /// lives at `/v1/plots/farms/{farmId}/plots`. Earlier the path was
+  /// `/farms/{farmId}/plots` and returned 404 silently — fixed in v1.3.5.
   Future<List<Plot>> listByFarm(String farmId) async {
-    final response = await _api.client.get('/farms/$farmId/plots');
+    final response = await _api.client.get('/plots/farms/$farmId/plots');
     return unwrapList(response.data, Plot.fromJson);
   }
 

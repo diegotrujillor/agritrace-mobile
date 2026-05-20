@@ -30,14 +30,14 @@ void main() {
   });
 
   test('listByFarm() GETs /farms/:farmId/plots and unwraps list', () async {
-    when(() => dio.get('/farms/farm-1/plots')).thenAnswer(
+    when(() => dio.get('/plots/farms/farm-1/plots')).thenAnswer(
       (_) async => okResponse(envelope([_plotJson()])),
     );
 
     final plots = await service.listByFarm('farm-1');
 
     expect(plots.single.status, PlotStatus.growing);
-    verify(() => dio.get('/farms/farm-1/plots')).called(1);
+    verify(() => dio.get('/plots/farms/farm-1/plots')).called(1);
   });
 
   test('get() GETs /plots/:id', () async {
@@ -122,7 +122,7 @@ void main() {
   });
 
   test('throws FormatException on malformed envelope', () async {
-    when(() => dio.get('/farms/farm-1/plots'))
+    when(() => dio.get('/plots/farms/farm-1/plots'))
         .thenAnswer((_) async => okResponse('not-a-map'));
 
     expect(service.listByFarm('farm-1'), throwsA(isA<FormatException>()));

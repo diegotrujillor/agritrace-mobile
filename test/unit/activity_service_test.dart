@@ -28,14 +28,14 @@ void main() {
   });
 
   test('listByPlot() GETs /plots/:plotId/activities', () async {
-    when(() => dio.get('/plots/plot-1/activities')).thenAnswer(
+    when(() => dio.get('/activities/plots/plot-1/activities')).thenAnswer(
       (_) async => okResponse(envelope([_activityJson()])),
     );
 
     final acts = await service.listByPlot('plot-1');
 
     expect(acts.single.type, ActivityType.pestControl);
-    verify(() => dio.get('/plots/plot-1/activities')).called(1);
+    verify(() => dio.get('/activities/plots/plot-1/activities')).called(1);
   });
 
   test('get() GETs /activities/:id', () async {
@@ -117,7 +117,7 @@ void main() {
   });
 
   test('throws FormatException on malformed envelope', () async {
-    when(() => dio.get('/plots/plot-1/activities'))
+    when(() => dio.get('/activities/plots/plot-1/activities'))
         .thenAnswer((_) async => okResponse({'success': true}));
 
     expect(service.listByPlot('plot-1'), throwsA(isA<FormatException>()));

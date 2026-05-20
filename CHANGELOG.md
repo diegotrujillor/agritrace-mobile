@@ -4,6 +4,19 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-20 — fix(api urls): P1 listar lotes/actividades 404
+- **fix (P1):** `PlotService.listByFarm` y `ActivityService.listByPlot`
+  usaban paths sin el prefijo de su router. Backend monta `plots` en
+  `/v1/plots` y `activities` en `/v1/activities`, así que las rutas
+  nesteadas son `/plots/farms/{farmId}/plots` y
+  `/activities/plots/{plotId}/activities`. Mobile pegaba a
+  `/farms/{farmId}/plots` y `/plots/{plotId}/activities` → **404 silencioso** →
+  `parseApiError` fallback → "Ocurrió un error" inline en farm-detail y
+  plot-detail screens (sección Lotes / Timeline de actividades).
+- **fix:** `plot_service.dart:17` + `activity_service.dart:20` con
+  comentarios de regresión + tests actualizados con los paths reales.
+- 200 tests verdes, `flutter analyze` clean.
+
 ## [Unreleased] - 2026-05-20 — fix(crud): P1 navegación post-create silent error
 - **fix (P1, bloqueador Sprint 5):** los FAB "+" (registrar finca / lote /
   actividad / alerta) usaban `context.go(...)` (REPLACE en go_router 14)

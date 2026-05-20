@@ -15,9 +15,14 @@ class ActivityService {
 
   final ApiService _api;
 
-  /// `GET /plots/:plotId/activities` — activities recorded on a plot.
+  /// `GET /activities/plots/:plotId/activities` — activities of a plot.
+  ///
+  /// Backend mounts the activities router at `/v1/activities`, so the
+  /// nested list lives at `/v1/activities/plots/{plotId}/activities`.
+  /// Earlier the path was `/plots/{plotId}/activities` and returned 404
+  /// silently — fixed in v1.3.5.
   Future<List<Activity>> listByPlot(String plotId) async {
-    final response = await _api.client.get('/plots/$plotId/activities');
+    final response = await _api.client.get('/activities/plots/$plotId/activities');
     return unwrapList(response.data, Activity.fromJson);
   }
 
