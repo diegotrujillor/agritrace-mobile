@@ -4,6 +4,19 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-19 — chore: Play Console setup (assets + runbook)
+- **chore (assets):** generados a partir del logo oficial y guardados
+  en `assets/brand/play/`:
+  - `icon-512.png` (ícono Play Store 512×512).
+  - `feature-graphic.svg` + `feature-graphic.png` (1024×500).
+- **ci:** `release-play.yml` añade `if: always()` al step *Archive AAB
+  artifact* — el AAB firmado queda disponible como artifact incluso
+  cuando la subida a Play falla (sin `PLAY_SERVICE_ACCOUNT_JSON`).
+  Sirve para el primer upload manual obligatorio.
+- **docs:** nuevo `docs/PLAY_CONSOLE_SETUP.md` — runbook completo
+  paso-a-paso (cuenta, app, listing, content rating, primer AAB,
+  service account, secret, closed testing 14d/12 testers).
+
 ## [Unreleased] - 2026-05-19 — fix: UX inputs auth
 ### Fixed
 - **bug (ux):** ícono del ojo en campo Contraseña invertido — con texto

@@ -102,6 +102,10 @@ jobs:
           status: completed
 
       - name: Archive AAB artifact
+        # Always archive the signed AAB, even when Play upload fails
+        # (lets us grab the artifact for the manual first-AAB upload that
+        # Play requires before the API can publish further versions).
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: agritrace-app-release-aab
