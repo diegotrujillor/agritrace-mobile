@@ -4,6 +4,12 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-05-20 — feat(plots): editar + eliminar lote (CU-12 + CU-13)
+- **feat:** pantalla `plot_edit_screen` con prefill, ruta `/plots/:id/edit`, entrada vía menú overflow en `plot_detail_screen`. Cierra CU-12.
+- **feat:** acción "Eliminar lote" en `plot_detail_screen` con `AlertDialog` de confirmación + cascade visible (actividades del lote desaparecen). Cierra CU-13.
+- **refactor:** `PlotForm` extraído como widget compartido entre create y edit (DRY).
+- 204 tests verdes (incluye 4 widget tests nuevos: 2 edit + 2 delete). `flutter analyze` limpio.
+
 ## [Unreleased] - 2026-05-20 — fix(iso utc): P1 datetimes sin Z fallaban Zod 400
 - **fix (P1):** `activity_service.dart` (`occurredAt` create/update),
   `alert_service.dart` (`scheduledFor` createReminder) y

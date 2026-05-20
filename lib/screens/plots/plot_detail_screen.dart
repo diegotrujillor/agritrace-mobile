@@ -34,6 +34,10 @@ class PlotDetailScreen extends ConsumerWidget {
       backgroundColor: AppColors.lightGreen,
       appBar: AppBar(
         title: Text(plotAsync.valueOrNull?.name ?? 'Lote'),
+        actions: [
+          if (plotAsync.valueOrNull != null)
+            _PlotMenu(plot: plotAsync.value!),
+        ],
       ),
       body: plotAsync.when(
         data: (plot) => RefreshIndicator(
@@ -184,6 +188,78 @@ class _ExportPdfButtonState extends ConsumerState<_ExportPdfButton> {
             )
           : const Icon(Icons.picture_as_pdf_outlined),
       label: const Text('Exportar PDF de trazabilidad'),
+    );
+  }
+}
+
+/// AppBar overflow menu offering "Editar" + "Eliminar" actions for a plot.
+///
+/// Delete prompts an [AlertDialog] confirmation and warns about the cascade
+/// (activities of the plot are removed too). Both `messenger` and `router`
+/// are captured before the await so the lint
+/// `use_build_context_synchronously` stays satisfied across the delete.
+class _PlotMenu extends ConsumerWidget {
+  const _PlotMenu({required this.plot});
+
+  final Plot plot;
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    // Capture before any await to avoid use_build_context_synchronously.
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('¿Eliminar lote?'),
+        content: const Text(
+          'Esta acción no se puede deshacer. '
+          'Las actividades asociadas también se eliminarán.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await ref
+          .read(plotsProvider(plot.farmId).notifier)
+          .deletePlot(plot.id);
+      router.go(Routes.farmDetail(plot.farmId));
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(parseApiError(error))),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PopupMenuButton<String>(
+      tooltip: 'Más opciones',
+      icon: const Icon(Icons.more_vert, color: AppColors.white),
+      onSelected: (value) {
+        switch (value) {
+          case 'edit':
+            context.push(Routes.plotEdit(plot.id));
+          case 'delete':
+            _confirmDelete(context, ref);
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 'edit', child: Text('Editar')),
+        PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+      ],
     );
   }
 }

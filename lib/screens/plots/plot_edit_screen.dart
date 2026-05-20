@@ -1,0 +1,113 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../models/plot.dart';
+import '../../providers/plots_provider.dart';
+import '../../utils/constants.dart';
+import '../../utils/error_parser.dart';
+import 'widgets/plot_form.dart';
+
+/// Edit an existing plot identified by [plotId].
+///
+/// Loads the plot through [plotProvider] and renders the shared [PlotForm]
+/// pre-filled with the current values. Submitting calls
+/// `plotsProvider(farmId).notifier.updatePlot(...)` and pops on success.
+class PlotEditScreen extends ConsumerWidget {
+  const PlotEditScreen({super.key, required this.plotId});
+
+  final String plotId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final plotAsync = ref.watch(plotProvider(plotId));
+
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      appBar: AppBar(
+        title: const Text('Editar lote'),
+      ),
+      body: SafeArea(
+        child: plotAsync.when(
+          data: (plot) => _EditBody(plot: plot),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: Text(
+                parseApiError(error),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.error, fontSize: 16),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Inner stateful body that owns submit/error state once the plot is loaded.
+class _EditBody extends ConsumerStatefulWidget {
+  const _EditBody({required this.plot});
+
+  final Plot plot;
+
+  @override
+  ConsumerState<_EditBody> createState() => _EditBodyState();
+}
+
+class _EditBodyState extends ConsumerState<_EditBody> {
+  bool _submitting = false;
+  String? _errorMessage;
+
+  Future<void> _submit(PlotFormValues values) async {
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+    });
+
+    // Capture before await to avoid use_build_context_synchronously.
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+
+    try {
+      await ref
+          .read(plotsProvider(widget.plot.farmId).notifier)
+          .updatePlot(
+            id: widget.plot.id,
+            name: values.name,
+            cropType: values.cropType,
+            status: values.status,
+            variety: values.variety,
+            areaHectares: values.areaHectares,
+          );
+      // Invalidate the single-plot lookup so the detail screen shows fresh data.
+      ref.invalidate(plotProvider(widget.plot.id));
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Lote actualizado')),
+      );
+      router.pop();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _errorMessage = parseApiError(error);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: PlotForm(
+        submitLabel: 'Guardar cambios',
+        onSubmit: _submit,
+        initial: widget.plot,
+        submitting: _submitting,
+        errorMessage: _errorMessage,
+      ),
+    );
+  }
+}

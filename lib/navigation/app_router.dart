@@ -10,6 +10,7 @@ import '../screens/farms/dashboard_screen.dart';
 import '../screens/farms/farm_detail_screen.dart';
 import '../screens/farms/farm_form_screen.dart';
 import '../screens/plots/plot_detail_screen.dart';
+import '../screens/plots/plot_edit_screen.dart';
 import '../screens/plots/plot_form_screen.dart';
 import '../screens/activities/activity_form_screen.dart';
 import '../screens/activities/activity_timeline_screen.dart';
@@ -73,6 +74,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.activityTimelinePath,
         builder: (_, state) => ActivityTimelineScreen(
           plotId: state.pathParameters['plotId']!,
+        ),
+      ),
+      // Static `/edit` segment declared before `/plots/:id` so it is matched
+      // as the edit route and never swallowed by the `:id` capture.
+      GoRoute(
+        path: Routes.plotEditPath,
+        builder: (_, state) => PlotEditScreen(
+          plotId: state.pathParameters['id']!,
         ),
       ),
       GoRoute(

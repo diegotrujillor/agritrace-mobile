@@ -14,6 +14,7 @@ void main() {
       Routes.farmDetailPath,
       Routes.plotNewPath,
       Routes.plotDetailPath,
+      Routes.plotEditPath,
       Routes.activityNewPath,
       Routes.activityTimelinePath,
     ];
