@@ -1,0 +1,74 @@
+name: 🐞 Bug en piloto (Sprint 5)
+description: Reporta un problema visto al usar AgriTrace en campo.
+title: "[bug] "
+labels: ["bug", "sprint-5", "field-test"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportar. Mientras más detalle, más rápido se arregla.
+        Si no sabes algún campo, déjalo en blanco.
+
+  - type: input
+    id: version
+    attributes:
+      label: Versión de la app
+      description: Se ve abajo en la pantalla de inicio (ej. 1.3.3).
+      placeholder: "1.3.3"
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Dispositivo
+      description: Marca + modelo (ej. Samsung A14, Xiaomi Redmi 12, Motorola e22).
+      placeholder: "Samsung Galaxy A14"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: connectivity
+    attributes:
+      label: ¿Estabas con internet cuando ocurrió?
+      options:
+        - "Sí, internet estable"
+        - "Sí, internet débil/intermitente"
+        - "No, sin internet"
+        - "No estoy seguro"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: ¿Qué hiciste paso a paso?
+      description: Como si le contaras a un compañero. Numera los pasos.
+      placeholder: |
+        1. Abrí la app
+        2. Toqué "Nueva actividad"
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: ¿Qué esperabas que pasara?
+      placeholder: "Que se guardara la actividad y apareciera en el timeline."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: ¿Qué pasó realmente?
+      placeholder: "La app mostró un mensaje rojo y cerró."
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Captura de pantalla o video
+      description: Si puedes, arrastra la imagen aquí. Si no, descríbela.

@@ -1,0 +1,61 @@
+name: 💬 Feedback de uso (Sprint 5)
+description: Cuenta cómo te va usando la app — qué funciona y qué falta.
+title: "[feedback] "
+labels: ["feedback", "sprint-5", "field-test"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Esto no es un bug — es para contarnos cómo se siente usar
+        AgriTrace en el día a día. No hay respuestas malas.
+
+  - type: dropdown
+    id: usage_frequency
+    attributes:
+      label: ¿Con qué frecuencia abriste la app esta semana?
+      options:
+        - "Todos los días"
+        - "3-5 días"
+        - "1-2 días"
+        - "No la abrí esta semana"
+    validations:
+      required: true
+
+  - type: textarea
+    id: easiest
+    attributes:
+      label: ¿Qué fue lo más fácil de hacer?
+      placeholder: "Registrar una actividad nueva, ver la lista de lotes, etc."
+    validations:
+      required: true
+
+  - type: textarea
+    id: hardest
+    attributes:
+      label: ¿Qué fue lo más difícil o confuso?
+      placeholder: "Encontrar dónde se editan los lotes, entender un mensaje, etc."
+    validations:
+      required: true
+
+  - type: textarea
+    id: missing
+    attributes:
+      label: ¿Qué le hace falta a la app para que la uses todos los días?
+      placeholder: "Recordatorio por SMS, modo voz, lista de insumos, etc."
+
+  - type: dropdown
+    id: would_recommend
+    attributes:
+      label: ¿Se la recomendarías a otro agricultor?
+      options:
+        - "Sí, sin dudar"
+        - "Sí, pero con peros"
+        - "Tal vez"
+        - "No por ahora"
+    validations:
+      required: true
+
+  - type: textarea
+    id: free_text
+    attributes:
+      label: Cualquier otra cosa que quieras decirnos
