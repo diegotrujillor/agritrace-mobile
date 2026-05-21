@@ -13,6 +13,15 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 - **fix:** retry budget per-request (max 1) impide loops infinitos de refresh; storage write atómico antes de liberar el future single-flight.
 - 224 tests verdes (incluye `test/unit/auth_interceptor_test.dart` con 6 casos: 401-then-refresh, 5 concurrent 401s coalescen, refresh-401 → collapse + onLogout + storage cleared, refresh-5xx → transient, non-401 passthrough, `/auth/refresh` sin Bearer). `flutter analyze` limpio.
 
+## [Unreleased] - 2026-05-21 — feat(offline): capa de persistencia SQLite offline-first con Drift
+- **feat:** Drift 2.x + drift_flutter integrados. Base de datos local `agritrace.db` con 4 tablas (`farms`, `plots`, `activities`, `alerts`) con columnas de sincronización (`syncStatus`, `updatedAt`) en cada fila.
+- **feat:** 4 repositorios nuevos (`FarmRepository`, `PlotRepository`, `ActivityRepository`, `AlertRepository`) como capa de acceso a datos local. Escritura offline-first con estados `pendingCreate` / `pendingUpdate` / `pendingDelete`.
+- **feat:** `SyncOrchestrator` drena cambios pendientes → POST `/v1/sync`, aplica cambios jalados del servidor con estrategia LWW (`updatedAt` del servidor gana). `SyncNotifier` auto-dispara sync 2 s después de reconexión vía `connectivityProvider`.
+- **feat:** Providers de dominio (`farmsProvider`, `plotsProvider`, `activitiesProvider`, `alertsProvider`) actualizados a streams reactivos desde SQLite — responden instantáneamente sin conexión.
+- **feat:** Seed inicial: al primer login/registro, `AuthNotifier` lanza `SyncOrchestrator.run()` en background para poblar la DB local.
+- **chore:** `database_provider.dart` centraliza `appDatabaseProvider` + 4 repository providers + `syncOrchestratorProvider`.
+- 223 tests verdes (unit + widget tests actualizados para mockear capa de repositorio). `flutter analyze` limpio.
+
 ## [Unreleased] - 2026-05-20 — feat(weather): trigger manual de chequeo de clima (CU-19)
 - **feat:** acción "Actualizar clima" en AppBar de `alerts_screen`. Llama `POST /v1/alerts/weather/check` (provider `WEATHER_PROVIDER=stub` en prod) y refresca la lista de alertas con el resultado.
 - **UX:** spinner inline durante la llamada + snackbar con resumen ("N alertas nuevas") o mensaje de error.

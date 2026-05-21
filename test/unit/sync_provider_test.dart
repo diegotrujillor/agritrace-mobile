@@ -2,9 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:agritrace_mobile/providers/sync_provider.dart';
+import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/services/sync_service.dart';
+import 'package:agritrace_mobile/services/sync_orchestrator.dart';
 
-class MockSyncService extends Mock implements SyncService {}
+class MockSyncOrchestrator extends Mock implements SyncOrchestrator {}
 
 SyncResult _result({DateTime? ts, int synced = 1, int conflicts = 0}) =>
     SyncResult(
@@ -19,14 +21,16 @@ void main() {
     registerFallbackValue(<SyncChange>[]);
   });
 
-  late MockSyncService mockService;
+  late MockSyncOrchestrator mockOrchestrator;
 
   setUp(() {
-    mockService = MockSyncService();
+    mockOrchestrator = MockSyncOrchestrator();
   });
 
   ProviderContainer makeContainer() => ProviderContainer(
-        overrides: [syncServiceProvider.overrideWithValue(mockService)],
+        overrides: [
+          syncOrchestratorProvider.overrideWithValue(mockOrchestrator),
+        ],
       );
 
   test('initial state is idle (null data, no error)', () async {
@@ -39,12 +43,9 @@ void main() {
     expect(container.read(syncProvider).hasError, isFalse);
   });
 
-  test('trigger() transitions idle -> success with the sync result',
-      () async {
-    when(() => mockService.syncNow(
-          changes: any(named: 'changes'),
-          since: any(named: 'since'),
-        )).thenAnswer((_) async => _result(synced: 3));
+  test('trigger() transitions idle -> success with the sync result', () async {
+    when(() => mockOrchestrator.run(since: any(named: 'since')))
+        .thenAnswer((_) async => _result(synced: 3));
 
     final container = makeContainer();
     addTearDown(container.dispose);
@@ -60,10 +61,8 @@ void main() {
   test('trigger() passes the previous timestamp as the next since cursor',
       () async {
     final firstTs = DateTime.utc(2026, 5, 1, 10);
-    when(() => mockService.syncNow(
-          changes: any(named: 'changes'),
-          since: any(named: 'since'),
-        )).thenAnswer((_) async => _result(ts: firstTs));
+    when(() => mockOrchestrator.run(since: any(named: 'since')))
+        .thenAnswer((_) async => _result(ts: firstTs));
 
     final container = makeContainer();
     addTearDown(container.dispose);
@@ -73,21 +72,16 @@ void main() {
     await container.read(syncProvider.notifier).trigger();
 
     final calls = verify(
-      () => mockService.syncNow(
-        changes: any(named: 'changes'),
-        since: captureAny(named: 'since'),
-      ),
+      () => mockOrchestrator.run(since: captureAny(named: 'since')),
     ).captured;
     expect(calls.first, isNull); // first run: no cursor
     expect(calls.last, firstTs); // second run: cursor from first result
   });
 
-  test('trigger() transitions idle -> error when the service throws',
+  test('trigger() transitions idle -> error when the orchestrator throws',
       () async {
-    when(() => mockService.syncNow(
-          changes: any(named: 'changes'),
-          since: any(named: 'since'),
-        )).thenThrow(Exception('sync failed'));
+    when(() => mockOrchestrator.run(since: any(named: 'since')))
+        .thenThrow(Exception('sync failed'));
 
     final container = makeContainer();
     addTearDown(container.dispose);
@@ -96,29 +90,5 @@ void main() {
     await container.read(syncProvider.notifier).trigger();
 
     expect(container.read(syncProvider).hasError, isTrue);
-  });
-
-  test('trigger() forwards explicit changes to the service', () async {
-    when(() => mockService.syncNow(
-          changes: any(named: 'changes'),
-          since: any(named: 'since'),
-        )).thenAnswer((_) async => _result());
-
-    final container = makeContainer();
-    addTearDown(container.dispose);
-    await container.read(syncProvider.future);
-
-    const changes = [
-      SyncChange(entity: 'farm', id: 'f1', action: 'update', data: {}),
-    ];
-    await container.read(syncProvider.notifier).trigger(changes: changes);
-
-    final captured = verify(
-      () => mockService.syncNow(
-        changes: captureAny(named: 'changes'),
-        since: any(named: 'since'),
-      ),
-    ).captured.single as List<SyncChange>;
-    expect(captured.single.id, 'f1');
   });
 }

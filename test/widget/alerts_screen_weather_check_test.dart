@@ -21,8 +21,12 @@ import 'package:agritrace_mobile/models/alert.dart';
 import 'package:agritrace_mobile/models/farm.dart';
 import 'package:agritrace_mobile/models/plot.dart';
 import 'package:agritrace_mobile/providers/alerts_provider.dart';
+import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/providers/farms_provider.dart';
 import 'package:agritrace_mobile/providers/plots_provider.dart';
+import 'package:agritrace_mobile/repositories/alert_repository.dart';
+import 'package:agritrace_mobile/repositories/farm_repository.dart';
+import 'package:agritrace_mobile/repositories/plot_repository.dart';
 import 'package:agritrace_mobile/screens/alerts/alerts_screen.dart';
 import 'package:agritrace_mobile/services/alert_service.dart';
 import 'package:agritrace_mobile/services/farm_service.dart';
@@ -34,6 +38,12 @@ class _MockAlertService extends Mock implements AlertService {}
 class _MockFarmService extends Mock implements FarmService {}
 
 class _MockPlotService extends Mock implements PlotService {}
+
+class _MockAlertRepository extends Mock implements AlertRepository {}
+
+class _MockFarmRepository extends Mock implements FarmRepository {}
+
+class _MockPlotRepository extends Mock implements PlotRepository {}
 
 Farm _farm(String id) => Farm(
       id: id,
@@ -70,11 +80,17 @@ void main() {
   late _MockAlertService mockAlerts;
   late _MockFarmService mockFarms;
   late _MockPlotService mockPlots;
+  late _MockAlertRepository mockAlertRepo;
+  late _MockFarmRepository mockFarmRepo;
+  late _MockPlotRepository mockPlotRepo;
 
   setUp(() {
     mockAlerts = _MockAlertService();
     mockFarms = _MockFarmService();
     mockPlots = _MockPlotService();
+    mockAlertRepo = _MockAlertRepository();
+    mockFarmRepo = _MockFarmRepository();
+    mockPlotRepo = _MockPlotRepository();
 
     // Default: the user owns one farm with two plots.
     when(() => mockFarms.list()).thenAnswer((_) async => [_farm('farm-1')]);
@@ -86,6 +102,19 @@ void main() {
           status: any(named: 'status'),
           type: any(named: 'type'),
         )).thenAnswer((_) async => <Alert>[]);
+    // Repository stubs for the notifiers' stream subscriptions + build().
+    when(() => mockAlertRepo.watchAll())
+        .thenAnswer((_) => Stream.value(<Alert>[]));
+    when(() => mockFarmRepo.watchAll())
+        .thenAnswer((_) => Stream.value([_farm('farm-1')]));
+    when(() => mockFarmRepo.listAll())
+        .thenAnswer((_) async => [_farm('farm-1')]);
+    when(() => mockPlotRepo.watchByFarm(any()))
+        .thenAnswer((_) => Stream.value(
+              [_plot('plot-1', 'farm-1'), _plot('plot-2', 'farm-1')],
+            ));
+    when(() => mockPlotRepo.listByFarm(any())).thenAnswer((_) async =>
+        [_plot('plot-1', 'farm-1'), _plot('plot-2', 'farm-1')]);
   });
 
   GoRouter router() => GoRouter(
@@ -105,6 +134,9 @@ void main() {
           alertServiceProvider.overrideWithValue(mockAlerts),
           farmServiceProvider.overrideWithValue(mockFarms),
           plotServiceProvider.overrideWithValue(mockPlots),
+          alertRepositoryProvider.overrideWithValue(mockAlertRepo),
+          farmRepositoryProvider.overrideWithValue(mockFarmRepo),
+          plotRepositoryProvider.overrideWithValue(mockPlotRepo),
         ],
         child: MaterialApp.router(routerConfig: router()),
       );
@@ -141,6 +173,8 @@ void main() {
         await gate.future;
         return WeatherCheckResult(provider: 'stub', alert: _alert('a-x'));
       });
+      when(() => mockAlertRepo.upsertFromServer(any()))
+          .thenAnswer((_) async {});
 
       await tester.pumpWidget(wrap());
       await tester.pumpAndSettle();
@@ -156,12 +190,9 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsWidgets);
       expect(find.byTooltip('Actualizar clima'), findsNothing);
 
-      // Swap the list mock so the post-check refresh returns the two new
-      // weather alerts.
-      when(() => mockAlerts.list(
-            status: any(named: 'status'),
-            type: any(named: 'type'),
-          )).thenAnswer((_) async => [_alert('a-1'), _alert('a-2')]);
+      // Swap the repo stream mock so the post-check refresh returns 2 alerts.
+      when(() => mockAlertRepo.watchAll())
+          .thenAnswer((_) => Stream.value([_alert('a-1'), _alert('a-2')]));
 
       // Open the gate — all in-flight checkWeather calls resolve in order.
       gate.complete();
@@ -172,28 +203,22 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       }
 
-      // Assert — snackbar with count, icon back, refresh hit `list` twice
-      // total (initial build + post-check refresh).
+      // Assert — snackbar with count, icon back, repo received 2 upserts.
       expect(
         find.text('Clima actualizado · 2 alertas nuevas'),
         findsOneWidget,
       );
       expect(find.byTooltip('Actualizar clima'), findsOneWidget);
-      verify(() => mockAlerts.list(
-            status: any(named: 'status'),
-            type: any(named: 'type'),
-          )).called(2);
+      verify(() => mockAlertRepo.upsertFromServer(any())).called(2);
     },
   );
 
   testWidgets(
     'error path · service throws → red snackbar, list not cleared',
     (tester) async {
-      // Arrange — seed an existing alert and make the weather check throw.
-      when(() => mockAlerts.list(
-            status: any(named: 'status'),
-            type: any(named: 'type'),
-          )).thenAnswer((_) async => [_alert('seed-1')]);
+      // Arrange — seed the repo with an existing alert and make the check throw.
+      when(() => mockAlertRepo.watchAll())
+          .thenAnswer((_) => Stream.value([_alert('seed-1')]));
       when(() => mockAlerts.checkWeather(any()))
           .thenThrow(Exception('network down'));
 

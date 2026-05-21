@@ -4,11 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:agritrace_mobile/models/user.dart';
 import 'package:agritrace_mobile/providers/auth_provider.dart';
+import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/services/auth_service.dart';
 import 'package:agritrace_mobile/services/storage_service.dart';
+import 'package:agritrace_mobile/services/sync_orchestrator.dart';
+import 'package:agritrace_mobile/services/sync_service.dart';
 
 class MockAuthService extends Mock implements AuthService {}
 class MockStorageService extends Mock implements StorageService {}
+class MockSyncOrchestrator extends Mock implements SyncOrchestrator {}
 
 const _testUser = User(
   id: 'user-1',
@@ -41,19 +45,31 @@ DioException _refreshHttpError(int statusCode) {
 void main() {
   late MockAuthService mockAuth;
   late MockStorageService mockStorage;
+  late MockSyncOrchestrator mockOrchestrator;
 
   setUp(() {
     mockAuth    = MockAuthService();
     mockStorage = MockStorageService();
+    mockOrchestrator = MockSyncOrchestrator();
     // deleteTokens() is called whenever the cold-start probe rejects
     // a stored token. Always stub it to a no-op so mocktail does not throw.
     when(() => mockStorage.deleteTokens()).thenAnswer((_) async {});
+    // Background seed sync — fire-and-forget. Stub to no-op so tests that
+    // exercise login/register/cold-start succeed without hitting the real DB.
+    when(() => mockOrchestrator.run(since: any(named: 'since')))
+        .thenAnswer((_) async => SyncResult(
+              synced: 0,
+              conflicts: 0,
+              pulledChanges: const [],
+              timestamp: DateTime.utc(2026, 1, 1),
+            ));
   });
 
   ProviderContainer makeContainer() => ProviderContainer(
         overrides: [
           authServiceProvider.overrideWithValue(mockAuth),
           storageServiceProvider.overrideWithValue(mockStorage),
+          syncOrchestratorProvider.overrideWithValue(mockOrchestrator),
         ],
       );
 

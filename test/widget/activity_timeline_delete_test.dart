@@ -17,7 +17,10 @@ import 'package:mocktail/mocktail.dart';
 import 'package:agritrace_mobile/models/activity.dart';
 import 'package:agritrace_mobile/models/plot.dart';
 import 'package:agritrace_mobile/providers/activities_provider.dart';
+import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/providers/plots_provider.dart';
+import 'package:agritrace_mobile/repositories/activity_repository.dart';
+import 'package:agritrace_mobile/repositories/plot_repository.dart';
 import 'package:agritrace_mobile/screens/activities/activity_timeline_screen.dart';
 import 'package:agritrace_mobile/services/activity_service.dart';
 import 'package:agritrace_mobile/services/plot_service.dart';
@@ -25,6 +28,10 @@ import 'package:agritrace_mobile/services/plot_service.dart';
 class _MockActivityService extends Mock implements ActivityService {}
 
 class _MockPlotService extends Mock implements PlotService {}
+
+class _MockActivityRepository extends Mock implements ActivityRepository {}
+
+class _MockPlotRepository extends Mock implements PlotRepository {}
 
 const _farmId = 'farm-1';
 const _plotId = 'plot-1';
@@ -75,20 +82,35 @@ void main() {
 
   late _MockActivityService mockActivityService;
   late _MockPlotService mockPlotService;
+  late _MockActivityRepository mockActivityRepo;
+  late _MockPlotRepository mockPlotRepo;
 
   setUp(() {
     mockActivityService = _MockActivityService();
     mockPlotService = _MockPlotService();
+    mockActivityRepo = _MockActivityRepository();
+    mockPlotRepo = _MockPlotRepository();
     when(() => mockPlotService.get(_plotId))
         .thenAnswer((_) async => _seedPlot());
     when(() => mockActivityService.listByPlot(_plotId))
         .thenAnswer((_) async => [_seedActivity()]);
+    // Repository stubs used by notifiers' stream subscriptions + build().
+    when(() => mockActivityRepo.watchByPlot(any()))
+        .thenAnswer((_) => Stream.value([_seedActivity()]));
+    when(() => mockActivityRepo.listByPlot(any()))
+        .thenAnswer((_) async => [_seedActivity()]);
+    when(() => mockPlotRepo.watchByFarm(any()))
+        .thenAnswer((_) => Stream.value([_seedPlot()]));
+    when(() => mockPlotRepo.listByFarm(any()))
+        .thenAnswer((_) async => [_seedPlot()]);
   });
 
   Widget wrap() => ProviderScope(
         overrides: [
           activityServiceProvider.overrideWithValue(mockActivityService),
           plotServiceProvider.overrideWithValue(mockPlotService),
+          activityRepositoryProvider.overrideWithValue(mockActivityRepo),
+          plotRepositoryProvider.overrideWithValue(mockPlotRepo),
         ],
         child: MaterialApp.router(routerConfig: _router()),
       );
@@ -96,19 +118,16 @@ void main() {
   testWidgets(
     'long-press → bottom sheet → Eliminar → confirm calls delete',
     (tester) async {
-      // Arrange — first list call returns the seeded activity, subsequent
-      // calls (post-delete refresh) return an empty list.
-      when(() => mockActivityService.delete(_activityId))
+      // Arrange — stub repo delete. Initial build shows the seeded activity.
+      when(() => mockActivityRepo.delete(_activityId))
           .thenAnswer((_) async {});
-      var listCalls = 0;
-      when(() => mockActivityService.listByPlot(_plotId)).thenAnswer((_) async {
-        listCalls += 1;
-        if (listCalls == 1) return [_seedActivity()];
-        return <Activity>[];
-      });
 
       await tester.pumpWidget(wrap());
       await tester.pumpAndSettle();
+
+      // Post-delete refresh returns empty list.
+      when(() => mockActivityRepo.listByPlot(any()))
+          .thenAnswer((_) async => <Activity>[]);
 
       // Act — long-press the activity row (matched by its type label).
       await tester.longPress(find.text('Cosecha'));
@@ -129,8 +148,8 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Eliminar'));
       await tester.pumpAndSettle();
 
-      // Assert — service called with the right id + success snackbar shown.
-      verify(() => mockActivityService.delete(_activityId)).called(1);
+      // Assert — repo called with the right id + success snackbar shown.
+      verify(() => mockActivityRepo.delete(_activityId)).called(1);
       expect(find.text('Actividad eliminada'), findsOneWidget);
     },
   );
@@ -149,7 +168,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('EDIT-$_activityId'), findsOneWidget);
-      verifyNever(() => mockActivityService.delete(any()));
+      verifyNever(() => mockActivityRepo.delete(any()));
     },
   );
 
@@ -168,7 +187,7 @@ void main() {
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
 
-      verifyNever(() => mockActivityService.delete(any()));
+      verifyNever(() => mockActivityRepo.delete(any()));
       // Still on the timeline.
       expect(find.text('Cosecha'), findsOneWidget);
     },

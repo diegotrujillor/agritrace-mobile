@@ -3,11 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:agritrace_mobile/models/alert.dart';
 import 'package:agritrace_mobile/providers/alerts_provider.dart';
+import 'package:agritrace_mobile/repositories/alert_repository.dart';
+import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/services/alert_service.dart';
+
+class MockAlertRepository extends Mock implements AlertRepository {}
 
 class MockAlertService extends Mock implements AlertService {}
 
-Alert _alert({String id = 'alert-1', AlertStatus status = AlertStatus.pending}) =>
+Alert _alert({
+  String id = 'alert-1',
+  AlertStatus status = AlertStatus.pending,
+}) =>
     Alert(
       id: id,
       type: AlertType.reminder,
@@ -20,32 +27,45 @@ Alert _alert({String id = 'alert-1', AlertStatus status = AlertStatus.pending}) 
 void main() {
   setUpAll(() {
     registerFallbackValue(DateTime.utc(2026));
+    registerFallbackValue(_alert());
+    registerFallbackValue(AlertStatus.pending);
   });
 
+  late MockAlertRepository mockRepo;
   late MockAlertService mockService;
 
   setUp(() {
+    mockRepo = MockAlertRepository();
     mockService = MockAlertService();
   });
 
   ProviderContainer makeContainer() => ProviderContainer(
-        overrides: [alertServiceProvider.overrideWithValue(mockService)],
+        overrides: [
+          alertRepositoryProvider.overrideWithValue(mockRepo),
+          alertServiceProvider.overrideWithValue(mockService),
+        ],
       );
 
+  void stubRepoDefaults(List<Alert> alerts) {
+    when(() => mockRepo.watchAll())
+        .thenAnswer((_) => Stream.value(alerts));
+  }
+
   test('build() loads the producer alerts list', () async {
-    when(() => mockService.list()).thenAnswer((_) async => [_alert()]);
+    stubRepoDefaults([_alert()]);
+
     final container = makeContainer();
     addTearDown(container.dispose);
 
     final alerts = await container.read(alertsProvider.future);
 
     expect(alerts.single.id, 'alert-1');
-    verify(() => mockService.list()).called(1);
+    verify(() => mockRepo.watchAll()).called(greaterThanOrEqualTo(1));
   });
 
-  test('createReminder() calls the service then refreshes', () async {
-    when(() => mockService.list()).thenAnswer((_) async => <Alert>[]);
-    when(() => mockService.createReminder(
+  test('createReminder() calls repo then refreshes', () async {
+    stubRepoDefaults([]);
+    when(() => mockRepo.createReminder(
           title: any(named: 'title'),
           scheduledFor: any(named: 'scheduledFor'),
           body: any(named: 'body'),
@@ -56,7 +76,8 @@ void main() {
     addTearDown(container.dispose);
     await container.read(alertsProvider.future);
 
-    when(() => mockService.list()).thenAnswer((_) async => [_alert()]);
+    when(() => mockRepo.watchAll())
+        .thenAnswer((_) => Stream.value([_alert()]));
     final when0 = DateTime.utc(2026, 4, 2, 8);
     await container.read(alertsProvider.notifier).createReminder(
           title: 'Regar lote',
@@ -64,7 +85,7 @@ void main() {
         );
 
     expect(container.read(alertsProvider).value, hasLength(1));
-    verify(() => mockService.createReminder(
+    verify(() => mockRepo.createReminder(
           title: 'Regar lote',
           scheduledFor: when0,
           body: null,
@@ -73,50 +94,57 @@ void main() {
   });
 
   test('dismiss() updates the alert status then refreshes', () async {
-    when(() => mockService.list()).thenAnswer((_) async => [_alert()]);
-    when(() => mockService.update(any(), status: any(named: 'status')))
+    stubRepoDefaults([_alert()]);
+    when(() => mockRepo.updateStatus(any(), any()))
         .thenAnswer((_) async => _alert(status: AlertStatus.dismissed));
 
     final container = makeContainer();
     addTearDown(container.dispose);
     await container.read(alertsProvider.future);
 
-    when(() => mockService.list())
-        .thenAnswer((_) async => [_alert(status: AlertStatus.dismissed)]);
+    when(() => mockRepo.watchAll()).thenAnswer(
+      (_) => Stream.value([_alert(status: AlertStatus.dismissed)]),
+    );
     await container.read(alertsProvider.notifier).dismiss('alert-1');
 
     expect(container.read(alertsProvider).value!.single.status,
         AlertStatus.dismissed);
-    verify(() => mockService.update('alert-1',
-        status: AlertStatus.dismissed)).called(1);
+    verify(() => mockRepo.updateStatus(any(), AlertStatus.dismissed))
+        .called(1);
   });
 
-  test('deleteAlert() calls the service then refreshes', () async {
-    when(() => mockService.list()).thenAnswer((_) async => [_alert()]);
-    when(() => mockService.delete(any())).thenAnswer((_) async {});
+  test('deleteAlert() calls repo delete then refreshes', () async {
+    stubRepoDefaults([_alert()]);
+    when(() => mockRepo.delete(any())).thenAnswer((_) async {});
 
     final container = makeContainer();
     addTearDown(container.dispose);
     await container.read(alertsProvider.future);
 
-    when(() => mockService.list()).thenAnswer((_) async => <Alert>[]);
+    when(() => mockRepo.watchAll())
+        .thenAnswer((_) => Stream.value(<Alert>[]));
     await container.read(alertsProvider.notifier).deleteAlert('alert-1');
 
     expect(container.read(alertsProvider).value, isEmpty);
-    verify(() => mockService.delete('alert-1')).called(1);
+    verify(() => mockRepo.delete('alert-1')).called(1);
   });
 
   test('runWeatherCheck() returns provider name and refreshes', () async {
-    when(() => mockService.list()).thenAnswer((_) async => <Alert>[]);
+    stubRepoDefaults([]);
     when(() => mockService.checkWeather('plot-1')).thenAnswer(
-      (_) async => const WeatherCheckResult(provider: 'stub'),
+      (_) async => WeatherCheckResult(
+        provider: 'stub',
+        alert: _alert(id: 'w-1'),
+      ),
     );
+    when(() => mockRepo.upsertFromServer(any())).thenAnswer((_) async {});
 
     final container = makeContainer();
     addTearDown(container.dispose);
     await container.read(alertsProvider.future);
 
-    when(() => mockService.list()).thenAnswer((_) async => [_alert()]);
+    when(() => mockRepo.watchAll())
+        .thenAnswer((_) => Stream.value([_alert()]));
     final provider = await container
         .read(alertsProvider.notifier)
         .runWeatherCheck('plot-1');
@@ -125,8 +153,10 @@ void main() {
     expect(container.read(alertsProvider).value, hasLength(1));
   });
 
-  test('build() surfaces an AsyncError when the service throws', () async {
-    when(() => mockService.list()).thenThrow(Exception('network down'));
+  test('build() surfaces an AsyncError when the repo stream errors', () async {
+    when(() => mockRepo.watchAll())
+        .thenAnswer((_) => Stream.error(Exception('db error')));
+
     final container = makeContainer();
     addTearDown(container.dispose);
 
@@ -137,15 +167,16 @@ void main() {
     expect(container.read(alertsProvider).hasError, isTrue);
   });
 
-  test('deleteAlert() error state when refresh fails', () async {
-    when(() => mockService.list()).thenAnswer((_) async => [_alert()]);
-    when(() => mockService.delete(any())).thenAnswer((_) async {});
+  test('deleteAlert() error state when repo throws', () async {
+    stubRepoDefaults([_alert()]);
+    when(() => mockRepo.delete(any())).thenAnswer((_) async {});
 
     final container = makeContainer();
     addTearDown(container.dispose);
     await container.read(alertsProvider.future);
 
-    when(() => mockService.list()).thenThrow(Exception('refresh failed'));
+    when(() => mockRepo.watchAll())
+        .thenAnswer((_) => Stream.error(Exception('refresh failed')));
     await container.read(alertsProvider.notifier).deleteAlert('alert-1');
 
     expect(container.read(alertsProvider).hasError, isTrue);

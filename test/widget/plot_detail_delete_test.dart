@@ -15,7 +15,10 @@ import 'package:mocktail/mocktail.dart';
 import 'package:agritrace_mobile/models/activity.dart';
 import 'package:agritrace_mobile/models/plot.dart';
 import 'package:agritrace_mobile/providers/activities_provider.dart';
+import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/providers/plots_provider.dart';
+import 'package:agritrace_mobile/repositories/activity_repository.dart';
+import 'package:agritrace_mobile/repositories/plot_repository.dart';
 import 'package:agritrace_mobile/screens/plots/plot_detail_screen.dart';
 import 'package:agritrace_mobile/services/activity_service.dart';
 import 'package:agritrace_mobile/services/plot_service.dart';
@@ -23,6 +26,10 @@ import 'package:agritrace_mobile/services/plot_service.dart';
 class _MockPlotService extends Mock implements PlotService {}
 
 class _MockActivityService extends Mock implements ActivityService {}
+
+class _MockPlotRepository extends Mock implements PlotRepository {}
+
+class _MockActivityRepository extends Mock implements ActivityRepository {}
 
 const _farmId = 'farm-1';
 const _plotId = 'plot-1';
@@ -61,15 +68,28 @@ void main() {
 
   late _MockPlotService mockPlotService;
   late _MockActivityService mockActivityService;
+  late _MockPlotRepository mockPlotRepo;
+  late _MockActivityRepository mockActivityRepo;
 
   setUp(() {
     mockPlotService = _MockPlotService();
     mockActivityService = _MockActivityService();
+    mockPlotRepo = _MockPlotRepository();
+    mockActivityRepo = _MockActivityRepository();
     when(() => mockPlotService.get(_plotId))
         .thenAnswer((_) async => _seedPlot());
     when(() => mockPlotService.listByFarm(_farmId))
         .thenAnswer((_) async => [_seedPlot()]);
     when(() => mockActivityService.listByPlot(_plotId))
+        .thenAnswer((_) async => <Activity>[]);
+    // Repository stubs used by the notifiers' stream subscriptions + build().
+    when(() => mockPlotRepo.watchByFarm(any()))
+        .thenAnswer((_) => Stream.value([_seedPlot()]));
+    when(() => mockPlotRepo.listByFarm(any()))
+        .thenAnswer((_) async => [_seedPlot()]);
+    when(() => mockActivityRepo.watchByPlot(any()))
+        .thenAnswer((_) => Stream.value(<Activity>[]));
+    when(() => mockActivityRepo.listByPlot(any()))
         .thenAnswer((_) async => <Activity>[]);
   });
 
@@ -77,6 +97,8 @@ void main() {
         overrides: [
           plotServiceProvider.overrideWithValue(mockPlotService),
           activityServiceProvider.overrideWithValue(mockActivityService),
+          plotRepositoryProvider.overrideWithValue(mockPlotRepo),
+          activityRepositoryProvider.overrideWithValue(mockActivityRepo),
         ],
         child: MaterialApp.router(routerConfig: _router()),
       );
@@ -85,9 +107,9 @@ void main() {
     'overflow menu → Eliminar → confirm calls delete and navigates back',
     (tester) async {
       // Arrange
-      when(() => mockPlotService.delete(_plotId)).thenAnswer((_) async {});
+      when(() => mockPlotRepo.delete(_plotId)).thenAnswer((_) async {});
       // After delete, list refetch returns an empty list (plot is gone).
-      when(() => mockPlotService.listByFarm(_farmId))
+      when(() => mockPlotRepo.listByFarm(any()))
           .thenAnswer((_) async => <Plot>[]);
 
       await tester.pumpWidget(wrap());
@@ -113,8 +135,8 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Eliminar'));
       await tester.pumpAndSettle();
 
-      // Assert — service called with the right id + back-nav landed on farm.
-      verify(() => mockPlotService.delete(_plotId)).called(1);
+      // Assert — repo called with the right id + back-nav landed on farm.
+      verify(() => mockPlotRepo.delete(_plotId)).called(1);
       expect(find.text('FARM-$_farmId'), findsOneWidget);
     },
   );
@@ -134,7 +156,7 @@ void main() {
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
 
-      verifyNever(() => mockPlotService.delete(any()));
+      verifyNever(() => mockPlotRepo.delete(any()));
       // Still on the plot detail screen — no nav happened.
       expect(find.text('Lote Norte'), findsWidgets);
     },

@@ -3,7 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:agritrace_mobile/models/activity.dart';
 import 'package:agritrace_mobile/providers/activities_provider.dart';
+import 'package:agritrace_mobile/repositories/activity_repository.dart';
+import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/services/activity_service.dart';
+
+class MockActivityRepository extends Mock implements ActivityRepository {}
 
 class MockActivityService extends Mock implements ActivityService {}
 
@@ -21,34 +25,45 @@ void main() {
   setUpAll(() {
     registerFallbackValue(ActivityType.other);
     registerFallbackValue(DateTime.utc(2026));
+    registerFallbackValue(_activity());
   });
 
+  late MockActivityRepository mockRepo;
   late MockActivityService mockService;
 
   setUp(() {
+    mockRepo = MockActivityRepository();
     mockService = MockActivityService();
   });
 
   ProviderContainer makeContainer() => ProviderContainer(
-        overrides: [activityServiceProvider.overrideWithValue(mockService)],
+        overrides: [
+          activityRepositoryProvider.overrideWithValue(mockRepo),
+          activityServiceProvider.overrideWithValue(mockService),
+        ],
       );
 
+  void stubRepoDefaults(List<Activity> acts) {
+    when(() => mockRepo.watchByPlot(any()))
+        .thenAnswer((_) => Stream.value(acts));
+    when(() => mockRepo.listByPlot(any())).thenAnswer((_) async => acts);
+  }
+
   test('build() loads activities for the given plot', () async {
-    when(() => mockService.listByPlot(_plotId))
-        .thenAnswer((_) async => [_activity()]);
+    stubRepoDefaults([_activity()]);
+
     final container = makeContainer();
     addTearDown(container.dispose);
 
     final acts = await container.read(activitiesProvider(_plotId).future);
 
     expect(acts.single.id, 'act-1');
-    verify(() => mockService.listByPlot(_plotId)).called(1);
+    verify(() => mockRepo.listByPlot(_plotId)).called(greaterThanOrEqualTo(1));
   });
 
-  test('createActivity() calls the service then refreshes', () async {
-    when(() => mockService.listByPlot(_plotId))
-        .thenAnswer((_) async => <Activity>[]);
-    when(() => mockService.create(
+  test('createActivity() calls repo then refreshes', () async {
+    stubRepoDefaults([]);
+    when(() => mockRepo.create(
           plotId: any(named: 'plotId'),
           type: any(named: 'type'),
           occurredAt: any(named: 'occurredAt'),
@@ -60,16 +75,18 @@ void main() {
     addTearDown(container.dispose);
     await container.read(activitiesProvider(_plotId).future);
 
-    when(() => mockService.listByPlot(_plotId))
+    when(() => mockRepo.listByPlot(_plotId))
         .thenAnswer((_) async => [_activity()]);
     final occurred = DateTime.utc(2026, 3, 1);
-    await container.read(activitiesProvider(_plotId).notifier).createActivity(
+    await container
+        .read(activitiesProvider(_plotId).notifier)
+        .createActivity(
           type: ActivityType.sowing,
           occurredAt: occurred,
         );
 
     expect(container.read(activitiesProvider(_plotId)).value, hasLength(1));
-    verify(() => mockService.create(
+    verify(() => mockRepo.create(
           plotId: _plotId,
           type: ActivityType.sowing,
           occurredAt: occurred,
@@ -78,12 +95,10 @@ void main() {
         )).called(1);
   });
 
-  test('updateActivity() calls the service then refreshes', () async {
-    when(() => mockService.listByPlot(_plotId))
-        .thenAnswer((_) async => [_activity()]);
-    when(() => mockService.update(
-          id: any(named: 'id'),
-          plotId: any(named: 'plotId'),
+  test('updateActivity() calls repo update then refreshes', () async {
+    stubRepoDefaults([_activity()]);
+    when(() => mockRepo.update(
+          any(),
           type: any(named: 'type'),
           occurredAt: any(named: 'occurredAt'),
           description: any(named: 'description'),
@@ -101,9 +116,8 @@ void main() {
           occurredAt: occurred,
         );
 
-    verify(() => mockService.update(
-          id: 'act-1',
-          plotId: _plotId,
+    verify(() => mockRepo.update(
+          any(),
           type: ActivityType.harvest,
           occurredAt: occurred,
           description: null,
@@ -111,28 +125,30 @@ void main() {
         )).called(1);
   });
 
-  test('deleteActivity() calls the service then refreshes', () async {
-    when(() => mockService.listByPlot(_plotId))
-        .thenAnswer((_) async => [_activity()]);
-    when(() => mockService.delete(any())).thenAnswer((_) async {});
+  test('deleteActivity() calls repo delete then refreshes', () async {
+    stubRepoDefaults([_activity()]);
+    when(() => mockRepo.delete(any())).thenAnswer((_) async {});
 
     final container = makeContainer();
     addTearDown(container.dispose);
     await container.read(activitiesProvider(_plotId).future);
 
-    when(() => mockService.listByPlot(_plotId))
+    when(() => mockRepo.listByPlot(_plotId))
         .thenAnswer((_) async => <Activity>[]);
     await container
         .read(activitiesProvider(_plotId).notifier)
         .deleteActivity('act-1');
 
     expect(container.read(activitiesProvider(_plotId)).value, isEmpty);
-    verify(() => mockService.delete('act-1')).called(1);
+    verify(() => mockRepo.delete('act-1')).called(1);
   });
 
-  test('build() surfaces an AsyncError when the service throws', () async {
-    when(() => mockService.listByPlot(_plotId))
-        .thenThrow(Exception('network down'));
+  test('build() surfaces an AsyncError when the repo throws', () async {
+    when(() => mockRepo.watchByPlot(any()))
+        .thenAnswer((_) => Stream.value([]));
+    when(() => mockRepo.listByPlot(_plotId))
+        .thenThrow(Exception('db error'));
+
     final container = makeContainer();
     addTearDown(container.dispose);
 
@@ -143,16 +159,15 @@ void main() {
     expect(container.read(activitiesProvider(_plotId)).hasError, isTrue);
   });
 
-  test('deleteActivity() error state when refresh fails', () async {
-    when(() => mockService.listByPlot(_plotId))
-        .thenAnswer((_) async => [_activity()]);
-    when(() => mockService.delete(any())).thenAnswer((_) async {});
+  test('deleteActivity() error state when repo throws', () async {
+    stubRepoDefaults([_activity()]);
+    when(() => mockRepo.delete(any())).thenAnswer((_) async {});
 
     final container = makeContainer();
     addTearDown(container.dispose);
     await container.read(activitiesProvider(_plotId).future);
 
-    when(() => mockService.listByPlot(_plotId))
+    when(() => mockRepo.listByPlot(_plotId))
         .thenThrow(Exception('refresh failed'));
     await container
         .read(activitiesProvider(_plotId).notifier)

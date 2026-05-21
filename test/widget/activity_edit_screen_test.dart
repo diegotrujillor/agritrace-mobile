@@ -13,10 +13,14 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:agritrace_mobile/models/activity.dart';
 import 'package:agritrace_mobile/providers/activities_provider.dart';
+import 'package:agritrace_mobile/providers/database_provider.dart';
+import 'package:agritrace_mobile/repositories/activity_repository.dart';
 import 'package:agritrace_mobile/screens/activities/activity_edit_screen.dart';
 import 'package:agritrace_mobile/services/activity_service.dart';
 
 class _MockActivityService extends Mock implements ActivityService {}
+
+class _MockActivityRepository extends Mock implements ActivityRepository {}
 
 const _plotId = 'plot-1';
 const _activityId = 'act-1';
@@ -54,20 +58,31 @@ void main() {
   setUpAll(() {
     registerFallbackValue(ActivityType.other);
     registerFallbackValue(DateTime.utc(2026));
+    registerFallbackValue(_seedActivity());
   });
 
   late _MockActivityService mockService;
+  late _MockActivityRepository mockActivityRepo;
 
   setUp(() {
     mockService = _MockActivityService();
+    mockActivityRepo = _MockActivityRepository();
     when(() => mockService.get(_activityId))
         .thenAnswer((_) async => _seedActivity());
     when(() => mockService.listByPlot(_plotId))
         .thenAnswer((_) async => [_seedActivity()]);
+    // Repository stubs for ActivitiesNotifier stream subscription + build().
+    when(() => mockActivityRepo.watchByPlot(any()))
+        .thenAnswer((_) => Stream.value([_seedActivity()]));
+    when(() => mockActivityRepo.listByPlot(any()))
+        .thenAnswer((_) async => [_seedActivity()]);
   });
 
   Widget wrap() => ProviderScope(
-        overrides: [activityServiceProvider.overrideWithValue(mockService)],
+        overrides: [
+          activityServiceProvider.overrideWithValue(mockService),
+          activityRepositoryProvider.overrideWithValue(mockActivityRepo),
+        ],
         child: MaterialApp.router(routerConfig: _router()),
       );
 
@@ -97,10 +112,9 @@ void main() {
   testWidgets(
     'submitting calls update with the edited values and shows snackbar',
     (tester) async {
-      // Arrange — stub the update call so the form can submit successfully.
-      when(() => mockService.update(
-            id: any(named: 'id'),
-            plotId: any(named: 'plotId'),
+      // Arrange — stub the repo update so the form can submit successfully.
+      when(() => mockActivityRepo.update(
+            any(),
             type: any(named: 'type'),
             occurredAt: any(named: 'occurredAt'),
             description: any(named: 'description'),
@@ -108,6 +122,8 @@ void main() {
           )).thenAnswer((_) async => _seedActivity().copyWith(
             description: 'Aplicación NPK 20-20-20',
           ));
+      when(() => mockActivityRepo.listByPlot(any())).thenAnswer((_) async =>
+          [_seedActivity().copyWith(description: 'Aplicación NPK 20-20-20')]);
 
       await tester.pumpWidget(wrap());
       await tester.pumpAndSettle();
@@ -123,11 +139,10 @@ void main() {
           .tap(find.widgetWithText(ElevatedButton, 'Guardar cambios'));
       await tester.pumpAndSettle();
 
-      // Assert — provider called the service with the edited description
-      // and the original type/occurredAt/photoUrl preserved.
-      verify(() => mockService.update(
-            id: _activityId,
-            plotId: _plotId,
+      // Assert — repo update called with the edited description;
+      // original type/occurredAt/photoUrl preserved.
+      verify(() => mockActivityRepo.update(
+            any(),
             type: ActivityType.fertilization,
             occurredAt: DateTime.utc(2026, 3, 15),
             description: 'Aplicación NPK 20-20-20',

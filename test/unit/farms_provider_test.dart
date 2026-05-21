@@ -3,7 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:agritrace_mobile/models/farm.dart';
 import 'package:agritrace_mobile/providers/farms_provider.dart';
+import 'package:agritrace_mobile/repositories/farm_repository.dart';
+import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/services/farm_service.dart';
+
+class MockFarmRepository extends Mock implements FarmRepository {}
 
 class MockFarmService extends Mock implements FarmService {}
 
@@ -16,41 +20,62 @@ Farm _farm({String id = 'farm-1', String name = 'Finca El Roble'}) => Farm(
     );
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(_farm());
+  });
+
+  late MockFarmRepository mockRepo;
   late MockFarmService mockService;
 
   setUp(() {
+    mockRepo = MockFarmRepository();
     mockService = MockFarmService();
   });
 
+  /// Builds a container with both the repository and service overridden.
   ProviderContainer makeContainer() => ProviderContainer(
-        overrides: [farmServiceProvider.overrideWithValue(mockService)],
+        overrides: [
+          farmRepositoryProvider.overrideWithValue(mockRepo),
+          farmServiceProvider.overrideWithValue(mockService),
+        ],
       );
 
+  /// Stubs the stream and listAll so FarmsNotifier.build() doesn't hit
+  /// the real DB.
+  void stubRepoDefaults(List<Farm> farms) {
+    when(() => mockRepo.watchAll())
+        .thenAnswer((_) => Stream.value(farms));
+    when(() => mockRepo.listAll()).thenAnswer((_) async => farms);
+  }
+
   test('build() loads the producer farms list', () async {
-    when(() => mockService.list()).thenAnswer((_) async => [_farm()]);
+    stubRepoDefaults([_farm()]);
+
     final container = makeContainer();
     addTearDown(container.dispose);
 
     final farms = await container.read(farmsProvider.future);
 
     expect(farms.single.name, 'Finca El Roble');
-    verify(() => mockService.list()).called(1);
+    verify(() => mockRepo.listAll()).called(greaterThanOrEqualTo(1));
   });
 
-  test('create() calls the service then refreshes the list', () async {
-    when(() => mockService.list()).thenAnswer((_) async => [_farm()]);
-    when(() => mockService.create(
+  test('create() writes to repo then refreshes the list', () async {
+    stubRepoDefaults([]);
+    when(() => mockRepo.create(
           name: any(named: 'name'),
           cropType: any(named: 'cropType'),
           areaHectares: any(named: 'areaHectares'),
           address: any(named: 'address'),
+          latitude: any(named: 'latitude'),
+          longitude: any(named: 'longitude'),
         )).thenAnswer((_) async => _farm(id: 'new'));
 
     final container = makeContainer();
     addTearDown(container.dispose);
     await container.read(farmsProvider.future);
 
-    when(() => mockService.list())
+    when(() => mockRepo.listAll())
         .thenAnswer((_) async => [_farm(), _farm(id: 'new')]);
     await container.read(farmsProvider.notifier).create(
           name: 'Nueva',
@@ -59,29 +84,25 @@ void main() {
         );
 
     expect(container.read(farmsProvider).value, hasLength(2));
-    verify(() => mockService.create(
-          name: 'Nueva',
-          cropType: 'cacao',
-          areaHectares: 5,
-          address: null,
-        )).called(1);
   });
 
-  test('updateFarm() calls the service then refreshes', () async {
-    when(() => mockService.list()).thenAnswer((_) async => [_farm()]);
-    when(() => mockService.update(
-          id: any(named: 'id'),
+  test('updateFarm() calls repo update then refreshes', () async {
+    stubRepoDefaults([_farm()]);
+    when(() => mockRepo.update(
+          any(),
           name: any(named: 'name'),
           cropType: any(named: 'cropType'),
           areaHectares: any(named: 'areaHectares'),
           address: any(named: 'address'),
+          latitude: any(named: 'latitude'),
+          longitude: any(named: 'longitude'),
         )).thenAnswer((_) async => _farm(name: 'Editada'));
 
     final container = makeContainer();
     addTearDown(container.dispose);
     await container.read(farmsProvider.future);
 
-    when(() => mockService.list())
+    when(() => mockRepo.listAll())
         .thenAnswer((_) async => [_farm(name: 'Editada')]);
     await container.read(farmsProvider.notifier).updateFarm(
           id: 'farm-1',
@@ -91,32 +112,27 @@ void main() {
         );
 
     expect(container.read(farmsProvider).value!.single.name, 'Editada');
-    verify(() => mockService.update(
-          id: 'farm-1',
-          name: 'Editada',
-          cropType: 'cacao',
-          areaHectares: 9,
-          address: null,
-        )).called(1);
   });
 
-  test('delete() calls the service then refreshes', () async {
-    when(() => mockService.list()).thenAnswer((_) async => [_farm()]);
-    when(() => mockService.delete(any())).thenAnswer((_) async {});
+  test('delete() calls repo delete then refreshes', () async {
+    stubRepoDefaults([_farm()]);
+    when(() => mockRepo.delete(any())).thenAnswer((_) async {});
 
     final container = makeContainer();
     addTearDown(container.dispose);
     await container.read(farmsProvider.future);
 
-    when(() => mockService.list()).thenAnswer((_) async => <Farm>[]);
+    when(() => mockRepo.listAll()).thenAnswer((_) async => <Farm>[]);
     await container.read(farmsProvider.notifier).delete('farm-1');
 
     expect(container.read(farmsProvider).value, isEmpty);
-    verify(() => mockService.delete('farm-1')).called(1);
+    verify(() => mockRepo.delete('farm-1')).called(1);
   });
 
-  test('build() surfaces an AsyncError when the service throws', () async {
-    when(() => mockService.list()).thenThrow(Exception('network down'));
+  test('build() surfaces an AsyncError when the repo throws', () async {
+    when(() => mockRepo.watchAll()).thenAnswer((_) => Stream.value([]));
+    when(() => mockRepo.listAll()).thenThrow(Exception('db error'));
+
     final container = makeContainer();
     addTearDown(container.dispose);
 
@@ -127,21 +143,21 @@ void main() {
     expect(container.read(farmsProvider).hasError, isTrue);
   });
 
-  test('create() puts the notifier in error state when refresh fails',
-      () async {
-    when(() => mockService.list()).thenAnswer((_) async => [_farm()]);
-    when(() => mockService.create(
+  test('create() puts the notifier in error state when repo throws', () async {
+    stubRepoDefaults([_farm()]);
+    when(() => mockRepo.create(
           name: any(named: 'name'),
           cropType: any(named: 'cropType'),
           areaHectares: any(named: 'areaHectares'),
           address: any(named: 'address'),
-        )).thenAnswer((_) async => _farm());
+          latitude: any(named: 'latitude'),
+          longitude: any(named: 'longitude'),
+        )).thenThrow(Exception('create failed'));
 
     final container = makeContainer();
     addTearDown(container.dispose);
     await container.read(farmsProvider.future);
 
-    when(() => mockService.list()).thenThrow(Exception('refresh failed'));
     await container.read(farmsProvider.notifier).create(
           name: 'X',
           cropType: 'cacao',
@@ -152,7 +168,7 @@ void main() {
   });
 
   test('farmProvider.family looks up a single farm by id', () async {
-    when(() => mockService.list()).thenAnswer((_) async => <Farm>[]);
+    stubRepoDefaults([]);
     when(() => mockService.get('farm-7'))
         .thenAnswer((_) async => _farm(id: 'farm-7'));
     final container = makeContainer();

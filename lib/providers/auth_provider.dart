@@ -1,3 +1,5 @@
+import 'dart:developer' as dev;
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +8,7 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
+import 'database_provider.dart';
 
 /// `flutter_secure_storage` backed by:
 ///  - iOS: Keychain (`first_unlock_this_device`)
@@ -90,6 +93,9 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     // `refresh()` is the closest equivalent and is rate-limited (`authLimiter`).
     try {
       final auth = await ref.read(authServiceProvider).refresh();
+      // Seed local DB with server data on cold start. Fire-and-forget so a
+      // network failure does not block the app from reaching the dashboard.
+      _seedInBackground('initial seed');
       return AuthAuthenticated(auth.user);
     } on DioException catch (e) {
       // 401/403 → refresh token rejected → unrecoverable. Any other status
@@ -111,6 +117,16 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     }
   }
 
+  /// Runs a sync round trip in the background, swallowing errors.
+  ///
+  /// Used to seed the local DB after authentication without blocking the
+  /// login/cold-start flow.  Errors are logged but not surfaced.
+  void _seedInBackground(String context) {
+    ref.read(syncOrchestratorProvider).run().then((_) {}).catchError((Object e) {
+      dev.log('AuthNotifier: $context sync failed: $e', name: 'auth');
+    });
+  }
+
   /// Flips the state to [AuthUnauthenticated] without going through
   /// [logout()] — used by the [ApiService] `onLogout` callback when the
   /// refresh interceptor detects an unrecoverable session collapse.
@@ -124,6 +140,8 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       final auth = await ref
           .read(authServiceProvider)
           .login(email: email, password: password);
+      // Seed local DB on fresh login. Fire-and-forget.
+      _seedInBackground('login seed');
       return AuthAuthenticated(auth.user);
     });
   }
@@ -144,6 +162,9 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
             password: password,
             privacyConsent: privacyConsent,
           );
+      // New account — local DB is empty; seed attempt is a no-op but
+      // marks the pattern consistent with login.
+      _seedInBackground('register seed');
       return AuthAuthenticated(auth.user);
     });
   }

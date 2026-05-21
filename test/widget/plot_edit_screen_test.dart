@@ -11,11 +11,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:agritrace_mobile/models/plot.dart';
+import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/providers/plots_provider.dart';
+import 'package:agritrace_mobile/repositories/plot_repository.dart';
 import 'package:agritrace_mobile/screens/plots/plot_edit_screen.dart';
 import 'package:agritrace_mobile/services/plot_service.dart';
 
 class _MockPlotService extends Mock implements PlotService {}
+
+class _MockPlotRepository extends Mock implements PlotRepository {}
 
 const _farmId = 'farm-1';
 const _plotId = 'plot-1';
@@ -52,20 +56,31 @@ GoRouter _router() => GoRouter(
 void main() {
   setUpAll(() {
     registerFallbackValue(PlotStatus.planning);
+    registerFallbackValue(_seedPlot());
   });
 
   late _MockPlotService mockService;
+  late _MockPlotRepository mockPlotRepo;
 
   setUp(() {
     mockService = _MockPlotService();
+    mockPlotRepo = _MockPlotRepository();
     when(() => mockService.get(_plotId))
         .thenAnswer((_) async => _seedPlot());
     when(() => mockService.listByFarm(_farmId))
         .thenAnswer((_) async => [_seedPlot()]);
+    // Repository stubs for PlotsNotifier stream subscription + build().
+    when(() => mockPlotRepo.watchByFarm(any()))
+        .thenAnswer((_) => Stream.value([_seedPlot()]));
+    when(() => mockPlotRepo.listByFarm(any()))
+        .thenAnswer((_) async => [_seedPlot()]);
   });
 
   Widget wrap() => ProviderScope(
-        overrides: [plotServiceProvider.overrideWithValue(mockService)],
+        overrides: [
+          plotServiceProvider.overrideWithValue(mockService),
+          plotRepositoryProvider.overrideWithValue(mockPlotRepo),
+        ],
         child: MaterialApp.router(routerConfig: _router()),
       );
 
@@ -83,16 +98,17 @@ void main() {
   });
 
   testWidgets('submitting calls update with the edited values', (tester) async {
-    // Arrange
-    when(() => mockService.update(
-          id: any(named: 'id'),
-          farmId: any(named: 'farmId'),
+    // Arrange — stub repo update; post-update refresh returns updated plot.
+    when(() => mockPlotRepo.update(
+          any(),
           name: any(named: 'name'),
           cropType: any(named: 'cropType'),
           status: any(named: 'status'),
           variety: any(named: 'variety'),
           areaHectares: any(named: 'areaHectares'),
         )).thenAnswer((_) async => _seedPlot().copyWith(name: 'Lote Sur'));
+    when(() => mockPlotRepo.listByFarm(any()))
+        .thenAnswer((_) async => [_seedPlot().copyWith(name: 'Lote Sur')]);
 
     await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
@@ -105,10 +121,9 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Guardar cambios'));
     await tester.pumpAndSettle();
 
-    // Assert
-    verify(() => mockService.update(
-          id: _plotId,
-          farmId: _farmId,
+    // Assert — repo update called with edited name; snackbar shown.
+    verify(() => mockPlotRepo.update(
+          any(),
           name: 'Lote Sur',
           cropType: 'cacao',
           status: PlotStatus.growing,

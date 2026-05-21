@@ -104,6 +104,18 @@ class Alert {
         scheduledFor: _parseNullableDate(json['scheduledFor']),
       );
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'type': type.wire,
+        'severity': severity.wire,
+        'title': title,
+        'status': status.wire,
+        'createdAt': createdAt.toIso8601String(),
+        'plotId': plotId,
+        'body': body,
+        'scheduledFor': scheduledFor?.toIso8601String(),
+      };
+
   Alert copyWith({
     String? id,
     AlertType? type,
