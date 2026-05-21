@@ -49,13 +49,16 @@ class Plot {
 
   factory Plot.fromJson(Map<String, dynamic> json) => Plot(
         id: json['id'] as String,
-        farmId: json['farmId'] as String,
+        farmId: (json['farmId'] ?? json['farm_id']) as String,
         name: json['name'] as String,
-        cropType: json['cropType'] as String,
+        cropType: (json['cropType'] ?? json['crop_type']) as String,
         status: PlotStatus.fromName(json['status']),
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        createdAt: DateTime.parse(
+          (json['createdAt'] ?? json['created_at']).toString(),
+        ),
         variety: json['variety'] as String?,
-        areaHectares: toDoubleOrNull(json['areaHectares']),
+        areaHectares:
+            toDoubleOrNull(json['areaHectares'] ?? json['area_hectares']),
       );
 
   Map<String, dynamic> toJson() => {

@@ -13,6 +13,13 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 - **fix:** retry budget per-request (max 1) impide loops infinitos de refresh; storage write atómico antes de liberar el future single-flight.
 - 224 tests verdes (incluye `test/unit/auth_interceptor_test.dart` con 6 casos: 401-then-refresh, 5 concurrent 401s coalescen, refresh-401 → collapse + onLogout + storage cleared, refresh-5xx → transient, non-401 passthrough, `/auth/refresh` sin Bearer). `flutter analyze` limpio.
 
+## [1.5.1] - 2026-05-21 — fix(sync): push envelope + fromJson snake_case — CU-22/CU-23 E2E pasa
+
+- **fix (CU-23):** `SyncService._pushEnvelope` ahora desenvuelve `body['data']` igual que `_pullEnvelope`. El backend responde `{ success, data: { synced, conflicts, timestamp } }` pero el cliente leía `push['synced']` en el nivel raíz → siempre 0. `synced` y `conflicts` ahora se leen correctamente.
+- **fix (CU-23):** `Farm.fromJson`, `Plot.fromJson`, `Activity.fromJson`, `Alert.fromJson` aceptan claves snake_case del pull de PostgreSQL (`crop_type`, `area_hectares`, `created_at`, `farm_id`, `plot_id`, `occurred_at`, `photo_url`, `scheduled_for`). La crash `type 'Null' is not a subtype of type 'String'` en `_applyPulledChange` está resuelta.
+- **verified (CU-22):** E2E emulador AVD confirmado — finca creada offline con `syncStatus=pendingCreate`, UI renderiza sin red, offline indicator visible.
+- **verified (CU-23):** E2E emulador AVD confirmado — `FarmRepo.getPending: 1 rows`, `server synced=1 conflicts=0 pulled=2`, `upsertFromServer` sin crashes. Batch-splitting >500 cambios no implementado (futura iteración).
+
 ## [1.5.0] - 2026-05-21 — feat(offline): capa de persistencia SQLite offline-first con Drift
 - **feat:** Drift 2.x + drift_flutter integrados. Base de datos local `agritrace.db` con 4 tablas (`farms`, `plots`, `activities`, `alerts`) con columnas de sincronización (`syncStatus`, `updatedAt`) en cada fila.
 - **feat:** 4 repositorios nuevos (`FarmRepository`, `PlotRepository`, `ActivityRepository`, `AlertRepository`) como capa de acceso a datos local. Escritura offline-first con estados `pendingCreate` / `pendingUpdate` / `pendingDelete`.

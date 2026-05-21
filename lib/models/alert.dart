@@ -98,10 +98,14 @@ class Alert {
         severity: AlertSeverity.fromWire(json['severity']),
         title: json['title'] as String,
         status: AlertStatus.fromWire(json['status']),
-        createdAt: DateTime.parse(json['createdAt'] as String),
-        plotId: json['plotId'] as String?,
+        createdAt: DateTime.parse(
+          (json['createdAt'] ?? json['created_at']).toString(),
+        ),
+        plotId: (json['plotId'] ?? json['plot_id']) as String?,
         body: json['body'] as String?,
-        scheduledFor: _parseNullableDate(json['scheduledFor']),
+        scheduledFor: _parseNullableDate(
+          json['scheduledFor'] ?? json['scheduled_for'],
+        ),
       );
 
   Map<String, dynamic> toJson() => {

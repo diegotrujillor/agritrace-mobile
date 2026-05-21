@@ -29,9 +29,12 @@ class Farm {
   factory Farm.fromJson(Map<String, dynamic> json) => Farm(
         id: json['id'] as String,
         name: json['name'] as String,
-        cropType: json['cropType'] as String,
-        areaHectares: toDoubleOrNull(json['areaHectares']) ?? 0,
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        cropType: (json['cropType'] ?? json['crop_type']) as String,
+        areaHectares:
+            toDoubleOrNull(json['areaHectares'] ?? json['area_hectares']) ?? 0,
+        createdAt: DateTime.parse(
+          (json['createdAt'] ?? json['created_at']).toString(),
+        ),
         latitude: toDoubleOrNull(json['latitude']),
         longitude: toDoubleOrNull(json['longitude']),
         address: json['address'] as String?,

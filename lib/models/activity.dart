@@ -64,12 +64,16 @@ class Activity {
 
   factory Activity.fromJson(Map<String, dynamic> json) => Activity(
         id: json['id'] as String,
-        plotId: json['plotId'] as String,
+        plotId: (json['plotId'] ?? json['plot_id']) as String,
         type: ActivityType.fromWire(json['type']),
-        occurredAt: DateTime.parse(json['occurredAt'] as String),
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        occurredAt: DateTime.parse(
+          (json['occurredAt'] ?? json['occurred_at']).toString(),
+        ),
+        createdAt: DateTime.parse(
+          (json['createdAt'] ?? json['created_at']).toString(),
+        ),
         description: json['description'] as String?,
-        photoUrl: json['photoUrl'] as String?,
+        photoUrl: (json['photoUrl'] ?? json['photo_url']) as String?,
       );
 
   Map<String, dynamic> toJson() => {

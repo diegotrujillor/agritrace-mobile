@@ -98,13 +98,15 @@ class SyncService {
     );
   }
 
-  /// Push response is `{ success, synced, conflicts, timestamp }` (counters
-  /// at top level, not under a `data` key).
+  /// Push response uses the standard `{ success, data: { synced, conflicts, timestamp } }`
+  /// envelope — same shape as pull.
   Map<String, dynamic> _pushEnvelope(Object? body) {
-    if (body is! Map<String, dynamic> || body['success'] != true) {
+    if (body is! Map<String, dynamic> ||
+        body['success'] != true ||
+        body['data'] == null) {
       throw const FormatException('Invalid sync push response');
     }
-    return body;
+    return body['data'] as Map<String, dynamic>;
   }
 
   /// Pull response uses the standard `{ success, data: { changes, timestamp } }`
