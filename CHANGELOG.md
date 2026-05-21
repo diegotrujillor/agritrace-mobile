@@ -13,7 +13,7 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 - **fix:** retry budget per-request (max 1) impide loops infinitos de refresh; storage write atómico antes de liberar el future single-flight.
 - 224 tests verdes (incluye `test/unit/auth_interceptor_test.dart` con 6 casos: 401-then-refresh, 5 concurrent 401s coalescen, refresh-401 → collapse + onLogout + storage cleared, refresh-5xx → transient, non-401 passthrough, `/auth/refresh` sin Bearer). `flutter analyze` limpio.
 
-## [Unreleased] - 2026-05-21 — feat(offline): capa de persistencia SQLite offline-first con Drift
+## [1.5.0] - 2026-05-21 — feat(offline): capa de persistencia SQLite offline-first con Drift
 - **feat:** Drift 2.x + drift_flutter integrados. Base de datos local `agritrace.db` con 4 tablas (`farms`, `plots`, `activities`, `alerts`) con columnas de sincronización (`syncStatus`, `updatedAt`) en cada fila.
 - **feat:** 4 repositorios nuevos (`FarmRepository`, `PlotRepository`, `ActivityRepository`, `AlertRepository`) como capa de acceso a datos local. Escritura offline-first con estados `pendingCreate` / `pendingUpdate` / `pendingDelete`.
 - **feat:** `SyncOrchestrator` drena cambios pendientes → POST `/v1/sync`, aplica cambios jalados del servidor con estrategia LWW (`updatedAt` del servidor gana). `SyncNotifier` auto-dispara sync 2 s después de reconexión vía `connectivityProvider`.
