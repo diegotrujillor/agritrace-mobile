@@ -4,6 +4,26 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.6.0] - 2026-05-21 — feat(pdf): teléfono, email, GPS y fotos en trazabilidad (CU-25)
+
+### Added
+- **feat (CU-25):** `PdfTraceabilityService.build/buildAndShare` aceptan
+  `producerPhone` y `producerEmail` opcionales. El resumen del PDF incluye
+  filas "Teléfono" y "Email" cuando no están vacías.
+- **feat (CU-25):** Fila "GPS (finca)" en el resumen cuando `Farm` tiene
+  `latitude` y `longitude` no nulos, formateada como `"10.3932° N, 75.4832° W"`.
+- **feat (CU-25):** Columna "Foto" en la tabla de actividades. Carga bytes
+  del archivo local (`dart:io File.readAsBytes()`) usando `Activity.photoUrl`.
+  Prefijos `file://` se descartan. Archivo no encontrado → thumbnail omitido
+  sin crash (`on IOException`).
+- **feat (CU-25):** `_activityTable` (solo texto) reemplazado por
+  `_activityList` + `_activityHeaderRow` + `_activityDataRow` para soportar
+  celdas con imágenes.
+- **test:** `test/unit/pdf_traceability_service_test.dart` — 15 tests nuevos.
+  Dónde: `lib/services/pdf_traceability_service.dart`,
+  `lib/screens/plots/plot_detail_screen.dart`,
+  `test/unit/pdf_traceability_service_test.dart`.
+
 ## [1.4.1] - 2026-05-20 — fix(auth): refresh interceptor coalescing + sesión-collapse sentinel (P1)
 - **fix (P1):** `_AuthInterceptor` reescrito como `QueuedInterceptor` con cache single-flight `Future<String>? _refreshFuture` (patrón `fresh_dio`). Refresh ahora se coalesce: N requests paralelos que reciben 401 comparten UN solo `/auth/refresh`. Cierra el bug que producía banners "Credenciales incorrectas" en pantallas con múltiples providers concurrentes ([[CU-11]]/14/15/18/20/21).
 - **fix:** `/auth/refresh` ahora corre sobre un Dio dedicado SIN interceptores → no recursión y no envío de Bearer vencido.

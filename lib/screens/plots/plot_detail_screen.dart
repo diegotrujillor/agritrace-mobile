@@ -244,14 +244,15 @@ class _ExportPdfButtonState extends ConsumerState<_ExportPdfButton> {
       final activities =
           await ref.read(activitiesProvider(widget.plot.id).future);
       final auth = ref.read(authProvider).valueOrNull;
-      final producerName =
-          auth is AuthAuthenticated ? auth.user.fullName : null;
+      final user = auth is AuthAuthenticated ? auth.user : null;
 
       await const PdfTraceabilityService().buildAndShare(
         farm: farm,
         plot: widget.plot,
         activities: activities,
-        producerName: producerName,
+        producerName: user?.fullName,
+        producerPhone: user?.phone,
+        producerEmail: user?.email,
       );
     } catch (error) {
       messenger.showSnackBar(
