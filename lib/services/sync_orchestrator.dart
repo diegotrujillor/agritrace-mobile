@@ -161,10 +161,7 @@ class SyncOrchestrator {
           await alertRepo.upsertFromServer(change);
       }
     } catch (e) {
-      dev.log(
-        'SyncOrchestrator: failed to apply pulled change: $e',
-        name: 'sync',
-      );
+      dev.log('SyncOrchestrator: failed to apply pulled change: $e', name: 'sync');
     }
   }
 }
