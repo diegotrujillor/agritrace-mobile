@@ -109,18 +109,18 @@ All backend responses: `{ success: bool, data: T }` or `{ success: false, error:
 ### Certificate types (Sprint 3+)
 `organic` | `fair_trade` | `ica` | `rainforest` | `other`
 
-## Sync protocol (Sprint 3 — WatermelonDB)
+## Sync protocol (Sprint 3 — Drift + custom sync)
 
 ```
 POST /v1/sync
 Body:  { changes: [{ entity, id, action: 'create'|'update', data }] }
-Response: { success, synced, conflicts, timestamp }
+Response: { success: true, data: { synced, conflicts, timestamp } }
 
 GET /v1/sync/changes?since=<ISO timestamp>
-Response: { changes, timestamp }
+Response: { success: true, data: { changes, timestamp } }
 ```
 
-WatermelonDB sync fields on every model: `_status` (`'created'`|`'updated'`|`'synced'`), `updated_at`, `synced_at`. Conflict resolution: Last-Write-Wins on `updated_at`. MVP guarantees 14-day offline operation.
+Drift sync fields on every model: `syncStatus TEXT` (`'synced'`|`'pendingCreate'`|`'pendingUpdate'`), `updatedAt`. `SyncOrchestrator` runs push → `_markSynced()` → pull → `_applyPulledChange()`. Conflict resolution: Last-Write-Wins on `updatedAt` (server wins on pull). MVP guarantees 14-day offline operation.
 
 ## Sprint context
 
@@ -144,7 +144,7 @@ Source of truth: `agritrace-docs/02-documentacion-tecnica/04-desarrollo/01-direc
 ### Fundamental principles
 
 1. **Mobile-First** — Flutter/Dart only. No web app, no React Native.
-2. **Offline-First** — app must work without connectivity, sync when online (WatermelonDB, 14-day guarantee).
+2. **Offline-First** — app must work without connectivity, sync when online (Drift SQLite, 14-day guarantee).
 3. **Security by Default** — tokens in `FlutterSecureStorage`, never plain storage.
 4. **Simplicity** — simple code over clever code.
 5. **Documentation** — `///` doc comments where needed.
