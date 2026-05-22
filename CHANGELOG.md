@@ -4,6 +4,20 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] — feat(profile): pantalla de perfil + ARCO (CU-27)
+
+### Added
+- **feat (CU-27):** `ProfileScreen` (`lib/screens/profile/profile_screen.dart`) — nueva Pantalla 11. Muestra nombre/email/teléfono del usuario autenticado y expone tres acciones: exportar datos JSON (Ley 1581), cerrar sesión y eliminar cuenta con confirmación.
+- **feat (CU-05):** `UsersService.exportMe()` llama `GET /v1/users/me/export`, serializa el bundle JSON con indentación y lo entrega al share-sheet Android como `agritrace-datos.json` vía `share_plus`.
+- **feat (CU-04):** `UsersService.deleteMe()` llama `DELETE /v1/users/me`. Tras respuesta 200, llama `logout()` (limpia tokens + redirige a Bienvenida).
+- **feat:** `UsersService` + `usersServiceProvider` en `lib/services/users_service.dart` y `lib/providers/users_provider.dart`.
+- **deps:** `share_plus: ^10.0.0` añadido a `pubspec.yaml`.
+
+### Changed
+- **ux:** ícono de logout directo en AppBar del Dashboard reemplazado por 👤 **"Mi perfil"** (`Icons.person_outline`) → navega a `Routes.profile`. Logout queda en Pantalla 11.
+- **nav:** `Routes.profile = '/profile'` en `route_names.dart`; ruta en `app_router.dart`.
+  Dónde: `lib/services/users_service.dart`, `lib/providers/users_provider.dart`, `lib/screens/profile/profile_screen.dart`, `lib/screens/farms/dashboard_screen.dart`, `lib/navigation/route_names.dart`, `lib/navigation/app_router.dart`, `pubspec.yaml`.
+
 ## [1.6.0] - 2026-05-21 — feat(pdf): teléfono, email, GPS y fotos en trazabilidad (CU-25)
 
 ### Added

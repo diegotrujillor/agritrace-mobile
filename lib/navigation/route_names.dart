@@ -10,6 +10,7 @@ abstract final class Routes {
   // farms/plots `/new`-before-`:id` ordering.
   static const alerts    = '/alerts';
   static const alertNew  = '/alerts/new';
+  static const profile   = '/profile';
 
   // Parameterised paths registered on the GoRouter. Use the builder helpers
   // below to construct concrete locations rather than string-concatenating

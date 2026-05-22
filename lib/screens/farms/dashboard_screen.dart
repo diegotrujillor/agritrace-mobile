@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/farm.dart';
 import '../../navigation/route_names.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/farms_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/error_parser.dart';
@@ -31,9 +30,9 @@ class DashboardScreen extends ConsumerWidget {
             onPressed: () => context.go(Routes.alerts),
           ),
           IconButton(
-            icon: const Icon(Icons.logout, color: AppColors.white),
-            tooltip: 'Cerrar sesión',
-            onPressed: () => ref.read(authProvider.notifier).logout(),
+            icon: const Icon(Icons.person_outline, color: AppColors.white),
+            tooltip: 'Mi perfil',
+            onPressed: () => context.push(Routes.profile),
           ),
         ],
       ),
