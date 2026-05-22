@@ -35,6 +35,7 @@ class WelcomeScreen extends StatelessWidget {
               AppButton(
                 label: 'Iniciar sesión',
                 onPressed: () => context.go(Routes.login),
+                variant: AppButtonVariant.light,
               ),
               const SizedBox(height: AppSpacing.md),
               TextButton(

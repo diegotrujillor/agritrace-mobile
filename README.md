@@ -63,10 +63,10 @@ agritrace-mobile/
 │   ├── services/
 │   │   ├── api_service.dart
 │   │   ├── auth_service.dart
-│   │   ├── sync_service.dart   # Sync WatermelonDB ↔ backend
+│   │   ├── sync_service.dart   # Sync Drift ↔ backend
 │   │   └── storage_service.dart
 │   ├── database/
-│   │   ├── database.dart       # WatermelonDB init
+│   │   ├── database.dart       # Drift DB init
 │   │   ├── models/             # Farm, Plot, Activity (modelos locales)
 │   │   └── migrations/
 │   ├── providers/              # Riverpod providers por dominio
@@ -155,7 +155,7 @@ impide publicar actualizaciones de la app.
 
 ## Offline-First
 
-El app usa **WatermelonDB** como base de datos local:
+El app usa **Drift** como base de datos local (SQLite):
 - Todos los datos se guardan localmente primero
 - `sync_service` sincroniza con el backend al recuperar conexión (`POST /v1/sync`)
 - `OfflineIndicator` muestra estado de conexión en tiempo real

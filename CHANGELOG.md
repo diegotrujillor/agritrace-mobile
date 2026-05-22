@@ -4,7 +4,9 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
-## [Unreleased] — feat(profile): pantalla de perfil + ARCO (CU-27)
+## [Unreleased]
+
+## [1.7.0] - 2026-05-21 — feat(profile)+fix(ux): pantalla de perfil ARCO + botón splash
 
 ### Added
 - **feat (CU-27):** `ProfileScreen` (`lib/screens/profile/profile_screen.dart`) — nueva Pantalla 11. Muestra nombre/email/teléfono del usuario autenticado y expone tres acciones: exportar datos JSON (Ley 1581), cerrar sesión y eliminar cuenta con confirmación.
@@ -17,6 +19,8 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 - **ux:** ícono de logout directo en AppBar del Dashboard reemplazado por 👤 **"Mi perfil"** (`Icons.person_outline`) → navega a `Routes.profile`. Logout queda en Pantalla 11.
 - **nav:** `Routes.profile = '/profile'` en `route_names.dart`; ruta en `app_router.dart`.
   Dónde: `lib/services/users_service.dart`, `lib/providers/users_provider.dart`, `lib/screens/profile/profile_screen.dart`, `lib/screens/farms/dashboard_screen.dart`, `lib/navigation/route_names.dart`, `lib/navigation/app_router.dart`, `pubspec.yaml`.
+- **fix(ux):** botón "Iniciar sesión" en pantalla de bienvenida ahora usa variante `light` (fondo blanco, texto verde) para ser visible sobre el fondo verde primario. Nuevo `AppButtonVariant.light` en `app_button.dart`.
+  Dónde: `lib/widgets/common/app_button.dart`, `lib/screens/auth/welcome_screen.dart`.
 
 ## [1.6.0] - 2026-05-21 — feat(pdf): teléfono, email, GPS y fotos en trazabilidad (CU-25)
 

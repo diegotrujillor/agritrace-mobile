@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../utils/constants.dart';
 
-enum AppButtonVariant { primary, outline }
+enum AppButtonVariant { primary, outline, light }
 
 class AppButton extends StatelessWidget {
   const AppButton({
@@ -28,6 +28,20 @@ class AppButton extends StatelessWidget {
           side: const BorderSide(color: AppColors.primaryGreen, width: 2),
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        child: _Content(label: label, isLoading: isLoading),
+      );
+    }
+    if (variant == AppButtonVariant.light) {
+      return ElevatedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.white,
+          foregroundColor: AppColors.primaryGreen,
+          disabledBackgroundColor: AppColors.white.withValues(alpha: 0.7),
+          minimumSize: const Size(double.infinity, 52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         child: _Content(label: label, isLoading: isLoading),
       );
