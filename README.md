@@ -20,6 +20,69 @@ App móvil del MVP de **AgriTrace** — plataforma de trazabilidad agrícola par
 | Testing | flutter_test + mocktail |
 | Plataformas | iOS + Android |
 
+### Cómo interactúan las 9 capas
+
+Cada componente de la tabla de arriba conectado con los demás, con el rol concreto que cumple en runtime.
+
+```mermaid
+flowchart TB
+    subgraph plat[📱 Plataformas runtime]
+        AND[🤖 Android APK]
+        IOS[🍎 iOS bundle]
+    end
+
+    subgraph app[🎨 App proceso Flutter Dart]
+        SCR[📺 Screens StatelessWidget]
+        WID[🧩 Widgets reusables comunes]
+        SCR --- WID
+    end
+
+    ROUTER[🧭 GoRouter app_router.dart]
+    RIV[🔁 Riverpod AsyncNotifier]
+    DIO[🌐 Dio HTTP client]
+    DRIFT[💾 Drift SQLite local]
+    SS[🔐 flutter_secure_storage Keychain Keystore]
+
+    subgraph testing[🧪 Testing dev-only]
+        FT[flutter_test]
+        MT[mocktail mocks]
+    end
+
+    AND -. empaqueta y ejecuta .-> app
+    IOS -. empaqueta y ejecuta .-> app
+
+    SCR -->|context go push pop| ROUTER
+    ROUTER -->|monta widget tree por ruta| SCR
+    SCR -->|ref watch listen| RIV
+    RIV -->|invoca services| DIO
+    RIV -->|invoca services| DRIFT
+    RIV -->|invoca services| SS
+
+    DIO -. lee tokens y agrega Bearer header .-> SS
+    DRIFT -. SQLite file en app sandbox .-> plat
+    SS -. cifrado nativo Keychain en iOS Keystore en Android .-> plat
+
+    FT -. test widget render .-> SCR
+    FT -. test unit estado .-> RIV
+    MT -. mockea Dio .-> DIO
+    MT -. mockea Drift .-> DRIFT
+```
+
+### Rol de cada capa
+
+| Capa de la tabla | Rol concreto en runtime | Vive en `lib/` |
+|------------------|--------------------------|----------------|
+| Flutter 3.x + Dart | El proceso entero. Render declarativo del widget tree. | todo `lib/` |
+| Drift SQLite | Source of truth local; UI siempre lee de aquí. Sync envía cambios al backend en background. | `lib/database/` |
+| Riverpod | Pega screens con services. Mantiene 3 estados loading data error en cada `AsyncNotifier`. | `lib/providers/` |
+| GoRouter | Mapea URLs a widget trees + ejecuta auth redirect en cada navegación. | `lib/navigation/` |
+| Dio | Cliente HTTP único. `_AuthInterceptor` agrega Bearer y refresca tokens en 401. | `lib/services/api_service.dart` |
+| flutter_secure_storage | Único lugar autorizado para guardar access y refresh token; usa Keychain en iOS, Keystore en Android. | `lib/services/storage_service.dart` |
+| flutter_test + mocktail | Solo en `test/`. mocktail produce dobles para Dio y Drift; tests cubren providers + widgets críticos. | `test/unit/`, `test/widget/` |
+| iOS + Android | Targets de build. Una codebase Dart, dos binarios firmados. | `android/`, `ios/` |
+
+> Foto-instantánea: los tokens nunca dejan `flutter_secure_storage`. Si la APK es decompilada, el atacante NO obtiene credenciales de GitHub ni del backend. El backend valida cada request con JWT firmado HS256.
+
 ## Pantallas MVP (10 pantallas — Flujo Productor)
 
 | # | Pantalla | Sprint |
