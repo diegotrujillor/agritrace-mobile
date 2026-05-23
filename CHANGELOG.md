@@ -6,6 +6,19 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 
 ## [Unreleased]
 
+### Tests
+- **test (sync):** `stubPush` helper en `test/unit/sync_service_test.dart`
+  ahora envuelve el body en `envelope(...)` para reflejar la shape
+  `{ success, data }` que el backend emite desde `c313d3a` (fix sync push
+  envelope + fromJson snake_case, CU-22/CU-23). El helper había quedado
+  fuera de sincronía con producción — 4 tests fallaban con
+  `FormatException: Invalid sync push response` (todos por la misma
+  causa). Callers actualizados para pasar sólo el resultado interno; el
+  test negativo "invalid push envelope" hace bypass directo de
+  `stubPush` para inyectar `{ success: false }`. No hay cambio en
+  producción. Suite: 240/244 → 244/244. `flutter analyze` limpio.
+- Dónde: `test/unit/sync_service_test.dart`.
+
 ## [1.7.1] - 2026-05-22 — fix(profile/export): unwrap envelope + honour X-Export-Truncated
 
 ### Fixed
