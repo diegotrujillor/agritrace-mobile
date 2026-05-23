@@ -6,6 +6,36 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-05-22 — fix(profile/export): unwrap envelope + honour X-Export-Truncated
+
+### Fixed
+- **fix (CU-05):** `UsersService.exportMe()` ahora desenvuelve el envelope
+  `{ success, data }` antes de compartir; el archivo `.json` ya no incluye
+  el wrapper del transporte API — el productor recibe directamente el
+  bundle Habeas Data (`{ exportedAt, user, producer, farms, plots,
+  activities, alerts, truncated }`). Sincroniza con backend v0.4.4 que
+  extendió el bundle. Si `success === false`, ahora lanza
+  `FormatException` con el `error` del servidor (antes pasaba el envelope
+  con `success:false` al share-sheet sin avisar).
+  Dónde: `lib/services/users_service.dart`,
+  `lib/screens/profile/profile_screen.dart`.
+
+### Added
+- **feat (CU-05):** lectura del header `X-Export-Truncated` (Dio lo
+  normaliza a `x-export-truncated`). Cualquier valor no vacío se mapea a
+  `truncated == true` en el nuevo DTO `UserExportResult` (`bundle` +
+  `truncated`). `ProfileScreen` muestra un `SnackBar` de 8 s advirtiendo
+  *"Exportación parcial: tu cuenta excede 10000 filas en alguna
+  colección. Contacta soporte para un export completo."* cuando el
+  bundle viene capado por el límite de 10000 filas por colección
+  (backend v0.4.4).
+- **feat:** filename del share-sheet con sello de fecha —
+  `agritrace-datos-YYYY-MM-DD.json` (deriva la fecha de
+  `bundle.exportedAt`; fallback a hoy UTC si falta).
+- **test:** `test/unit/users_service_test.dart` (nuevo) — 6 tests que
+  cubren envelope unwrap, header truthy/ausente, `success:false` y la
+  ruta de `deleteMe`.
+
 ## [1.7.0] - 2026-05-21 — feat(profile)+fix(ux): pantalla de perfil ARCO + botón splash
 
 ### Added

@@ -23,19 +23,53 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => _exportBusy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final data = await ref.read(usersServiceProvider).exportMe();
-      final json = const JsonEncoder.withIndent('  ').convert(data);
+      final result = await ref.read(usersServiceProvider).exportMe();
+      final json = const JsonEncoder.withIndent('  ').convert(result.bundle);
       final bytes = const Utf8Encoder().convert(json);
       await Share.shareXFiles(
-        [XFile.fromData(bytes, mimeType: 'application/json', name: 'agritrace-datos.json')],
+        [
+          XFile.fromData(
+            bytes,
+            mimeType: 'application/json',
+            name: _buildExportFilename(result.bundle['exportedAt']),
+          ),
+        ],
         subject: 'AgriTrace — Mis datos personales',
       );
+      if (!mounted) return;
+      if (result.truncated) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Exportación parcial: tu cuenta excede 10000 filas en alguna '
+              'colección. Contacta soporte para un export completo.',
+            ),
+            duration: Duration(seconds: 8),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text(parseApiError(e))));
     } finally {
       if (mounted) setState(() => _exportBusy = false);
     }
+  }
+
+  /// Builds the share-sheet filename. Uses the date portion of
+  /// `bundle.exportedAt` (ISO 8601) when present, otherwise falls back to
+  /// today's UTC date so the file always carries a stamp.
+  static String _buildExportFilename(Object? exportedAt) {
+    String date;
+    if (exportedAt is String && exportedAt.length >= 10) {
+      final parsed = DateTime.tryParse(exportedAt);
+      date = parsed != null
+          ? parsed.toUtc().toIso8601String().substring(0, 10)
+          : exportedAt.substring(0, 10);
+    } else {
+      date = DateTime.now().toUtc().toIso8601String().substring(0, 10);
+    }
+    return 'agritrace-datos-$date.json';
   }
 
   Future<void> _delete() async {
