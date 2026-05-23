@@ -17,9 +17,15 @@ void main() {
     service = SyncService(api);
   });
 
+  /// Wraps `body` in the `{success, data}` envelope the backend returns from
+  /// `POST /v1/sync` (see backend `src/api/sync/sync.controller.ts:16`).
+  /// Callers pass the inner result; the helper handles the wrapping —
+  /// matches the `stubPull` idiom in this file. Tests that intentionally
+  /// stub a malformed envelope should call `dio.post(...)` directly
+  /// instead of going through this helper.
   void stubPush(Map<String, dynamic> body) {
     when(() => dio.post('/sync', data: any(named: 'data')))
-        .thenAnswer((_) async => okResponse(body));
+        .thenAnswer((_) async => okResponse(envelope(body)));
   }
 
   void stubPull(Map<String, dynamic> body) {
@@ -30,7 +36,6 @@ void main() {
 
   test('syncNow() pushes changes then pulls and aggregates result', () async {
     stubPush({
-      'success': true,
       'synced': 2,
       'conflicts': 1,
       'timestamp': '2026-05-01T00:00:00.000Z',
@@ -56,7 +61,7 @@ void main() {
   });
 
   test('syncNow() serialises changes and sends since cursor', () async {
-    stubPush({'success': true, 'synced': 1, 'conflicts': 0});
+    stubPush({'synced': 1, 'conflicts': 0});
     stubPull(envelope({'changes': [], 'timestamp': '2026-05-01T00:00:00.000Z'}));
 
     await service.syncNow(
@@ -86,7 +91,7 @@ void main() {
   });
 
   test('syncNow() omits since on first run (null cursor)', () async {
-    stubPush({'success': true, 'synced': 0, 'conflicts': 0});
+    stubPush({'synced': 0, 'conflicts': 0});
     stubPull(envelope({'changes': [], 'timestamp': '2026-05-01T00:00:00.000Z'}));
 
     await service.syncNow();
@@ -99,14 +104,16 @@ void main() {
   });
 
   test('throws FormatException when push envelope is invalid', () async {
-    stubPush({'success': false});
+    // Bypass stubPush to inject a deliberately malformed envelope.
+    when(() => dio.post('/sync', data: any(named: 'data')))
+        .thenAnswer((_) async => okResponse({'success': false}));
     stubPull(envelope({'changes': [], 'timestamp': '2026-05-01T00:00:00.000Z'}));
 
     expect(service.syncNow(), throwsA(isA<FormatException>()));
   });
 
   test('throws FormatException when pull envelope lacks data', () async {
-    stubPush({'success': true, 'synced': 0, 'conflicts': 0});
+    stubPush({'synced': 0, 'conflicts': 0});
     when(() => dio.get('/sync/changes',
             queryParameters: any(named: 'queryParameters')))
         .thenAnswer((_) async => okResponse({'success': true}));
@@ -115,7 +122,7 @@ void main() {
   });
 
   test('coerces string counters and falls back on bad timestamp', () async {
-    stubPush({'success': true, 'synced': '5', 'conflicts': '0'});
+    stubPush({'synced': '5', 'conflicts': '0'});
     stubPull(envelope({'changes': null, 'timestamp': 12345}));
 
     final result = await service.syncNow();
