@@ -270,6 +270,94 @@ sequenceDiagram
 
 > Detalle del protocolo: [`CLAUDE.md → Sync protocol`](CLAUDE.md). Casos de uso afectados: CU-22 (trabajar offline), CU-23 (reconectar y sincronizar), CU-24 (LWW conflict resolution) en [`agritrace-docs/01-preparacion-mvp/03-mapeo-funcional/casos-de-uso/`](https://github.com/diegotrujillor/agritrace-docs/tree/main/01-preparacion-mvp/03-mapeo-funcional/casos-de-uso).
 
+### Flujo de autenticación (vista cliente)
+
+Ciclo completo desde tap inicial hasta refresh automático en 401. Complementa el server-side flow del backend en [`agritrace-backend/README.md → Flujo de autenticación`](https://github.com/diegotrujillor/agritrace-backend/blob/main/README.md#flujo-de-autenticación-jwt-access--refresh).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as 👨‍🌾 Productor
+    participant UI as 📱 LoginScreen
+    participant Prov as 🔁 authProvider
+    participant AS as 🔌 AuthService
+    participant DIO as 🌐 Dio + _AuthInterceptor
+    participant SS as 🔐 flutter_secure_storage
+    participant API as ⚙️ Backend
+
+    Note over P,API: Login inicial CU-02
+    P->>UI: Tap Iniciar sesion con email password
+    UI->>Prov: invoca login
+    Prov->>AS: login email password
+    AS->>DIO: POST v1 auth login con body
+    DIO->>API: HTTPS request sin Bearer aun
+    API-->>DIO: 200 con accessToken refreshToken user
+    DIO-->>AS: response data
+    AS->>SS: write access_token y refresh_token cifrados
+    AS-->>Prov: AuthAuthenticated user
+    Prov-->>UI: estado autenticado, GoRouter redirect a dashboard
+
+    Note over P,API: Uso normal de cualquier endpoint protegido
+    P->>UI: navega o ejecuta accion
+    UI->>Prov: invoca operacion ejemplo cargar fincas
+    Prov->>DIO: GET v1 farms
+    DIO->>SS: read access_token
+    SS-->>DIO: token vigente
+    DIO->>API: HTTPS GET con Authorization Bearer
+    API-->>DIO: 200 con data
+
+    Note over P,API: Token expirado, refresh transparente
+    P->>UI: navega o ejecuta otra accion
+    UI->>Prov: invoca operacion
+    Prov->>DIO: GET v1 alerts
+    DIO->>SS: read access_token
+    SS-->>DIO: token expirado o sera rechazado
+    DIO->>API: HTTPS GET con Bearer viejo
+    API-->>DIO: 401 token expired
+    DIO->>SS: read refresh_token
+    SS-->>DIO: refresh vigente
+    DIO->>API: POST v1 auth refresh con refresh
+    API-->>DIO: 200 con tokens rotados nuevos
+    DIO->>SS: write access_token y refresh_token nuevos
+    DIO->>API: retry GET v1 alerts con Bearer nuevo
+    API-->>DIO: 200 con data
+    DIO-->>Prov: response data, UI nunca vio el 401
+
+    Note over P,API: Logout CU-03
+    P->>UI: Tap Cerrar sesion en ProfileScreen
+    UI->>Prov: invoca logout
+    Prov->>AS: logout
+    AS->>SS: read refresh_token
+    AS->>DIO: POST v1 auth logout con refresh
+    DIO->>API: HTTPS POST con Bearer del access
+    API-->>DIO: 200 con success true
+    AS->>SS: delete access_token y refresh_token
+    AS-->>Prov: AuthUnauthenticated
+    Prov-->>UI: GoRouter redirect a welcome
+
+    Note over P,API: Token comprometido escenario de seguridad
+    DIO->>API: cualquier request con Bearer revocado
+    API->>API: verifyAccessToken consulta revoked_tokens en PG
+    API-->>DIO: 401 token revoked
+    DIO->>API: POST v1 auth refresh con refresh
+    API-->>DIO: 401 refresh tambien revocado
+    DIO->>SS: delete tokens forzar logout
+    DIO-->>UI: trigger redirect a welcome con mensaje sesion expirada
+```
+
+**Garantías de seguridad cliente-side:**
+
+| Aspecto | Cómo lo cumple el app |
+|---------|------------------------|
+| Tokens nunca en plain storage | `flutter_secure_storage` usa **Keychain en iOS** (Secure Enclave cuando hay TouchID/FaceID) y **Keystore en Android** (StrongBox cuando hay hardware). Single source de truth. |
+| Refresh transparente al usuario | `_AuthInterceptor` (`api_service.dart`) intercepta cualquier 401, refresca, reintenta. La UI nunca ve el 401 si el refresh es vigente. |
+| Concurrencia segura | El interceptor tiene un single-flight lock: si 5 requests fallan a la vez con 401, sólo 1 dispara el refresh; las otras 4 esperan al nuevo token. Evita refresh-storm + tokens divergentes. |
+| Logout limpio | `AuthService.logout` borra ambos tokens del Keychain/Keystore antes de redirigir. Imposible reusar la sesión post-logout. |
+| Refresh comprometido | Si el backend invalida también el refresh (`401` en `/auth/refresh`), el interceptor borra ambos tokens y dispara redirect a `/welcome`. No retry loop infinito. |
+| API base configurable | `--dart-define=API_BASE_URL=...` en build time. El APK release apunta a `https://api.agritrace.co/v1`; debug builds pueden apuntar a localhost. |
+
+> CU-01 (registro), CU-02 (login), CU-03 (logout) están en [`agritrace-docs/01-preparacion-mvp/03-mapeo-funcional/casos-de-uso/`](https://github.com/diegotrujillor/agritrace-docs/tree/main/01-preparacion-mvp/03-mapeo-funcional/casos-de-uso). La implementación vive en `lib/services/auth_service.dart`, `lib/services/api_service.dart` (interceptor), `lib/providers/auth_provider.dart`.
+
 ## Sistema de Diseño
 
 ```dart
