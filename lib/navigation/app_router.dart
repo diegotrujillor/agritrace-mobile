@@ -60,8 +60,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.plotNewPath,
+        // `extra` (when set) is the free-text cropType the producer typed
+        // on the farm form — used to pre-select the plot dropdown when
+        // arriving via the post-create-finca auto-navigation flow.
         builder: (_, state) => PlotFormScreen(
           farmId: state.pathParameters['farmId']!,
+          initialCropTypeSuggestion: state.extra as String?,
         ),
       ),
       // Activity routes use a `:plotId` segment and are declared before

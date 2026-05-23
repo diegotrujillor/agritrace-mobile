@@ -172,6 +172,9 @@ void main() {
   });
 
   test('plotProvider.family looks up a single plot by id', () async {
+    // v1.9.0 — plotProvider is now local-first. Stub the repo lookup to
+    // return null so the provider falls through to the service.
+    when(() => mockRepo.getById('plot-9')).thenAnswer((_) async => null);
     when(() => mockService.get('plot-9'))
         .thenAnswer((_) async => _plot(id: 'plot-9'));
     final container = makeContainer();
@@ -180,5 +183,18 @@ void main() {
     final plot = await container.read(plotProvider('plot-9').future);
 
     expect(plot.id, 'plot-9');
+  });
+
+  test('plotProvider.family returns local plot when present (bug #20)',
+      () async {
+    when(() => mockRepo.getById('plot-local'))
+        .thenAnswer((_) async => _plot(id: 'plot-local'));
+    final container = makeContainer();
+    addTearDown(container.dispose);
+
+    final plot = await container.read(plotProvider('plot-local').future);
+
+    expect(plot.id, 'plot-local');
+    verifyNever(() => mockService.get(any()));
   });
 }

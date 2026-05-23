@@ -84,6 +84,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   validator: validateEmail,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
+                  // v1.9.0 — bug #4 fix. Wipe the error banner the moment
+                  // the producer edits the field. Without this, a previous
+                  // "Credenciales incorrectas" stays glued to the screen
+                  // even after the user fixes the typo.
+                  onChanged: (_) =>
+                      ref.read(authProvider.notifier).clearError(),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 AppInput(
@@ -93,6 +99,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   validator: validatePassword,
                   obscureText: true,
                   textInputAction: TextInputAction.done,
+                  onChanged: (_) =>
+                      ref.read(authProvider.notifier).clearError(),
                   onFieldSubmitted: (_) => _submit(),
                 ),
                 if (errorMessage != null) ...[

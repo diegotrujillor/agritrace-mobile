@@ -116,6 +116,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   validator: validateEmail,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
+                  // v1.9.0 — bug #4 fix. Identical pattern to LoginScreen.
+                  onChanged: (_) =>
+                      ref.read(authProvider.notifier).clearError(),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 AppInput(

@@ -97,9 +97,15 @@ void main() {
       expect(find.text('Editar actividad'), findsOneWidget);
       // Type dropdown shows the loaded type label.
       expect(find.text('Fertilización'), findsOneWidget);
-      // Description + photoUrl fields show their stored values.
+      // Description field shows the stored note.
       expect(find.text('Aplicación NPK 15-15-15'), findsOneWidget);
-      expect(find.text('https://example.com/photo.jpg'), findsOneWidget);
+      // v1.9.0 — the photo URL is no longer a TextField; the existing URL
+      // is rendered as a thumbnail (Image.network), and the controls now
+      // include the "Foto (opcional)" label plus the camera/gallery
+      // buttons. Assert the label is visible instead of the raw URL.
+      expect(find.text('Foto (opcional)'), findsOneWidget);
+      expect(find.text('Tomar foto'), findsOneWidget);
+      expect(find.text('Galería'), findsOneWidget);
       // The submit button reads "Guardar cambios" in edit mode (not
       // "Registrar actividad").
       expect(
@@ -128,19 +134,27 @@ void main() {
       await tester.pumpWidget(wrap());
       await tester.pumpAndSettle();
 
-      // Act — edit the description (first TextFormField) and tap Guardar.
-      // ActivityForm renders 2 text fields: description (index 0) and
-      // photoUrl (index 1).
+      // Act — edit the description (the only TextFormField on the form
+      // post-v1.9.0; the photo URL text input was replaced with the
+      // image-picker section).
       await tester.enterText(
         find.byType(TextFormField).first,
         'Aplicación NPK 20-20-20',
+      );
+      // Scroll the submit button into view: with the photo section
+      // injected above it, the default 800×600 test viewport pushes the
+      // button slightly off-screen.
+      await tester.ensureVisible(
+        find.widgetWithText(ElevatedButton, 'Guardar cambios'),
       );
       await tester
           .tap(find.widgetWithText(ElevatedButton, 'Guardar cambios'));
       await tester.pumpAndSettle();
 
       // Assert — repo update called with the edited description;
-      // original type/occurredAt/photoUrl preserved.
+      // original type/occurredAt/photoUrl preserved (the form caches the
+      // initial photoUrl as the "last uploaded" value when no new photo
+      // is picked).
       verify(() => mockActivityRepo.update(
             any(),
             type: ActivityType.fertilization,

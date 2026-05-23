@@ -158,17 +158,26 @@ void main() {
     addTearDown(container.dispose);
     await container.read(farmsProvider.future);
 
-    await container.read(farmsProvider.notifier).create(
-          name: 'X',
-          cropType: 'cacao',
-          areaHectares: 1,
-        );
-
+    // v1.9.0 — create() now returns the created Farm so the post-create
+    // auto-nav flow can read its id, which means a repo failure must
+    // throw (not just be captured in state). Both signals — the thrown
+    // exception AND the notifier's error state — survive.
+    await expectLater(
+      container.read(farmsProvider.notifier).create(
+            name: 'X',
+            cropType: 'cacao',
+            areaHectares: 1,
+          ),
+      throwsA(isA<Exception>()),
+    );
     expect(container.read(farmsProvider).hasError, isTrue);
   });
 
   test('farmProvider.family looks up a single farm by id', () async {
     stubRepoDefaults([]);
+    // v1.9.0 — farmProvider is now local-first. Stub the repo lookup to
+    // return null so the provider falls through to the service.
+    when(() => mockRepo.getById('farm-7')).thenAnswer((_) async => null);
     when(() => mockService.get('farm-7'))
         .thenAnswer((_) async => _farm(id: 'farm-7'));
     final container = makeContainer();
@@ -177,5 +186,19 @@ void main() {
     final farm = await container.read(farmProvider('farm-7').future);
 
     expect(farm.id, 'farm-7');
+  });
+
+  test('farmProvider.family returns local farm when present (bug #10)',
+      () async {
+    stubRepoDefaults([]);
+    when(() => mockRepo.getById('farm-local'))
+        .thenAnswer((_) async => _farm(id: 'farm-local'));
+    final container = makeContainer();
+    addTearDown(container.dispose);
+
+    final farm = await container.read(farmProvider('farm-local').future);
+
+    expect(farm.id, 'farm-local');
+    verifyNever(() => mockService.get(any()));
   });
 }

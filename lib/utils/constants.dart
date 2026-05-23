@@ -22,13 +22,59 @@ abstract final class AppSpacing {
   static const double xl = 32;
 }
 
-/// Crop types offered in the farm/plot forms. Constrained to the MVP pilot
+/// Crop types offered in the **plot** form. Constrained to the MVP pilot
 /// region (Valle del Cauca) primary crops plus an `otro` escape hatch. The
 /// value is sent verbatim to the backend `cropType` field.
+///
+/// **v1.9.0 — plot form only.** The farm form now accepts free-text (the
+/// farm-level cultivo is informational and can be "Agricultura de
+/// exportación" or similar). The plot form still uses this fixed enum so
+/// agronomic analytics (yield per crop, sync grouping) keep clean labels.
 const List<String> kCropTypes = <String>[
   'cacao',
-  'caña',
+  'cana_panelera',
   'hortalizas',
   'frutas',
   'otro',
 ];
+
+/// Human-readable Spanish label for a plot `cropType` wire value.
+///
+/// Used by `PlotForm` to render the dropdown items with proper accents and
+/// capitalisation (the wire value is snake_case / lowercase). New entries
+/// must be added here whenever [kCropTypes] grows.
+String cropTypeLabel(String wireValue) => switch (wireValue) {
+      'cacao' => 'Cacao',
+      'cana_panelera' => 'Caña panelera',
+      'hortalizas' => 'Hortalizas',
+      'frutas' => 'Frutas',
+      'otro' => 'Otro',
+      _ => wireValue,
+    };
+
+/// Maps a free-text farm `cropType` suggestion to a plot enum value when
+/// the strings line up (case-insensitive, accent-folded). Returns `null`
+/// when there is no match — the plot form then falls back to the default
+/// selection.
+///
+/// Examples: `'Cacao'` → `'cacao'`, `'Caña panelera'` → `'cana_panelera'`.
+/// Tolerates the pre-1.9.0 single-word `'caña'` value found in legacy
+/// offline rows so an upgrade in place keeps a sensible default.
+String? matchPlotCropType(String? suggestion) {
+  if (suggestion == null) return null;
+  final normalised = suggestion
+      .trim()
+      .toLowerCase()
+      // Drop accents on the few letters we care about (á é í ó ú ñ).
+      .replaceAll('á', 'a')
+      .replaceAll('é', 'e')
+      .replaceAll('í', 'i')
+      .replaceAll('ó', 'o')
+      .replaceAll('ú', 'u')
+      .replaceAll('ñ', 'n')
+      .replaceAll(' ', '_');
+  if (normalised.isEmpty) return null;
+  if (kCropTypes.contains(normalised)) return normalised;
+  if (normalised == 'cana') return 'cana_panelera';
+  return null;
+}

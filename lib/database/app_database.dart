@@ -51,6 +51,11 @@ class AppDatabase extends _$AppDatabase {
   Future<List<PlotsTableData>> getPlotsByFarm(String farmId) =>
       (select(plotsTable)..where((t) => t.farmId.equals(farmId))).get();
 
+  /// One-shot single-plot lookup by id. Used by [PlotRepository.getById]
+  /// to power the offline-first plot detail screen (bug #20 fix).
+  Future<PlotsTableData?> getPlotById(String id) =>
+      (select(plotsTable)..where((t) => t.id.equals(id))).getSingleOrNull();
+
   Future<void> upsertPlot(PlotsTableCompanion plot) =>
       into(plotsTable).insertOnConflictUpdate(plot);
 

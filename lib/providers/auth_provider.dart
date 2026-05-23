@@ -134,6 +134,27 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     state = const AsyncData(AuthUnauthenticated());
   }
 
+  /// Drops any [AsyncError] currently held by the notifier without changing
+  /// the underlying auth status.
+  ///
+  /// v1.9.0 — fixes bug #4: a failed login (e.g. "Credenciales incorrectas")
+  /// leaves the error banner glued to the auth state, and `LoginScreen` keeps
+  /// re-rendering it even after the user has fixed their input. The screens
+  /// call this from `onChanged` to wipe the banner the moment the user types
+  /// in the email or password field.
+  ///
+  /// Idempotent: when the state is already `data` this is a no-op so the
+  /// notifier never publishes a redundant frame.
+  void clearError() {
+    final current = state;
+    if (current is! AsyncError) return;
+    // Preserve the underlying value if there was one (e.g. an
+    // authenticated user whose subsequent token refresh errored); fall
+    // back to "unauthenticated" when none was held.
+    final preserved = current.valueOrNull ?? const AuthUnauthenticated();
+    state = AsyncData(preserved);
+  }
+
   Future<void> login({required String email, required String password}) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {

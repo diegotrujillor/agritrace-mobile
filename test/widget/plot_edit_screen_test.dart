@@ -74,6 +74,11 @@ void main() {
         .thenAnswer((_) => Stream.value([_seedPlot()]));
     when(() => mockPlotRepo.listByFarm(any()))
         .thenAnswer((_) async => [_seedPlot()]);
+    // v1.9.0 — plotProvider is now local-first, so the detail/edit screen
+    // hits the repo first. Returning the seeded plot from the local DB
+    // mirrors what a freshly-pulled or freshly-created plot looks like.
+    when(() => mockPlotRepo.getById(_plotId))
+        .thenAnswer((_) async => _seedPlot());
   });
 
   Widget wrap() => ProviderScope(

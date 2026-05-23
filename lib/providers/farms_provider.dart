@@ -51,19 +51,30 @@ class FarmsNotifier extends AsyncNotifier<List<Farm>> {
     return _repo.listAll();
   }
 
-  Future<void> create({
+  /// Creates a farm locally and returns the persisted [Farm] so callers
+  /// can navigate to its detail / nested screens. v1.9.0 auto-navigates
+  /// to `PlotFormScreen` with the freshly-created `farmId` right after
+  /// the create succeeds, which requires the id to be available without
+  /// re-reading the list.
+  ///
+  /// [cropType] is optional (v1.9.0 — farm-level cultivo is free-text and
+  /// can be skipped). When `null` we persist an empty string so the
+  /// non-null Drift schema constraint is still satisfied; the backend
+  /// treats either as "no crop".
+  Future<Farm> create({
     required String name,
-    required String cropType,
+    String? cropType,
     required double areaHectares,
     String? address,
     double? latitude,
     double? longitude,
   }) async {
     state = const AsyncLoading();
+    Farm? created;
     state = await AsyncValue.guard(() async {
-      await _repo.create(
+      created = await _repo.create(
         name: name,
-        cropType: cropType,
+        cropType: cropType ?? '',
         areaHectares: areaHectares,
         address: address,
         latitude: latitude,
@@ -71,12 +82,24 @@ class FarmsNotifier extends AsyncNotifier<List<Farm>> {
       );
       return _repo.listAll();
     });
+    final result = created;
+    if (result == null) {
+      // `state` already carries the error captured by AsyncValue.guard;
+      // re-throw so the form-level try/catch can render the banner.
+      final err = state;
+      if (err is AsyncError) {
+        final captured = err.error;
+        if (captured is Object) throw captured;
+      }
+      throw StateError('FarmsNotifier.create() failed without an error');
+    }
+    return result;
   }
 
   Future<void> updateFarm({
     required String id,
     required String name,
-    required String cropType,
+    String? cropType,
     required double areaHectares,
     String? address,
     double? latitude,
@@ -88,7 +111,7 @@ class FarmsNotifier extends AsyncNotifier<List<Farm>> {
       await _repo.update(
         existing,
         name: name,
-        cropType: cropType,
+        cropType: cropType ?? '',
         areaHectares: areaHectares,
         address: address,
         latitude: latitude,
@@ -118,6 +141,16 @@ final _farmsStreamProvider = StreamProvider<List<Farm>>(
 /// Single farm lookup by id, used by the detail screen header. Kept separate
 /// from [farmsProvider] so a deep link to a farm detail does not require the
 /// full list to have been loaded first.
-final farmProvider = FutureProvider.family<Farm, String>(
-  (ref, id) => ref.read(farmServiceProvider).get(id),
-);
+///
+/// v1.9.0 — bug #10 fix. Local-first: read the row from SQLite when it
+/// exists (true for any farm the producer just created offline, or for
+/// previously-synced farms). Falls back to the network on a miss so a
+/// deep link to a never-synced farm still resolves. Without the local
+/// fallback, the detail screen rendered "No tienes permiso" immediately
+/// after the post-create auto-nav because the server didn't know about
+/// the farm yet (it lives in pending-sync state for up to 14 days).
+final farmProvider = FutureProvider.family<Farm, String>((ref, id) async {
+  final local = await ref.read(farmRepositoryProvider).getById(id);
+  if (local != null) return local;
+  return ref.read(farmServiceProvider).get(id);
+});

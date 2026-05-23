@@ -1,5 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../models/activity.dart';
+import '../../../models/upload.dart';
+import '../../../providers/uploads_provider.dart';
 import '../../../utils/constants.dart';
 import '../../../utils/date_format.dart';
 import '../../../utils/error_parser.dart';
@@ -10,14 +15,21 @@ import '../../../widgets/common/app_input.dart';
 import '../../../widgets/common/app_labeled_dropdown.dart';
 
 /// Shared form body for creating and editing an activity. Renders the 4
-/// fields (type / occurred-on date / optional note / optional photo URL),
-/// owns the local form state and delegates persistence to [onSubmit].
+/// fields (type / occurred-on date / optional note / optional photo) and
+/// delegates persistence to [onSubmit].
+///
+/// **v1.9.0 — photo capture:** replaces the previous "paste URL"
+/// text-field with an `image_picker` flow (camera + gallery). On submit
+/// the form first uploads the selected file via [uploadsServiceProvider]
+/// (`POST /v1/uploads/photos`) and then calls [onSubmit] with the
+/// resulting `url`. If the upload fails, [onSubmit] is NOT called — the
+/// user can fix and retry without losing the rest of the form.
 ///
 /// [onSubmit] is `async` so the form can show the spinner while the parent
 /// performs the network call (create or update) and pop on success. If the
 /// callback throws, the form re-enables the button and surfaces the
 /// parsed error in the embedded banner.
-class ActivityForm extends StatefulWidget {
+class ActivityForm extends ConsumerStatefulWidget {
   const ActivityForm({
     super.key,
     required this.submitLabel,
@@ -26,6 +38,7 @@ class ActivityForm extends StatefulWidget {
     this.initialOccurredAt,
     this.initialDescription,
     this.initialPhotoUrl,
+    this.imagePicker,
   });
 
   /// CTA label (e.g. "Registrar actividad" or "Guardar cambios").
@@ -44,21 +57,40 @@ class ActivityForm extends StatefulWidget {
   final ActivityType initialType;
   final DateTime? initialOccurredAt;
   final String? initialDescription;
+
+  /// Pre-filled photo URL (edit mode). Displayed as the initial preview
+  /// when present; the user can replace it with a fresh camera/gallery
+  /// capture which will then re-upload.
   final String? initialPhotoUrl;
 
+  /// Optional [ImagePicker] override — exists purely for widget tests so
+  /// they can swap in a fake without touching the real platform channel.
+  /// Production usage leaves this null.
+  final ImagePicker? imagePicker;
+
   @override
-  State<ActivityForm> createState() => _ActivityFormState();
+  ConsumerState<ActivityForm> createState() => _ActivityFormState();
 }
 
-class _ActivityFormState extends State<ActivityForm> {
+class _ActivityFormState extends ConsumerState<ActivityForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _descriptionController;
-  late final TextEditingController _photoUrlController;
+  late ImagePicker _picker;
 
   late ActivityType _type;
   late DateTime _occurredAt;
   bool _submitting = false;
   String? _errorMessage;
+
+  /// Locally selected photo (camera or gallery). When non-null, takes
+  /// precedence over [_uploadedUrl] / [widget.initialPhotoUrl] on submit
+  /// — we re-upload to get a fresh URL.
+  XFile? _pickedPhoto;
+
+  /// URL of the most recent successful upload, or the [initialPhotoUrl]
+  /// pre-filled by the edit screen. Sent as `photoUrl` on submit when
+  /// the user did NOT pick a new photo.
+  String? _uploadedUrl;
 
   @override
   void initState() {
@@ -67,14 +99,13 @@ class _ActivityFormState extends State<ActivityForm> {
     _occurredAt = widget.initialOccurredAt ?? DateTime.now();
     _descriptionController =
         TextEditingController(text: widget.initialDescription ?? '');
-    _photoUrlController =
-        TextEditingController(text: widget.initialPhotoUrl ?? '');
+    _uploadedUrl = widget.initialPhotoUrl;
+    _picker = widget.imagePicker ?? ImagePicker();
   }
 
   @override
   void dispose() {
     _descriptionController.dispose();
-    _photoUrlController.dispose();
     super.dispose();
   }
 
@@ -91,13 +122,46 @@ class _ActivityFormState extends State<ActivityForm> {
     }
   }
 
-  String? _optionalUrl(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    final uri = Uri.tryParse(value.trim());
-    if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
-      return 'Ingresa una URL válida';
+  /// Wraps [ImagePicker.pickImage] with a shared error-handling shell so
+  /// camera- and gallery-paths look identical to the user. `maxWidth`
+  /// caps the long edge so a typical phone shot stays well under the
+  /// backend's 5 MB limit even before any re-encoding.
+  Future<void> _pickFrom(ImageSource source) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final file = await _picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        imageQuality: 85,
+      );
+      if (file == null) return; // user cancelled
+      if (!mounted) return;
+      setState(() {
+        _pickedPhoto = file;
+        // Drop any previous uploaded URL — we'll re-upload on submit.
+        _uploadedUrl = null;
+      });
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo abrir la foto: $e')),
+      );
     }
-    return null;
+  }
+
+  void _removePhoto() {
+    setState(() {
+      _pickedPhoto = null;
+      _uploadedUrl = null;
+    });
+  }
+
+  /// MIME inference from the file-name extension. `image_picker` does
+  /// not surface contentType, and the backend Zod validator only accepts
+  /// `image/jpeg` and `image/png` — anything else returns 400.
+  String _inferContentType(String filename) {
+    final lower = filename.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    return 'image/jpeg';
   }
 
   Future<void> _submit() async {
@@ -108,14 +172,63 @@ class _ActivityFormState extends State<ActivityForm> {
     });
 
     final description = _descriptionController.text.trim();
-    final photoUrl = _photoUrlController.text.trim();
+    final messenger = ScaffoldMessenger.of(context);
 
     try {
+      // Photo upload happens FIRST so a failed upload doesn't leave a
+      // stale activity row behind. If the upload fails, we re-enable the
+      // button + show a banner — the rest of the form survives untouched.
+      String? photoUrl = _uploadedUrl;
+      final picked = _pickedPhoto;
+      if (picked != null) {
+        try {
+          final bytes = await File(picked.path).readAsBytes();
+          final result =
+              await ref.read(uploadsServiceProvider).uploadPhoto(
+                    bytes: bytes,
+                    filename: picked.name,
+                    contentType: _inferContentType(picked.name),
+                  );
+          photoUrl = result.url;
+          // Cache so a retry of the form does not re-upload.
+          _uploadedUrl = result.url;
+        } on UploadRateLimitException catch (e) {
+          if (!mounted) return;
+          setState(() {
+            _submitting = false;
+            _errorMessage = e.userMessage;
+          });
+          messenger.showSnackBar(SnackBar(content: Text(e.userMessage)));
+          return;
+        } on UploadTooLargeException catch (e) {
+          if (!mounted) return;
+          setState(() {
+            _submitting = false;
+            _errorMessage = e.userMessage;
+          });
+          messenger.showSnackBar(SnackBar(content: Text(e.userMessage)));
+          return;
+        } catch (e) {
+          if (!mounted) return;
+          setState(() {
+            _submitting = false;
+            _errorMessage =
+                'No se pudo subir la foto: ${parseApiError(e)}';
+          });
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('No se pudo subir la foto. Intenta de nuevo.'),
+            ),
+          );
+          return;
+        }
+      }
+
       await widget.onSubmit(
         type: _type,
         occurredAt: _occurredAt,
         description: description.isEmpty ? null : description,
-        photoUrl: photoUrl.isEmpty ? null : photoUrl,
+        photoUrl: photoUrl,
       );
       // On success the parent typically pops this route; clearing the
       // submitting flag here would race with a possibly-unmounted state.
@@ -126,6 +239,96 @@ class _ActivityFormState extends State<ActivityForm> {
         _errorMessage = parseApiError(error);
       });
     }
+  }
+
+  Widget _buildPhotoSection() {
+    final picked = _pickedPhoto;
+    final existingUrl = _uploadedUrl;
+    final hasPhoto = picked != null || existingUrl != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Foto (opcional)',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: AppColors.darkGreen,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        if (hasPhoto)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: picked != null
+                ? Image.file(
+                    File(picked.path),
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  )
+                : Image.network(
+                    existingUrl!,
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 160,
+                      color: AppColors.lightGrey,
+                      child: const Center(
+                        child: Icon(Icons.broken_image_outlined),
+                      ),
+                    ),
+                  ),
+          ),
+        if (hasPhoto) const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _submitting
+                    ? null
+                    : () => _pickFrom(ImageSource.camera),
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: const Text('Tomar foto'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primaryGreen,
+                  side: const BorderSide(color: AppColors.primaryGreen),
+                  minimumSize: const Size(0, 44),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _submitting
+                    ? null
+                    : () => _pickFrom(ImageSource.gallery),
+                icon: const Icon(Icons.photo_library_outlined),
+                label: const Text('Galería'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primaryGreen,
+                  side: const BorderSide(color: AppColors.primaryGreen),
+                  minimumSize: const Size(0, 44),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (hasPhoto) ...[
+          const SizedBox(height: AppSpacing.xs),
+          TextButton.icon(
+            onPressed: _submitting ? null : _removePhoto,
+            icon: const Icon(Icons.delete_outline, color: AppColors.error),
+            label: const Text(
+              'Quitar foto',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   @override
@@ -156,17 +359,10 @@ class _ActivityFormState extends State<ActivityForm> {
             hint: 'Detalle de la actividad',
             controller: _descriptionController,
             textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: AppSpacing.md),
-          AppInput(
-            label: 'URL de foto (opcional)',
-            hint: 'https://...',
-            controller: _photoUrlController,
-            validator: _optionalUrl,
-            keyboardType: TextInputType.url,
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => _submit(),
-          ),
+          _buildPhotoSection(),
           if (_errorMessage != null) ...[
             const SizedBox(height: AppSpacing.md),
             AppErrorBanner(message: _errorMessage),

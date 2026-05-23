@@ -6,6 +6,151 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-05-23 — feat(uploads+gps+forms): photo capture, GPS, crop_type rules + 5 P1 fixes
+
+### Added
+- **feat (FASE 2 — `Registrar finca`):** `crop_type` ahora es un
+  `TextField` libre opcional (max 255 chars, validador
+  `validateOptionalFarmCropType` en `utils/validators.dart`). Placeholder
+  *"Ej. Agricultura de exportación"*. `TextCapitalization.sentences`
+  aplicado. El backend Zod (parallel agent v0.6.0) acepta cualquier
+  string al nivel finca.
+  Dónde: `lib/screens/farms/farm_form_screen.dart`, `lib/utils/validators.dart`.
+- **feat (FASE 2 — GPS capture):** botón "Capturar ubicación GPS" en
+  `FarmFormScreen` que pide permiso con `Geolocator.checkPermission()` +
+  `requestPermission()` y captura una posición con
+  `getCurrentPosition(accuracy: medium, timeLimit: 15s)`. Snackbar de
+  error si el permiso es denegado o el servicio está apagado; skip
+  permite continuar sin GPS (lat/lng = null). Visualiza
+  `"lat, lng capturado"` cuando hay fix.
+  Dónde: `lib/screens/farms/farm_form_screen.dart`.
+- **feat (FASE 2 — auto-navegación post-finca):** tras crear una finca
+  con éxito, navega automáticamente a `PlotFormScreen(farmId, suggestion)`
+  via `context.go` (reemplaza la ruta del farm form). El plot form
+  pre-selecciona el dropdown si el free-text del cultivo de la finca
+  matchea uno de los wire values del enum (helper `matchPlotCropType`).
+  El AppBar back-button del plot form vuelve a `/dashboard`, no al farm
+  form (que ya no está en el stack).
+  Dónde: `lib/screens/farms/farm_form_screen.dart`,
+  `lib/screens/plots/plot_form_screen.dart`,
+  `lib/navigation/app_router.dart`.
+- **feat (FASE 2 — `Registrar lote` crop_type):** dropdown enum
+  obligatorio con wire values `cacao`, `cana_panelera`, `hortalizas`,
+  `frutas`, `otro` (renombrado el legacy `caña` → `cana_panelera` por
+  contrato backend v0.6.0). Labels human-readable vía `cropTypeLabel`:
+  "Cacao", "Caña panelera", etc. Validador `validatePlotCropType`
+  rechaza vacíos y valores fuera del allow-list.
+  Dónde: `lib/utils/constants.dart`, `lib/utils/validators.dart`,
+  `lib/screens/plots/widgets/plot_form.dart`.
+- **feat (FASE 2 — `Registrar actividad` foto):** reemplaza el `TextField`
+  "URL de foto" con un widget de captura `image_picker` (cámara +
+  galería) + preview thumbnail + botón "Quitar foto". Al hacer submit,
+  primero sube la foto via `POST /v1/uploads/photos` (`UploadsService`),
+  luego persiste la URL en `activity.photoUrl`. Errores de upload
+  (429 rate-limit, 413 too-large, 5xx, network) muestran snackbar +
+  banner inline SIN perder el resto del form — el usuario puede reintentar.
+  `maxWidth: 1920`, `imageQuality: 85` capa el tamaño bajo los 5 MB del
+  backend.
+  Dónde: `lib/screens/activities/widgets/activity_form.dart`,
+  `lib/services/uploads_service.dart` (nuevo),
+  `lib/providers/uploads_provider.dart` (nuevo),
+  `lib/models/upload.dart` (nuevo).
+- **feat (FASE 2 — capitalización global):** `AppInput` ahora acepta
+  `onChanged` (también necesario para bug #4 — ver Fixed). Forms críticos
+  reciben `TextCapitalization.sentences` (nombre finca, nombre lote,
+  cultivo libre finca, dirección, nota actividad, variedad lote). El
+  email queda con `none` (lowercase).
+  Dónde: `lib/widgets/common/app_input.dart` y todos los forms.
+- **deps:** `image_picker: ^1.1.0`, `geolocator: ^13.0.0`,
+  `permission_handler: ^11.3.0`, `http_parser: ^4.0.2` añadidos a
+  `pubspec.yaml`. Lockfile actualizado.
+- **android:** `AndroidManifest.xml` declara los permisos `CAMERA`,
+  `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `READ_MEDIA_IMAGES`
+  (API 33+), y `READ_EXTERNAL_STORAGE` con `maxSdkVersion="32"` para
+  compatibilidad de galería en pre-API-33.
+
+### Fixed
+- **fix (bug #4 — email pegado tras rechazo):** después de un login
+  fallido con "Credenciales incorrectas", editar el campo email o
+  contraseña no limpiaba el banner — el `parseApiError(authState.error)`
+  seguía leyendo el `AsyncError`. Nuevo `AuthNotifier.clearError()`
+  invocado desde `onChanged` de ambos campos en `LoginScreen` y
+  `RegisterScreen`. Idempotente: no-op si el state es `data`.
+  Dónde: `lib/providers/auth_provider.dart`,
+  `lib/screens/auth/login_screen.dart`,
+  `lib/screens/auth/register_screen.dart`,
+  `lib/widgets/common/app_input.dart`.
+- **fix (bug #7 — login muestra "Sesión expirada"):** un POST
+  `/auth/login` con credenciales erradas hacía 401 → el
+  `_AuthInterceptor` intentaba refresh → fallaba con
+  `_RefreshFailure('no refresh token in storage')` → emitía el sentinel
+  `AuthSessionCollapsed` que `parseApiError` mapeaba a *"Sesión expirada"*.
+  El interceptor ahora hace early-return en rutas anónimas (login /
+  register), dejando que el 401 raw pase al `parseApiError` que lo
+  traduce a *"Credenciales incorrectas"*.
+  Dónde: `lib/services/api_service.dart` (nuevos
+  `kAuthLoginPath` + `kAuthRegisterPath` + check `_isAnonymousAuthPath`).
+- **fix (bug #10 — vista finca: error inmediato al abrir):** tras crear
+  una finca offline, abrir la vista detalle devolvía error porque
+  `farmProvider(farmId)` consultaba `GET /v1/farms/:id` directamente y
+  el backend no conocía la finca pendiente de sync (hasta 14 días).
+  Ahora es local-first: lee del repo Drift primero, fallback al server
+  sólo si el local no la tiene.
+  Dónde: `lib/providers/farms_provider.dart`,
+  `lib/repositories/farm_repository.dart` (nuevo `getById`).
+- **fix (bug #20 — vista lote: "No tienes permiso" + saca a login):**
+  mismo síntoma que #10 — `plotProvider(plotId)` era server-first y
+  devolvía 401/403 para lotes no sincronizados, y el interceptor
+  interpretaba el 401 como sesión colapsada y forzaba logout. Mismo fix:
+  local-first via `PlotRepository.getById` + nuevo `AppDatabase.getPlotById`.
+  La parte del *"saca a login"* también queda mitigada por el fix de
+  bug #7 (el interceptor ya no escala 401 a session-collapse cuando el
+  refresh es trivialmente posible).
+  Dónde: `lib/providers/plots_provider.dart`,
+  `lib/repositories/plot_repository.dart`,
+  `lib/database/app_database.dart`.
+- **fix (bug #28 — editar lote: cambios no refrescan):** `PlotEditScreen`
+  ya invalidaba `plotProvider(plotId)`; añadido `invalidate` también de
+  `plotsProvider(farmId)` (family) para forzar el re-fetch de la lista
+  cuando el stream reactivo de Drift no emite a tiempo.
+  Dónde: `lib/screens/plots/plot_edit_screen.dart`.
+
+### Tests
+- **test (nuevo):** `test/unit/uploads_service_test.dart` — 11 tests
+  cubren multipart body con field `photo`, parsing del envelope 201,
+  guard local 5 MB → `UploadTooLargeException` sin tocar la red,
+  mapping de 413/429/502/`success:false`, y `UploadResponse.fromJson`
+  con tolerancia para `num` size.
+- **test (nuevo):** `test/unit/farms_form_test.dart` — 6 tests del
+  `validateOptionalFarmCropType` (null/empty/255/256/trim).
+- **test (nuevo):** `test/unit/plots_form_test.dart` — 14 tests del
+  `validatePlotCropType` con allow-list, `cropTypeLabel` Spanish
+  rendering, y `matchPlotCropType` (incluido el fallback de legacy
+  `caña` → `cana_panelera`).
+- **test (existing, ajustados):** `test/unit/farms_provider_test.dart`
+  + `test/unit/plots_provider_test.dart` actualizados al nuevo contrato
+  local-first de `farmProvider`/`plotProvider` (stub `getById`), y dos
+  tests nuevos por archivo para cubrir el path local. El test de
+  `create()` ahora espera `throwsA(...)` además del state `hasError`,
+  porque `FarmsNotifier.create()` retorna `Future<Farm>` (necesario para
+  la auto-navegación post-finca).
+- **test (existing, ajustados):** `test/widget/plot_edit_screen_test.dart`
+  + `test/widget/plot_detail_delete_test.dart` + `test/widget/activity_edit_screen_test.dart`
+  actualizados para reflejar la UI v1.9.0 (stub `mockPlotRepo.getById`,
+  reemplazo del assert del campo URL por aserciones de los nuevos
+  controles "Foto (opcional)" / "Tomar foto" / "Galería", + `ensureVisible`
+  para que el botón "Guardar cambios" no quede off-screen con la sección
+  de foto añadida).
+- **Suite:** 251 → **281 tests** (`flutter analyze` limpio, todos verde).
+
+### Notas de despliegue
+- **Acoplamiento conocido:** el endpoint `POST /v1/uploads/photos` queda
+  fallando hasta que `agritrace-backend` v0.6.0 (con S3 bucket
+  configurado en el OCI VM) se despliegue. El mobile build sube en
+  paralelo; en runtime sólo fallará la subida de foto (el resto del form
+  sigue funcionando — la foto es opcional). Documentado en commit + tag
+  v1.9.0.
+
 ## [1.8.0] - 2026-05-22 — feat(profile/report): in-app issue reporting → GitHub Issues (CU-28)
 
 ### Added

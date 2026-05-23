@@ -26,6 +26,18 @@ class FarmRepository {
   Future<List<Farm>> listAll() async =>
       (await _db.getAllFarms()).map(_fromRow).toList();
 
+  /// Returns the [Farm] with [id] from the local DB, or `null` when no
+  /// row exists (e.g. the producer deep-linked to a farm we haven't
+  /// synced yet). Used by [farmProvider] to power an offline-first
+  /// detail screen — see bug #10 in the v1.9.0 backlog.
+  Future<Farm?> getById(String id) async {
+    final all = await _db.getAllFarms();
+    for (final row in all) {
+      if (row.id == id) return _fromRow(row);
+    }
+    return null;
+  }
+
   // ── Writes ─────────────────────────────────────────────────────────────────
 
   /// Creates a new [Farm] locally and marks it [pendingCreate] for sync.

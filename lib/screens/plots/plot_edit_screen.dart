@@ -81,8 +81,13 @@ class _EditBodyState extends ConsumerState<_EditBody> {
             variety: values.variety,
             areaHectares: values.areaHectares,
           );
-      // Invalidate the single-plot lookup so the detail screen shows fresh data.
+      // v1.9.0 — bug #28 fix. Invalidate BOTH the single-plot lookup
+      // (so the detail header re-reads from the local DB after the
+      // update) AND the family-scoped list (in case the Drift reactive
+      // stream emits before the notifier's write completes and the
+      // detail screen is rebuilt against a stale snapshot).
       ref.invalidate(plotProvider(widget.plot.id));
+      ref.invalidate(plotsProvider(widget.plot.farmId));
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(content: Text('Lote actualizado')),

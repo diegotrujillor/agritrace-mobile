@@ -34,12 +34,18 @@ class PlotFormValues {
 /// [submitLabel] is shown on the submit button (e.g. "Agregar lote" /
 /// "Guardar cambios"). [submitting] disables the button + shows the spinner,
 /// and [errorMessage] (nullable) renders an [AppErrorBanner] above it.
+///
+/// [initialCropType] (v1.9.0) lets a create-mode caller pre-select the
+/// dropdown — used by the post-create-finca auto-nav flow when the
+/// producer's free-text farm cultivo lined up with one of the plot enum
+/// values. Ignored when [initial] is provided (edit mode wins).
 class PlotForm extends StatefulWidget {
   const PlotForm({
     super.key,
     required this.submitLabel,
     required this.onSubmit,
     this.initial,
+    this.initialCropType,
     this.submitting = false,
     this.errorMessage,
   });
@@ -47,6 +53,7 @@ class PlotForm extends StatefulWidget {
   final String submitLabel;
   final ValueChanged<PlotFormValues> onSubmit;
   final Plot? initial;
+  final String? initialCropType;
   final bool submitting;
   final String? errorMessage;
 
@@ -67,9 +74,16 @@ class _PlotFormState extends State<PlotForm> {
   void initState() {
     super.initState();
     final initial = widget.initial;
-    _cropType = (initial != null && kCropTypes.contains(initial.cropType))
-        ? initial.cropType
-        : kCropTypes.first;
+    // Resolution order: edit-mode initial.cropType wins; then explicit
+    // create-mode suggestion ([initialCropType]); finally the first enum.
+    if (initial != null && kCropTypes.contains(initial.cropType)) {
+      _cropType = initial.cropType;
+    } else if (widget.initialCropType != null &&
+        kCropTypes.contains(widget.initialCropType)) {
+      _cropType = widget.initialCropType!;
+    } else {
+      _cropType = kCropTypes.first;
+    }
     _status = initial?.status ?? PlotStatus.planning;
     if (initial != null) {
       _nameController.text = initial.name;
@@ -123,14 +137,20 @@ class _PlotFormState extends State<PlotForm> {
             controller: _nameController,
             validator: validateRequiredText,
             textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: AppSpacing.md),
           AppLabeledDropdown<String>(
             label: 'Tipo de cultivo',
             value: _cropType,
             items: [
+              // Wire values are snake_case (e.g. `cana_panelera`); render
+              // the human-readable Spanish label via `cropTypeLabel`.
               for (final crop in kCropTypes)
-                DropdownMenuItem(value: crop, child: Text(crop)),
+                DropdownMenuItem(
+                  value: crop,
+                  child: Text(cropTypeLabel(crop)),
+                ),
             ],
             onChanged: (v) => setState(() => _cropType = v),
           ),
@@ -140,6 +160,7 @@ class _PlotFormState extends State<PlotForm> {
             hint: 'CCN-51',
             controller: _varietyController,
             textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: AppSpacing.md),
           AppInput(

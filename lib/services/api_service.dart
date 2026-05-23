@@ -19,6 +19,17 @@ const _baseUrl = String.fromEnvironment('API_BASE_URL');
 /// interceptor and the request-skip check stay in sync.
 const String kAuthRefreshPath = '/auth/refresh';
 
+/// Path on the backend for the login endpoint. The interceptor must NOT
+/// attempt a refresh when this path returns 401 — a fresh login with
+/// wrong credentials should surface as "Credenciales incorrectas", never
+/// as the session-expired collapse sentinel (bug #7).
+const String kAuthLoginPath = '/auth/login';
+
+/// Path on the backend for the register endpoint. Same skip-reasoning as
+/// [kAuthLoginPath] — a 401 here (anonymous, no token sent) is not a
+/// session-expired event.
+const String kAuthRegisterPath = '/auth/register';
+
 bool _isAllowedScheme(String url) {
   if (url.startsWith('https://')) return true;
   if (url.startsWith('http://localhost')) return true;
@@ -176,7 +187,16 @@ class _AuthInterceptor extends QueuedInterceptor {
     ErrorInterceptorHandler handler,
   ) async {
     final isAuthError = err.response?.statusCode == 401;
-    if (!isAuthError || _isRefreshPath(err.requestOptions.path)) {
+    // Three early-outs share the same shape:
+    //  - not a 401 → not our concern
+    //  - 401 on the refresh path → already handled inside _doRefresh
+    //  - 401 on login/register (anonymous, no Bearer to refresh) →
+    //    surfacing this as a "session expired" sentinel was bug #7 in
+    //    the v1.9.0 backlog. Pass through verbatim so `parseApiError`
+    //    can render "Credenciales incorrectas" instead.
+    if (!isAuthError ||
+        _isRefreshPath(err.requestOptions.path) ||
+        _isAnonymousAuthPath(err.requestOptions.path)) {
       handler.next(err);
       return;
     }
@@ -357,4 +377,11 @@ class _AuthInterceptor extends QueuedInterceptor {
 
   /// Path comparison that tolerates the `/v1` baseUrl prefix vs. raw paths.
   bool _isRefreshPath(String path) => path.endsWith(kAuthRefreshPath);
+
+  /// True when [path] is one of the anonymous auth endpoints (login or
+  /// register). The interceptor must not run the refresh-and-retry dance
+  /// for those — no Bearer was ever attached, and a 401 there means
+  /// "credentials are wrong", not "session expired".
+  bool _isAnonymousAuthPath(String path) =>
+      path.endsWith(kAuthLoginPath) || path.endsWith(kAuthRegisterPath);
 }

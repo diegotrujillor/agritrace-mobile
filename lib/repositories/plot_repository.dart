@@ -25,6 +25,14 @@ class PlotRepository {
   Future<List<Plot>> listByFarm(String farmId) async =>
       (await _db.getPlotsByFarm(farmId)).map(_fromRow).toList();
 
+  /// Returns the [Plot] with [id] from the local DB, or `null` when no
+  /// row exists. Used by [plotProvider] to power the offline-first detail
+  /// screen — see bug #20 in the v1.9.0 backlog.
+  Future<Plot?> getById(String id) async {
+    final row = await _db.getPlotById(id);
+    return row == null ? null : _fromRow(row);
+  }
+
   // ── Writes ─────────────────────────────────────────────────────────────────
 
   /// Creates a new [Plot] locally and marks it [pendingCreate] for sync.

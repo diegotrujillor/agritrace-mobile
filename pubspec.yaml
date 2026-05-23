@@ -1,7 +1,7 @@
 name: agritrace_mobile
 description: AgriTrace MVP — Flutter mobile app | Offline-First | Drift SQLite | Farmer-First traceability
 publish_to: 'none'
-version: 1.8.0+3
+version: 1.9.0+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -39,6 +39,17 @@ dependencies:
   # flutter_secure_storage_windows ^3.1.2 → win32 ^5). The API
   # `PackageInfo.fromPlatform()` is identical across 9.x and 10.x.
   package_info_plus: ^9.0.0
+  # v1.9.0 — Activity photo capture (gallery + camera) and farm-form GPS
+  # capture. `image_picker` is the canonical Flutter package; `geolocator`
+  # exposes `getCurrentPosition()`; `permission_handler` is needed to
+  # request runtime camera + location permissions on Android 6+.
+  image_picker: ^1.1.0
+  geolocator: ^13.0.0
+  permission_handler: ^11.3.0
+  # Multipart helper used by `UploadsService` when posting the captured photo
+  # to `POST /v1/uploads/photos`. `http_parser` provides `MediaType` so we
+  # can set the correct `Content-Type` per file (image/jpeg vs image/png).
+  http_parser: ^4.0.2
 
 dev_dependencies:
   flutter_test:

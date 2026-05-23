@@ -63,3 +63,32 @@ String? validateArea(String? value) {
   if (parsed > 100000) return 'El área es demasiado grande';
   return null;
 }
+
+/// Validator for the **farm-level** `cropType` field (v1.9.0 — free-text,
+/// optional). Empty input is accepted (returns `null`); when present,
+/// the value must not exceed 255 characters (matches the backend Zod
+/// upper bound after the v0.6.0 relaxation).
+String? validateOptionalFarmCropType(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+  if (value.trim().length > 255) {
+    return 'El tipo de cultivo es demasiado largo';
+  }
+  return null;
+}
+
+/// Validator for the **plot-level** `cropType` enum (v1.9.0 — required,
+/// must be one of [allowed]). Empty/non-enum values are rejected so the
+/// backend Zod enum constraint can't surface as a generic 400.
+///
+/// Takes [allowed] as a parameter to avoid pulling `lib/utils/constants.dart`
+/// (where `kCropTypes` lives) into the validators file — keeps the
+/// dependency direction in `constants → validators`, never the other way.
+String? validatePlotCropType(String? value, List<String> allowed) {
+  if (value == null || value.trim().isEmpty) {
+    return 'Selecciona un tipo de cultivo';
+  }
+  if (!allowed.contains(value)) {
+    return 'Tipo de cultivo no válido';
+  }
+  return null;
+}

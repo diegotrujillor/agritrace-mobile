@@ -91,6 +91,11 @@ void main() {
         .thenAnswer((_) => Stream.value(<Activity>[]));
     when(() => mockActivityRepo.listByPlot(any()))
         .thenAnswer((_) async => <Activity>[]);
+    // v1.9.0 — plotProvider is now local-first; stub the repo lookup so
+    // the detail screen resolves without hitting the (mocked-but-unstubbed)
+    // service path.
+    when(() => mockPlotRepo.getById(_plotId))
+        .thenAnswer((_) async => _seedPlot());
   });
 
   Widget wrap() => ProviderScope(

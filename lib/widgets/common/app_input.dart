@@ -12,6 +12,7 @@ class AppInput extends StatefulWidget {
     this.obscureText      = false,
     this.textInputAction,
     this.onFieldSubmitted,
+    this.onChanged,
     this.textCapitalization = TextCapitalization.none,
   });
 
@@ -23,6 +24,7 @@ class AppInput extends StatefulWidget {
   final bool obscureText;
   final TextInputAction? textInputAction;
   final void Function(String)? onFieldSubmitted;
+  final void Function(String)? onChanged;
   final TextCapitalization textCapitalization;
 
   @override
@@ -60,6 +62,7 @@ class _AppInputState extends State<AppInput> {
           textCapitalization: widget.textCapitalization,
           textInputAction: widget.textInputAction,
           onFieldSubmitted: widget.onFieldSubmitted,
+          onChanged: widget.onChanged,
           decoration: InputDecoration(
             hintText: widget.hint,
             suffixIcon: widget.obscureText

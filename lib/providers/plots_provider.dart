@@ -118,6 +118,15 @@ final _plotsStreamProvider = StreamProvider.family<List<Plot>, String>(
 );
 
 /// Single plot lookup by id, used by the plot detail screen.
-final plotProvider = FutureProvider.family<Plot, String>(
-  (ref, id) => ref.read(plotServiceProvider).get(id),
-);
+///
+/// v1.9.0 — bug #20 fix. Local-first lookup: a freshly-created plot
+/// lives in pending-sync state for up to 14 days, so a server hit on
+/// the detail screen returned "No tienes permiso" (the backend didn't
+/// know it yet) and the interceptor occasionally interpreted that as a
+/// session-collapse and bounced the user to /welcome. Reading from
+/// SQLite first sidesteps both failure modes.
+final plotProvider = FutureProvider.family<Plot, String>((ref, id) async {
+  final local = await ref.read(plotRepositoryProvider).getById(id);
+  if (local != null) return local;
+  return ref.read(plotServiceProvider).get(id);
+});

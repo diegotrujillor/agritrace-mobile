@@ -25,10 +25,12 @@ class FarmService {
     return unwrapOne(response.data, Farm.fromJson);
   }
 
-  /// `POST /farms`.
+  /// `POST /farms`. v1.9.0 — `cropType` is optional at the farm level
+  /// (free-text on the form, or skip). Empty/null is omitted so the
+  /// backend stores SQL NULL and the relaxed Zod validator accepts it.
   Future<Farm> create({
     required String name,
-    required String cropType,
+    String? cropType,
     required double areaHectares,
     String? address,
     double? latitude,
@@ -36,7 +38,7 @@ class FarmService {
   }) async {
     final response = await _api.client.post('/farms', data: {
       'name': name,
-      'cropType': cropType,
+      if (cropType != null && cropType.isNotEmpty) 'cropType': cropType,
       'areaHectares': areaHectares,
       if (address != null && address.isNotEmpty) 'address': address,
       if (latitude != null) 'latitude': latitude,
@@ -45,11 +47,11 @@ class FarmService {
     return unwrapOne(response.data, Farm.fromJson);
   }
 
-  /// `PUT /farms/:id`.
+  /// `PUT /farms/:id`. See [create] for [cropType] handling.
   Future<Farm> update({
     required String id,
     required String name,
-    required String cropType,
+    String? cropType,
     required double areaHectares,
     String? address,
     double? latitude,
@@ -57,7 +59,7 @@ class FarmService {
   }) async {
     final response = await _api.client.put('/farms/$id', data: {
       'name': name,
-      'cropType': cropType,
+      if (cropType != null && cropType.isNotEmpty) 'cropType': cropType,
       'areaHectares': areaHectares,
       if (address != null && address.isNotEmpty) 'address': address,
       if (latitude != null) 'latitude': latitude,
