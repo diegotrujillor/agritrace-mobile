@@ -341,6 +341,51 @@ con `storePassword/keyPassword/keyAlias=agritrace/storeFile=agritrace-release.ke
 **Resguardar keystore + passwords en gestor de contraseñas** — perderlo
 impide publicar actualizaciones de la app.
 
+### Pipeline de release (de git tag a tester)
+
+Un `git tag vX.Y.Z` dispara dos workflows en paralelo: uno para el APK de side-load (canal del piloto) y otro para el AAB del Play Console (canal post-pilot).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Dev as 💻 Diego local
+    participant Repo as 📦 agritrace-mobile main
+    participant W1 as 🤖 Build Release APK workflow
+    participant W2 as 🤖 Release to Google Play workflow
+    participant GH as 🐙 GitHub Release
+    participant Play as 🛍️ Play Console
+    participant Land as 🌐 agritrace.co instalar
+    participant Tester as 👨‍🌾 Tester
+
+    Dev->>Repo: git tag vX.Y.Z y git push --tags
+    Repo->>W1: tag dispara build-apk yml
+    Repo->>W2: tag dispara release-play yml en paralelo
+
+    Note over W1: 1 flutter analyze, 2 flutter build apk release, 3 firma con KEYSTORE_BASE64 desde secrets, 4 verifica apksigner v2 v3, 5 limpia key.properties
+    W1->>GH: action-gh-release sube AgriTrace.apk al release de la tag
+
+    Note over W2: 1 flutter analyze, 2 flutter test, 3 flutter build appbundle release, 4 firma AAB, 5 archiva AAB como artifact
+    W2->>Play: upload signed AAB al track configurado
+    W2->>GH: archive AAB como build artifact respaldo
+
+    Note over GH,Land: landing apex agritrace.co instalar redirige a releases latest download AgriTrace.apk
+    Tester->>Land: tap boton verde Descargar AgriTrace
+    Land->>GH: 302 a /releases/latest/download/AgriTrace.apk
+    GH-->>Tester: APK firmado, instalar encima
+```
+
+**Características:**
+
+| Aspecto | Cómo lo implementamos |
+|---------|------------------------|
+| Trigger | Solo `git tag vX.Y.Z + git push --tags`. Push a `main` sin tag **no** dispara release. |
+| Secreto del keystore | `KEYSTORE_BASE64` en GitHub Actions Secrets. Se decodifica al filesystem del runner, se usa, se borra antes del cleanup step. |
+| Verificación de firma | `apksigner verify --verbose --print-certs` confirma v2 + v3 schemes. Falla el job si no firma correctamente. |
+| Canal de distribución actual | GitHub Release APK descargada desde `agritrace.co/#instalar` (mientras Play Internal testing no esté listo). |
+| Canal post-pilot | Play Console internal testing → closed alpha → producción. Build pipeline ya emite el AAB hoy aunque el track Play sea no-op hasta que se complete `PLAY_CONSOLE_SETUP.md`. |
+| Rollback de APK | Tester re-descarga la tag anterior desde GitHub Releases e instala encima. **No pierde datos** (Drift SQLite local persiste; mismo certificado de firma). |
+| Idempotencia | Re-ejecutar el mismo tag falla en el upload (action-gh-release rechaza tag existente). Bump de patch obligado. |
+
 ## Offline-First
 
 El app usa **Drift** como base de datos local (SQLite):
