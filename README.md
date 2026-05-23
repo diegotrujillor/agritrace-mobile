@@ -12,7 +12,7 @@ App móvil del MVP de **AgriTrace** — plataforma de trazabilidad agrícola par
 |------|------------|
 | Framework | Flutter 3.x |
 | Lenguaje | Dart |
-| Almacenamiento local | WatermelonDB (offline-first) |
+| Almacenamiento local | Drift (SQLite offline-first) |
 | Estado | Riverpod |
 | Navegación | GoRouter |
 | HTTP | Dio |
