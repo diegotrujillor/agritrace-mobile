@@ -6,6 +6,52 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-05-22 — feat(profile/report): in-app issue reporting → GitHub Issues (CU-28)
+
+### Added
+- **feat (CU-28):** nueva pantalla **"Reportar problema"** accesible desde
+  `ProfileScreen` (entre "Exportar mis datos" y "Cerrar sesión"). Los
+  pilotos pueden enviar bugs/sugerencias sin llamar a Diego — el reporte
+  se postea a `POST /v1/feedback` (contrato congelado coordinado con
+  backend v0.5.0) y el backend crea un GitHub Issue, devolviendo
+  `{ issueUrl, issueNumber }` que se muestra en un `AlertDialog` con
+  botón "Ver en GitHub" (`url_launcher.launchUrl`).
+  Dónde: `lib/screens/profile/report_issue_screen.dart`,
+  `lib/screens/profile/profile_screen.dart`.
+- **feat:** `FeedbackService.submit()` con DTOs tipados
+  (`FeedbackCategory` enum bug/feature/other, `FeedbackDevice`,
+  `FeedbackSubmitted`). Mapea HTTP 429 a una excepción tipada
+  `FeedbackRateLimitException` con mensaje en español *"Has alcanzado el
+  límite de 5 reportes por día — intenta mañana."*; otros errores
+  propagan como `DioException` y caen al `parseApiError` genérico.
+  Dónde: `lib/services/feedback_service.dart`, `lib/models/feedback.dart`,
+  `lib/providers/feedback_provider.dart`.
+- **feat:** captura automática de `appVersion` (`PackageInfo.fromPlatform`
+  → `'${version}+${buildNumber}'`) y `device`
+  (`DeviceInfoPlugin().androidInfo` → `model`, `'android'`,
+  `'Android ${version.release}'`). Sección read-only "Información que se
+  enviará" en la pantalla muestra al usuario exactamente qué se manda
+  (RNF-05 / Ley 1581 — transparencia). Guarda con `Platform.isAndroid` y
+  fallback a placeholders seguros si el plugin falla.
+- **deps:** `device_info_plus: ^12.0.0` y `package_info_plus: ^9.0.0`
+  añadidos a `pubspec.yaml`. **Versiones pinned a las series 12.x/9.x
+  por incompatibilidad de `win32`:** la 13.x/10.x dependen de `win32:
+  ^6.0.1` que choca con `flutter_secure_storage_windows: ^3.1.2` (`win32:
+  ^5`). Las APIs Android que usamos (`androidInfo.model`,
+  `version.release`, `PackageInfo.fromPlatform`) son idénticas entre las
+  series.
+- **test:** `test/unit/feedback_service_test.dart` (nuevo) — 7 tests:
+  body contractuado, mapping del enum, happy path, 429 →
+  `FeedbackRateLimitException`, 502 → `DioException` propagado,
+  `success:false` → `FormatException` con error del servidor, envelope
+  malformado → `FormatException`. Suite: 244 → 251 tests (`flutter
+  analyze` limpio).
+
+### Notas de despliegue
+- **Acoplamiento conocido:** la pantalla devolverá 404 hasta que
+  `agritrace-backend` v0.5.0 (con `GITHUB_FEEDBACK_TOKEN` configurado en
+  el OCI VM) se despliegue. Documentado en commit + tag v1.8.0.
+
 ### Tests
 - **test (sync):** `stubPush` helper en `test/unit/sync_service_test.dart`
   ahora envuelve el body en `envelope(...)` para reflejar la shape

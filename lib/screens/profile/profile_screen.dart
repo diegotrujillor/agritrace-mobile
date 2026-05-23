@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/users_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/error_parser.dart';
+import 'report_issue_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -128,6 +129,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             subtitle: 'Descarga un JSON con tu información (Ley 1581)',
             busy: _exportBusy,
             onTap: _export,
+          ),
+          const Divider(height: 1, indent: AppSpacing.lg),
+          // CU-28 — Reportar problema desde la app (v1.8.0). Sits between
+          // "Exportar mis datos" and "Cerrar sesión" so it is visible above
+          // the destructive "Eliminar mi cuenta" action.
+          _ActionTile(
+            icon: Icons.bug_report_outlined,
+            iconColor: AppColors.certBlue,
+            title: 'Reportar problema',
+            subtitle: 'Envía un bug o sugerencia al equipo',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ReportIssueScreen(),
+              ),
+            ),
           ),
           const Divider(height: 1, indent: AppSpacing.lg),
           _ActionTile(

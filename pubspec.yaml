@@ -1,7 +1,7 @@
 name: agritrace_mobile
 description: AgriTrace MVP — Flutter mobile app | Offline-First | Drift SQLite | Farmer-First traceability
 publish_to: 'none'
-version: 1.7.1+2
+version: 1.8.0+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -24,6 +24,21 @@ dependencies:
   path_provider: ^2.1.4
   uuid: ^4.4.0
   share_plus: ^10.0.0
+  # In-app issue reporting (v1.8.0): capture device + app metadata so the
+  # bug report posted to /v1/feedback (→ GitHub Issues) carries the context
+  # we'd otherwise have to ask the user for. `device_info_plus` is the
+  # canonical Flutter package for OS/model metadata; `package_info_plus`
+  # exposes the version+build from pubspec at runtime.
+  # device_info_plus pinned to 12.x: 13.x depends on win32 ^6.0.1 which
+  # conflicts with flutter_secure_storage_windows ^3.1.2 (win32 ^5). The
+  # Android API surface we use (`model`, `version.release`) is identical
+  # across 12.x and 13.x.
+  device_info_plus: ^12.0.0
+  # package_info_plus pinned to 9.x for the same win32 reason as
+  # device_info_plus above (10.x depends on win32 ^6 which conflicts with
+  # flutter_secure_storage_windows ^3.1.2 → win32 ^5). The API
+  # `PackageInfo.fromPlatform()` is identical across 9.x and 10.x.
+  package_info_plus: ^9.0.0
 
 dev_dependencies:
   flutter_test:
