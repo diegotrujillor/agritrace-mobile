@@ -7,7 +7,9 @@ import '../../navigation/route_names.dart';
 import '../../providers/farms_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/error_parser.dart';
+import '../../utils/text_format.dart';
 import '../../utils/validators.dart';
+import '../../widgets/common/app_logo_mark.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_error_banner.dart';
 import '../../widgets/common/app_input.dart';
@@ -135,8 +137,12 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
     });
 
     final name = _nameController.text.trim();
-    final cropTypeRaw = _cropTypeController.text.trim();
-    final cropType = cropTypeRaw.isEmpty ? null : cropTypeRaw;
+    // v1.9.2 — QA cycle-02: normalise on save (source of truth). Autofill,
+    // paste, or edit-mode reload could land an uncapitalised value that
+    // `TextCapitalization.sentences` would never fix on its own.
+    // `capitalizeFirstLetter` returns null for empty input so the optional
+    // backend field is preserved when the producer skipped it.
+    final cropType = capitalizeFirstLetter(_cropTypeController.text);
     final area =
         double.parse(_areaController.text.trim().replaceAll(',', '.'));
     final address = _addressController.text.trim();
@@ -201,13 +207,22 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
         title: Text(_isEdit ? 'Editar finca' : 'Registrar finca'),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.xl,
+                AppSpacing.xl,
+                // Extra bottom padding so the form does not crash into the
+                // BottomLeftLogo overlay (v1.9.2 — QA cycle-01 #13).
+                AppSpacing.xl + 56,
+              ),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 AppInput(
                   label: 'Nombre de la finca',
                   hint: 'Finca El Roble',
@@ -286,9 +301,19 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
                   onPressed: _submitting ? null : _submit,
                   isLoading: _submitting,
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
-          ),
+            // v1.9.2 — QA cycle-01 #13: brand mark pinned to bottom-left.
+            const Align(
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: AppLogoMark(size: 40),
+              ),
+            ),
+          ],
         ),
       ),
     );

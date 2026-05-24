@@ -6,6 +6,7 @@ import '../../navigation/route_names.dart';
 import '../../providers/farms_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/error_parser.dart';
+import '../../widgets/common/app_logo_mark.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/error_state.dart';
 import '../../widgets/common/offline_indicator.dart';
@@ -36,26 +37,37 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          const OfflineIndicator(),
-          Expanded(
-            child: farmsAsync.when(
-              data: (farms) => farms.isEmpty
-                  ? const EmptyState(
-                      icon: Icons.agriculture_outlined,
-                      title: 'No tienes fincas aún',
-                      subtitle: 'Registra tu primera finca para comenzar',
-                      subtitleHeight: 1.5,
-                    )
-                  : _FarmsList(farms: farms),
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (e, _) => ErrorState(
-                message: parseApiError(e),
-                onRetry: () => ref.invalidate(farmsProvider),
+          Column(
+            children: [
+              const OfflineIndicator(),
+              Expanded(
+                child: farmsAsync.when(
+                  data: (farms) => farms.isEmpty
+                      ? const EmptyState(
+                          icon: Icons.agriculture_outlined,
+                          title: 'No tienes fincas aún',
+                          subtitle: 'Registra tu primera finca para comenzar',
+                          subtitleHeight: 1.5,
+                        )
+                      : _FarmsList(farms: farms),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => ErrorState(
+                    message: parseApiError(e),
+                    onRetry: () => ref.invalidate(farmsProvider),
+                  ),
+                ),
               ),
-            ),
+            ],
+          ),
+          // v1.9.2 — QA cycle-01 #9: brand mark bottom-left, mirroring
+          // the FAB on the right at the same 56px size + 16px margins.
+          const Positioned(
+            left: AppSpacing.md,
+            bottom: AppSpacing.md,
+            child: AppLogoMark(size: 56),
           ),
         ],
       ),

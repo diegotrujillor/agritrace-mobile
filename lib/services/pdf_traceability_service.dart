@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import '../models/activity.dart';
 import '../models/farm.dart';
 import '../models/plot.dart';
+import '../utils/constants.dart';
 import '../utils/date_format.dart';
 
 /// Client-side traceability PDF (W1c).
@@ -170,7 +171,9 @@ class PdfTraceabilityService {
           _row('Cultivo (finca)', farm.cropType),
           if (gps != null) _row('GPS (finca)', gps),
           _row('Lote', plot.name),
-          _row('Cultivo (lote)', plot.cropType),
+          // v1.9.2 — QA cycle-02: human label for the plot enum value so
+          // the PDF reads "Caña panelera" instead of "cana_panelera".
+          _row('Cultivo (lote)', cropTypeLabel(plot.cropType)),
           if (plot.variety != null && plot.variety!.isNotEmpty)
             _row('Variedad', plot.variety!),
           _row('Estado', plot.status.label),

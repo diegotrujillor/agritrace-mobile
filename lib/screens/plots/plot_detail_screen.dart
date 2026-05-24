@@ -399,7 +399,11 @@ class _PlotSummary extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          InfoRow(label: 'Cultivo', value: plot.cropType),
+          // v1.9.2 — QA cycle-02: surface the human label so saved lotes
+          // show "Caña panelera" instead of the raw wire value
+          // "cana_panelera". Submits still send the canonical snake_case
+          // value to the backend.
+          InfoRow(label: 'Cultivo', value: cropTypeLabel(plot.cropType)),
           if (plot.variety != null && plot.variety!.isNotEmpty)
             InfoRow(label: 'Variedad', value: plot.variety!),
           if (plot.areaHectares != null)

@@ -5,6 +5,7 @@ import '../../navigation/route_names.dart';
 import '../../providers/plots_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/error_parser.dart';
+import '../../widgets/common/app_logo_mark.dart';
 import 'widgets/plot_form.dart';
 
 /// Create a plot under [farmId]. Area is optional for plots (a farmer may
@@ -86,16 +87,34 @@ class _PlotFormScreenState extends ConsumerState<PlotFormScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: PlotForm(
-            submitLabel: 'Agregar lote',
-            onSubmit: _submit,
-            submitting: _submitting,
-            errorMessage: _errorMessage,
-            initialCropType:
-                matchPlotCropType(widget.initialCropTypeSuggestion),
-          ),
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.xl,
+                AppSpacing.xl,
+                // Reserve room for the bottom-left logo overlay below.
+                AppSpacing.xl + 56,
+              ),
+              child: PlotForm(
+                submitLabel: 'Agregar lote',
+                onSubmit: _submit,
+                submitting: _submitting,
+                errorMessage: _errorMessage,
+                initialCropType:
+                    matchPlotCropType(widget.initialCropTypeSuggestion),
+              ),
+            ),
+            // v1.9.2 — QA cycle-01 #19: brand mark pinned to bottom-left.
+            const Align(
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: AppLogoMark(size: 40),
+              ),
+            ),
+          ],
         ),
       ),
     );

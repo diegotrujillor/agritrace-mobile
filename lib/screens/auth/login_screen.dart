@@ -10,6 +10,7 @@ import '../../utils/validators.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_error_banner.dart';
 import '../../widgets/common/app_input.dart';
+import '../../widgets/common/app_logo_mark.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -128,6 +129,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ),
+                // v1.9.2 — QA cycle-01 #5: brand mark centered at the
+                // bottom of the auth column, below the register CTA.
+                const SizedBox(height: AppSpacing.xl),
+                const Center(child: AppLogoMark(size: 48)),
+                const SizedBox(height: AppSpacing.lg),
               ],
             ),
           ),

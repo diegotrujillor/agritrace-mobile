@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/activity.dart';
 import '../../providers/activities_provider.dart';
 import '../../utils/constants.dart';
+import '../../widgets/common/app_logo_mark.dart';
 import 'widgets/activity_form.dart';
 
 /// Register an activity for [plotId]. Type + occurred-on date are required;
@@ -25,30 +26,47 @@ class ActivityFormScreen extends ConsumerWidget {
         title: const Text('Registrar actividad'),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: ActivityForm(
-            submitLabel: 'Registrar actividad',
-            onSubmit: ({
-              required ActivityType type,
-              required DateTime occurredAt,
-              String? description,
-              String? photoUrl,
-            }) async {
-              // Capture router before await to avoid
-              // use_build_context_synchronously across the network call.
-              final router = GoRouter.of(context);
-              await ref
-                  .read(activitiesProvider(plotId).notifier)
-                  .createActivity(
-                    type: type,
-                    occurredAt: occurredAt,
-                    description: description,
-                    photoUrl: photoUrl,
-                  );
-              router.pop();
-            },
-          ),
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.xl,
+                AppSpacing.xl,
+                AppSpacing.xl + 56,
+              ),
+              child: ActivityForm(
+                submitLabel: 'Registrar actividad',
+                onSubmit: ({
+                  required ActivityType type,
+                  required DateTime occurredAt,
+                  String? description,
+                  String? photoUrl,
+                }) async {
+                  // Capture router before await to avoid
+                  // use_build_context_synchronously across the network call.
+                  final router = GoRouter.of(context);
+                  await ref
+                      .read(activitiesProvider(plotId).notifier)
+                      .createActivity(
+                        type: type,
+                        occurredAt: occurredAt,
+                        description: description,
+                        photoUrl: photoUrl,
+                      );
+                  router.pop();
+                },
+              ),
+            ),
+            // v1.9.2 — QA cycle-01 #22: brand mark pinned to bottom-left.
+            const Align(
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: AppLogoMark(size: 40),
+              ),
+            ),
+          ],
         ),
       ),
     );

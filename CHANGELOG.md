@@ -6,6 +6,60 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-05-23 — fix(qa-cycle-02): crop_type display lote + finca capitalize + logos 7 screens
+
+### Fixed
+- **fix (QA cycle-02): display de `lote.crop_type` en minúscula tras guardar.**
+  El form usaba `cropTypeLabel(crop)` para los items del dropdown, pero las
+  pantallas de detalle mostraban el valor crudo de la DB (`cana_panelera`,
+  `cacao`) en vez del label humano (`Caña panelera`, `Cacao`). Se envuelven
+  todos los renders visibles de `plot.cropType` con `cropTypeLabel(...)`.
+  Los submits/POSTs siguen mandando el valor canónico snake_case al backend
+  — solo cambia el render. Dónde:
+  `lib/screens/farms/farm_detail_screen.dart` (PlotTile),
+  `lib/screens/plots/plot_detail_screen.dart` (PlotSummary InfoRow),
+  `lib/services/pdf_traceability_service.dart` (fila "Cultivo (lote)" del
+  PDF de trazabilidad).
+- **fix (QA cycle-02): capitalización de `finca.crop_type` (texto libre).**
+  `TextCapitalization.sentences` solo se aplica al tipear; falla con
+  autofill, paste, o edit-mode (cuando se recarga un valor previo en
+  minúscula el cursor no dispara la capitalización al inicio). Fix robusto:
+  normalizar el valor antes de guardar (source of truth). Nuevo helper puro
+  `capitalizeFirstLetter(String? input)` en `lib/utils/text_format.dart` que
+  hace `trim` → null si queda vacío → `toUpperCase()` sobre el primer char.
+  Se aplica en `FarmFormScreen._submit()` antes de pasar `cropType` a
+  `farmService.create()` / `update()`. Dónde:
+  `lib/utils/text_format.dart` (nuevo),
+  `lib/screens/farms/farm_form_screen.dart`,
+  `test/unit/text_format_test.dart` (nuevo, 9 cases).
+
+### Added
+- **Logo placement en 7 pantallas (QA cycle-01).** Nuevo widget reusable
+  `AppLogoMark({size, color, variant})` en `lib/widgets/common/app_logo_mark.dart`
+  que renderiza el SVG del brand mark (`assets/brand/agritrace-logo-mark.svg`
+  por default, `agritrace-logo-white.svg` para variant `white`). Aplicado:
+  - `RegisterScreen`: top-left, antes del título "Crear cuenta", 40 px.
+  - `LoginScreen`: bottom centered debajo del link "¿No tienes cuenta?",
+    48 px.
+  - `DashboardScreen`: `Stack` con `Positioned(bottom, left)`, 56 px —
+    mismo tamaño y nivel vertical que el FAB "+" del lado opuesto.
+  - `FarmDetailScreen`: `Stack` con `Positioned(bottom, left)`, 56 px —
+    mismo nivel del FAB "Agregar lote".
+  - `FarmFormScreen`: bottom-left dentro de `Stack`, 40 px.
+  - `PlotFormScreen`: bottom-left dentro de `Stack`, 40 px.
+  - `ActivityFormScreen`: bottom-left dentro de `Stack`, 40 px.
+  En las form screens se añade padding bottom extra al `SingleChildScrollView`
+  para que el último botón no choque con el overlay del logo. Dónde:
+  `lib/widgets/common/app_logo_mark.dart` (nuevo),
+  `lib/screens/auth/register_screen.dart`,
+  `lib/screens/auth/login_screen.dart`,
+  `lib/screens/farms/dashboard_screen.dart`,
+  `lib/screens/farms/farm_detail_screen.dart`,
+  `lib/screens/farms/farm_form_screen.dart`,
+  `lib/screens/plots/plot_form_screen.dart`,
+  `lib/screens/activities/activity_form_screen.dart`,
+  `test/widget/app_logo_mark_test.dart` (nuevo, 3 cases).
+
 ## [1.9.1] - 2026-05-23 — fix(qa-manual): back arrows + autofill trim + profile order + hint color
 
 ### Fixed

@@ -12,6 +12,7 @@ import '../../utils/validators.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_error_banner.dart';
 import '../../widgets/common/app_input.dart';
+import '../../widgets/common/app_logo_mark.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -76,6 +77,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // v1.9.2 — QA cycle-01 #3: brand mark top-left, before
+                // the "Crear cuenta" title.
+                const SizedBox(height: AppSpacing.md),
+                const AppLogoMark(size: 40),
                 const SizedBox(height: AppSpacing.lg),
                 Text(
                   'Crear cuenta',

@@ -10,6 +10,7 @@ import '../../providers/plots_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/error_parser.dart';
 import '../../widgets/common/app_card.dart';
+import '../../widgets/common/app_logo_mark.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/info_row.dart';
 import '../../widgets/common/inline_error.dart';
@@ -53,11 +54,13 @@ class FarmDetailScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () => ref.refresh(plotsProvider(farmId).future),
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          children: [
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: () => ref.refresh(plotsProvider(farmId).future),
+            child: ListView(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              children: [
             farmAsync.when(
               data: (farm) => _FarmHeader(farm: farm),
               loading: () => const Padding(
@@ -96,8 +99,17 @@ class FarmDetailScreen extends ConsumerWidget {
               ),
               error: (e, _) => InlineError(message: parseApiError(e)),
             ),
-          ],
-        ),
+              ],
+            ),
+          ),
+          // v1.9.2 — QA cycle-01 #12: brand mark bottom-left at the same
+          // height as the "Agregar lote" FAB on the opposite corner.
+          const Positioned(
+            left: AppSpacing.md,
+            bottom: AppSpacing.md,
+            child: AppLogoMark(size: 56),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.primaryGreen,
@@ -171,7 +183,11 @@ class _PlotTile extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  '${plot.cropType} · ${plot.status.label}',
+                  // v1.9.2 — QA cycle-02: render the human label so saved
+                  // lotes show "Caña panelera" instead of the raw wire
+                  // value "cana_panelera". Submits still send the canonical
+                  // snake_case value to the backend.
+                  '${cropTypeLabel(plot.cropType)} · ${plot.status.label}',
                   style: const TextStyle(
                     color: AppColors.grey,
                     fontSize: 14,
