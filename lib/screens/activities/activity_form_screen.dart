@@ -33,7 +33,9 @@ class ActivityFormScreen extends ConsumerWidget {
                 AppSpacing.xl,
                 AppSpacing.xl,
                 AppSpacing.xl,
-                AppSpacing.xl + 56,
+                // v1.9.3 — QA cycle-03: reserve grew 56 → 80 px to clear
+                // the bumped brand mark below.
+                AppSpacing.xl + 80,
               ),
               child: ActivityForm(
                 submitLabel: 'Registrar actividad',
@@ -58,12 +60,13 @@ class ActivityFormScreen extends ConsumerWidget {
                 },
               ),
             ),
-            // v1.9.2 — QA cycle-01 #22: brand mark pinned to bottom-left.
+            // v1.9.3 — QA cycle-03: bump brand mark 2× (40 → 80 px).
+            // Alignment + position unchanged (bottom-left).
             const Align(
               alignment: Alignment.bottomLeft,
               child: Padding(
                 padding: EdgeInsets.all(AppSpacing.md),
-                child: AppLogoMark(size: 40),
+                child: AppLogoMark(size: 80),
               ),
             ),
           ],

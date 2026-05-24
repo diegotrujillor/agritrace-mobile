@@ -6,6 +6,103 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 
 ## [Unreleased]
 
+## [1.9.3] - 2026-05-24 — fix(security): clear Drift on logout (P0 data leak) + farm detail refresh + activity edit/delete + logo sizes
+
+### Security
+- **P0 — fix (data leak): wipe local Drift DB on logout AND on cross-account
+  login.** Drift's SQLite database (`agritrace`) is shared across every
+  account that authenticates on the same device. Before this fix, `logout()`
+  only cleared the Bearer tokens in `flutter_secure_storage`; the local
+  `farms`, `plots`, `activities` and `alerts` rows survived, and the next
+  user that logged in (or registered) on the same device saw the previous
+  account's farms — full PII + GPS leak across users.
+
+  Implementation (no SQLCipher yet; flagged for Sprint 6+):
+  - `AppDatabase.wipeAllUserData()` — single SQLite transaction issuing
+    `DELETE FROM activities`, `DELETE FROM alerts`, `DELETE FROM plots`,
+    `DELETE FROM farms` (children before parents). All-or-nothing semantics
+    so a crash mid-wipe cannot leave a partial state.
+  - `AuthService` now accepts an optional `DataWiper` callback in its
+    constructor and is wired in `authServiceProvider` to delegate to
+    `AppDatabase.wipeAllUserData`. Keeping the binding at the provider
+    layer lets `AuthService` stay Flutter-free and unit-testable without
+    importing Drift.
+  - `AuthService.logout()` wraps its work in `try / finally`; the `finally`
+    block always (a) `_storage.deleteAll()` (tokens + `last_user_id`) and
+    (b) invokes the wiper. The server `/auth/logout` round-trip remains
+    best-effort.
+  - **Defense in depth:** `AuthService.login()` and `.register()` now
+    compare the freshly authenticated `user.id` against the cached
+    `last_user_id` and run the wiper iff they differ — closes the gap
+    where a user closes the app without logging out and another account
+    then signs in on the same device. First-device logins never wipe
+    (nothing to leak). Same-user re-login (e.g. token refresh recovery)
+    never wipes.
+  - `StorageService` gains `last_user_id` storage (`getLastUserId`,
+    `saveLastUserId`) and a `deleteAll()` that clears all three keys at
+    once.
+  - `AuthService.refresh()` also persists `last_user_id` so post-cold-start
+    sessions keep the marker fresh (covers Android backup-restore edge
+    case where tokens survive a reinstall).
+
+  Dónde:
+  `lib/database/app_database.dart`,
+  `lib/services/storage_service.dart`,
+  `lib/services/auth_service.dart`,
+  `lib/providers/auth_provider.dart`,
+  `test/unit/auth_service_test.dart` (+5 new tests covering: logout-always-
+  wipes-even-on-server-error, cross-user-login-wipes, same-user-login-keeps,
+  first-login-keeps, register-also-wipes-when-different).
+
+  **Known limitation (backlog Sprint 6+):** SQLCipher per-user database
+  encryption is the long-term fix — it makes the wipe redundant because
+  the previous user's rows are unreadable without their key. This MVP
+  wipe closes the leak without rotating keys.
+
+### Fixed
+- **P1 — fix (farm detail refresh): editar tipo de cultivo de una finca no
+  refrescaba la pantalla de detalle.** `FarmFormScreen._submit()` invalidaba
+  `farmsProvider` (lista del dashboard) tras un `updateFarm`, pero NO
+  invalidaba `farmProvider(id)` (singular del detail). `farmProvider` es un
+  `FutureProvider.family` cuyo snapshot está cacheado independientemente
+  del notifier de la lista, así que la cabecera del detalle seguía mostrando
+  el `cropType` viejo aunque el dashboard ya reflejara el nuevo. Fix idéntico
+  al patrón ya usado en `plot_edit_screen.dart`: invalidar ambos providers
+  tras el `await notifier.updateFarm(...)`. Dónde:
+  `lib/screens/farms/farm_form_screen.dart`.
+- **P1 — confirm (activity edit/delete): el reporte "lista las actividades
+  pero no permite editar o eliminar" se traza a un build stale en QA.** La
+  funcionalidad ya estaba implementada en v1.9.2 (CU-16 + CU-17):
+  long-press en cualquier card de actividad (tanto en `plot_detail_screen`
+  como en `activity_timeline_screen`) abre un bottom sheet con
+  "Editar / Eliminar"; `ActivityEditScreen` ya existe y postea PUT con
+  invalidate de `activityProvider`. Los widget tests
+  `test/widget/activity_timeline_delete_test.dart` y
+  `test/widget/activity_edit_screen_test.dart` cubren ambos flujos. Esta
+  versión incluye un APK recién compilado para descartar build stale en el
+  device de QA; no se requieren cambios de código.
+
+### Changed
+- **Logo sizes — QA cycle-03 (5 pantallas bump 2×, vista finca aumenta a
+  80 px, dashboard se mantiene 56 px = altura del FAB).**
+  | Pantalla | Antes | Después | Notas |
+  |----------|-------|---------|-------|
+  | Login | 48 px | 96 px | Posición intacta (centered, debajo del CTA "¿No tienes cuenta?"). |
+  | Register | 40 px (top-left) | 80 px (derecha) | Re-estructurado en `Row(spaceBetween)` con el título "Crear cuenta", para alinear el logo verticalmente al label. Texto + estilo del título sin cambios para no romper text-finders de tests. |
+  | Vista finca (`FarmDetailScreen`) | 56 px | 80 px | Spec autorizaba 80-90 px como fallback cuando 112 px choca con el FAB "Agregar lote". Alineación + posición (bottom-left + AppSpacing.md) sin cambios. |
+  | Registrar finca | 40 px | 80 px | Reserva inferior del scroll: `AppSpacing.xl + 56` → `AppSpacing.xl + 80` para que el botón "Registrar finca" no se solape con el logo. |
+  | Registrar lote | 40 px | 80 px | Reserva inferior actualizada al mismo valor. |
+  | Registrar actividad | 40 px | 80 px | Reserva inferior actualizada al mismo valor. |
+  | Dashboard | 56 px | 56 px (sin cambio) | Ya coincidía con la altura por defecto del FAB Material; el spec pidió "= altura EXACTA del FAB +" y se mantiene. |
+
+  Dónde:
+  `lib/screens/auth/login_screen.dart`,
+  `lib/screens/auth/register_screen.dart`,
+  `lib/screens/farms/farm_detail_screen.dart`,
+  `lib/screens/farms/farm_form_screen.dart`,
+  `lib/screens/plots/plot_form_screen.dart`,
+  `lib/screens/activities/activity_form_screen.dart`.
+
 ## [1.9.2] - 2026-05-23 — fix(qa-cycle-02): crop_type display lote + finca capitalize + logos 7 screens
 
 ### Fixed

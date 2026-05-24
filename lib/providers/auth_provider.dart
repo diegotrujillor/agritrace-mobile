@@ -56,6 +56,11 @@ final authServiceProvider = Provider<AuthService>(
   (ref) => AuthService(
     ref.read(apiServiceProvider),
     ref.read(storageServiceProvider),
+    // v1.9.3 — P0 fix. Inject a DataWiper that delegates to the shared
+    // [AppDatabase]. Keeping the binding here (provider layer) means
+    // [AuthService] never imports Drift and stays pure-Dart-testable.
+    wipeLocalData: () =>
+        ref.read(appDatabaseProvider).wipeAllUserData(),
   ),
 );
 

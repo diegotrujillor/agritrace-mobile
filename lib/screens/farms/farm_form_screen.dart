@@ -159,6 +159,17 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
           latitude: _latitude,
           longitude: _longitude,
         );
+        // v1.9.3 — P1 fix. Mirrors the pattern already in
+        // `plot_edit_screen.dart`: invalidate BOTH the single-farm
+        // lookup (so the detail header re-reads the freshly-persisted
+        // value when the user pops back) AND the dashboard list (so
+        // the FarmCard re-renders with the new crop type). Without
+        // this, the detail screen stayed stuck on the previous
+        // `cropType` even though the dashboard reflected the change —
+        // because `farmProvider(id)` is a FutureProvider.family whose
+        // cached snapshot is independent of the FarmsNotifier list.
+        ref.invalidate(farmProvider(widget.farm!.id));
+        ref.invalidate(farmsProvider);
         if (!mounted) return;
         context.pop();
         return;
@@ -215,8 +226,10 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
                 AppSpacing.xl,
                 AppSpacing.xl,
                 // Extra bottom padding so the form does not crash into the
-                // BottomLeftLogo overlay (v1.9.2 — QA cycle-01 #13).
-                AppSpacing.xl + 56,
+                // BottomLeftLogo overlay (v1.9.3 — QA cycle-03: logo
+                // bumped to 80 px, so the reserve grows from
+                // AppSpacing.xl + 56 → AppSpacing.xl + 80).
+                AppSpacing.xl + 80,
               ),
               child: Form(
                 key: _formKey,
@@ -305,12 +318,14 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
                 ),
               ),
             ),
-            // v1.9.2 — QA cycle-01 #13: brand mark pinned to bottom-left.
+            // v1.9.3 — QA cycle-03: bump brand mark 2× (40 → 80 px).
+            // Alignment + position unchanged (bottom-left,
+            // AppSpacing.md padding). Scroll reserve above grew to match.
             const Align(
               alignment: Alignment.bottomLeft,
               child: Padding(
                 padding: EdgeInsets.all(AppSpacing.md),
-                child: AppLogoMark(size: 40),
+                child: AppLogoMark(size: 80),
               ),
             ),
           ],

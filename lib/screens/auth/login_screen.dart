@@ -129,10 +129,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ),
-                // v1.9.2 — QA cycle-01 #5: brand mark centered at the
-                // bottom of the auth column, below the register CTA.
+                // v1.9.3 — QA cycle-03: bump brand mark 2× (48 → 96 px).
+                // Position unchanged (centered, below the register CTA).
                 const SizedBox(height: AppSpacing.xl),
-                const Center(child: AppLogoMark(size: 48)),
+                const Center(child: AppLogoMark(size: 96)),
                 const SizedBox(height: AppSpacing.lg),
               ],
             ),

@@ -2,11 +2,29 @@ import '../models/user.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
 
+/// Callback invoked when the auth flow needs to truncate the local Drift
+/// database (cross-account login or logout).
+///
+/// v1.9.3 — injected via constructor so [AuthService] stays free of any
+/// Drift / Flutter imports and remains pure-Dart-testable. The provider
+/// layer (`lib/providers/auth_provider.dart`) wires it to
+/// `AppDatabase.wipeAllUserData`.
+typedef DataWiper = Future<void> Function();
+
 class AuthService {
-  const AuthService(this._api, this._storage);
+  /// [wipeLocalData] is `null`-safe: when omitted (e.g. in legacy tests
+  /// that only exercise the network surface) the wipe step is silently
+  /// skipped. Production callers always supply it through
+  /// `authServiceProvider`.
+  const AuthService(
+    this._api,
+    this._storage, {
+    DataWiper? wipeLocalData,
+  }) : _wipeLocalData = wipeLocalData;
 
   final ApiService _api;
   final StorageService _storage;
+  final DataWiper? _wipeLocalData;
 
   Future<AuthResponse> register({
     required String fullName,
@@ -28,10 +46,14 @@ class AuthService {
       'privacyConsentVersion': privacyConsentVersion,
     });
     final auth = AuthResponse.fromJson(response.data as Map<String, dynamic>);
+    // v1.9.3 — P0 fix (defense in depth). A brand-new account on a device
+    // that previously hosted another account must not inherit its rows.
+    await _wipeIfCrossUser(auth.user.id);
     await _storage.saveTokens(
       accessToken: auth.accessToken,
       refreshToken: auth.refreshToken,
     );
+    await _storage.saveLastUserId(auth.user.id);
     return auth;
   }
 
@@ -44,11 +66,33 @@ class AuthService {
       'password': password,
     });
     final auth = AuthResponse.fromJson(response.data as Map<String, dynamic>);
+    // v1.9.3 — P0 fix (defense in depth). The user may close the app
+    // without ever calling `logout()`; if someone else then logs in on
+    // the same device they would otherwise see the previous account's
+    // farms, plots, activities and alerts. Wipe whenever the freshly
+    // authenticated id differs from the one cached at the last login.
+    await _wipeIfCrossUser(auth.user.id);
     await _storage.saveTokens(
       accessToken: auth.accessToken,
       refreshToken: auth.refreshToken,
     );
+    await _storage.saveLastUserId(auth.user.id);
     return auth;
+  }
+
+  /// Wipes the local Drift DB iff the cached `last_user_id` is set AND
+  /// differs from [newUserId]. The first login on a device leaves the
+  /// DB untouched — there is no previous account whose data could leak.
+  ///
+  /// No-op when the host did not supply a [DataWiper] (legacy unit-test
+  /// constructions of `AuthService`).
+  Future<void> _wipeIfCrossUser(String newUserId) async {
+    final wiper = _wipeLocalData;
+    if (wiper == null) return;
+    final lastUserId = await _storage.getLastUserId();
+    if (lastUserId != null && lastUserId != newUserId) {
+      await wiper();
+    }
   }
 
   /// Probes the backend with the stored refresh token. Returns the renewed
@@ -75,24 +119,44 @@ class AuthService {
       accessToken: auth.accessToken,
       refreshToken: auth.refreshToken,
     );
+    // v1.9.3 — keep the cached `last_user_id` in sync on cold-start
+    // refresh too. The probe is the first place the freshly-bound app
+    // learns who the active session belongs to; without this, a device
+    // that re-installs the app (tokens still in Keychain after Android
+    // backup-restore) would never seed the marker and the cross-account
+    // check on the next login could miss.
+    await _storage.saveLastUserId(auth.user.id);
     return auth;
   }
 
   Future<void> logout() async {
-    final refreshToken = await _storage.getRefreshToken();
-    // Skip the network call entirely when there is nothing to revoke
-    // server-side; this keeps the request log clean and matches the
-    // backend's `logoutSchema` which requires a non-empty refreshToken.
-    if (refreshToken != null && refreshToken.isNotEmpty) {
-      try {
-        await _api.client.post(
-          '/auth/logout',
-          data: {'refreshToken': refreshToken},
-        );
-      } catch (_) {
-        // best-effort server logout; always clear local tokens
+    try {
+      final refreshToken = await _storage.getRefreshToken();
+      // Skip the network call entirely when there is nothing to revoke
+      // server-side; this keeps the request log clean and matches the
+      // backend's `logoutSchema` which requires a non-empty refreshToken.
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        try {
+          await _api.client.post(
+            '/auth/logout',
+            data: {'refreshToken': refreshToken},
+          );
+        } catch (_) {
+          // best-effort server logout; always clear local state below.
+        }
       }
+    } finally {
+      // v1.9.3 — P0 fix. Logout MUST always:
+      //   1. clear tokens + `last_user_id` from secure storage, and
+      //   2. wipe the local Drift DB so the next user that logs in on
+      //      this device cannot see the previous account's data.
+      // Wrapping the clears in `finally` guarantees they run even if
+      // reading the refresh token or the server round-trip throws an
+      // unexpected exception above (the inner `try` only swallows the
+      // `_api.client.post` failure).
+      await _storage.deleteAll();
+      final wiper = _wipeLocalData;
+      if (wiper != null) await wiper();
     }
-    await _storage.deleteTokens();
   }
 }

@@ -77,23 +77,42 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // v1.9.2 — QA cycle-01 #3: brand mark top-left, before
-                // the "Crear cuenta" title.
+                // v1.9.3 — QA cycle-03: bump brand mark 2× (40 → 80 px)
+                // AND move it to the RIGHT, aligned at the same vertical
+                // level as the "Crear cuenta" title (Row with
+                // spaceBetween). Title text + style unchanged so the
+                // existing widget tests keep matching their text finders.
                 const SizedBox(height: AppSpacing.md),
-                const AppLogoMark(size: 40),
-                const SizedBox(height: AppSpacing.lg),
-                Text(
-                  'Crear cuenta',
-                  style: GoogleFonts.inter(
-                    color: AppColors.darkGreen,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                const Text(
-                  'Regístrate como productor agrícola',
-                  style: TextStyle(color: AppColors.grey, fontSize: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Crear cuenta',
+                            style: GoogleFonts.inter(
+                              color: AppColors.darkGreen,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          const Text(
+                            'Regístrate como productor agrícola',
+                            style: TextStyle(
+                              color: AppColors.grey,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    const AppLogoMark(size: 80),
+                  ],
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 AppInput(

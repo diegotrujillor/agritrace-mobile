@@ -121,4 +121,30 @@ class AppDatabase extends _$AppDatabase {
   Future<void> markAlertSynced(String id) =>
       (update(alertsTable)..where((t) => t.id.equals(id)))
           .write(const AlertsTableCompanion(syncStatus: Value('synced')));
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+  /// Truncates every domain table that holds user-scoped data.
+  ///
+  /// v1.9.3 — P0 security fix. Drift's SQLite database is shared across
+  /// every user that authenticates on the same device, so leaving rows
+  /// behind on logout (or before a second account's login) leaks finca,
+  /// lote, actividad and alerta data across accounts. Called from
+  /// [AuthService.logout] inside a `finally` block (so a failed
+  /// `/auth/logout` round-trip still wipes the local DB) and from the
+  /// notifier's `login` path whenever the freshly authenticated user id
+  /// differs from the last-seen one.
+  ///
+  /// Wrapped in a single [transaction] so the four `DELETE FROM ...`
+  /// statements either all commit or all roll back — partial wipes on
+  /// crash are impossible.
+  ///
+  /// SQLCipher per-user encryption is the long-term fix (Sprint 6+); this
+  /// MVP wipe closes the leak without rotating keys.
+  Future<void> wipeAllUserData() => transaction(() async {
+        await delete(activitiesTable).go();
+        await delete(alertsTable).go();
+        await delete(plotsTable).go();
+        await delete(farmsTable).go();
+      });
 }

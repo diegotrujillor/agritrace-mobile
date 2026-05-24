@@ -94,8 +94,10 @@ class _PlotFormScreenState extends ConsumerState<PlotFormScreen> {
                 AppSpacing.xl,
                 AppSpacing.xl,
                 AppSpacing.xl,
-                // Reserve room for the bottom-left logo overlay below.
-                AppSpacing.xl + 56,
+                // Reserve room for the bottom-left logo overlay below
+                // (v1.9.3 — QA cycle-03: 56 → 80 px to match the bigger
+                // brand mark).
+                AppSpacing.xl + 80,
               ),
               child: PlotForm(
                 submitLabel: 'Agregar lote',
@@ -106,12 +108,13 @@ class _PlotFormScreenState extends ConsumerState<PlotFormScreen> {
                     matchPlotCropType(widget.initialCropTypeSuggestion),
               ),
             ),
-            // v1.9.2 — QA cycle-01 #19: brand mark pinned to bottom-left.
+            // v1.9.3 — QA cycle-03: bump brand mark 2× (40 → 80 px).
+            // Alignment + position unchanged (bottom-left).
             const Align(
               alignment: Alignment.bottomLeft,
               child: Padding(
                 padding: EdgeInsets.all(AppSpacing.md),
-                child: AppLogoMark(size: 40),
+                child: AppLogoMark(size: 80),
               ),
             ),
           ],
