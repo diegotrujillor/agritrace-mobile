@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../utils/constants.dart';
 
 class AppInput extends StatefulWidget {
@@ -14,6 +15,7 @@ class AppInput extends StatefulWidget {
     this.onFieldSubmitted,
     this.onChanged,
     this.textCapitalization = TextCapitalization.none,
+    this.inputFormatters,
   });
 
   final String label;
@@ -26,6 +28,10 @@ class AppInput extends StatefulWidget {
   final void Function(String)? onFieldSubmitted;
   final void Function(String)? onChanged;
   final TextCapitalization textCapitalization;
+  // Optional formatters forwarded to the underlying TextFormField. Added in
+  // v1.9.1 so callers can sanitize autofill input (e.g. strip trailing
+  // whitespace) without rebuilding the wrapping widget.
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   State<AppInput> createState() => _AppInputState();
@@ -63,6 +69,7 @@ class _AppInputState extends State<AppInput> {
           textInputAction: widget.textInputAction,
           onFieldSubmitted: widget.onFieldSubmitted,
           onChanged: widget.onChanged,
+          inputFormatters: widget.inputFormatters,
           decoration: InputDecoration(
             hintText: widget.hint,
             suffixIcon: widget.obscureText

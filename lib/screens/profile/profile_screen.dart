@@ -131,9 +131,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             onTap: _export,
           ),
           const Divider(height: 1, indent: AppSpacing.lg),
-          // CU-28 — Reportar problema desde la app (v1.8.0). Sits between
-          // "Exportar mis datos" and "Cerrar sesión" so it is visible above
-          // the destructive "Eliminar mi cuenta" action.
+          // CU-28 — Reportar problema desde la app (v1.8.0).
           _ActionTile(
             icon: Icons.bug_report_outlined,
             iconColor: AppColors.certBlue,
@@ -146,13 +144,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
           const Divider(height: 1, indent: AppSpacing.lg),
-          _ActionTile(
-            icon: Icons.logout,
-            iconColor: AppColors.grey,
-            title: 'Cerrar sesión',
-            onTap: () => ref.read(authProvider.notifier).logout(),
-          ),
-          const Divider(height: 1, indent: AppSpacing.lg),
+          // v1.9.1 — PDF QA cycle-01 #8. Reordered: "Eliminar mi cuenta"
+          // now sits above "Cerrar sesión" so the logout action is the
+          // very last tile (least destructive, most frequently used).
           _ActionTile(
             icon: Icons.delete_forever_outlined,
             iconColor: AppColors.error,
@@ -161,6 +155,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             subtitle: 'Borra permanentemente tu cuenta y datos',
             busy: _deleteBusy,
             onTap: _delete,
+          ),
+          const Divider(height: 1, indent: AppSpacing.lg),
+          _ActionTile(
+            icon: Icons.logout,
+            iconColor: AppColors.grey,
+            title: 'Cerrar sesión',
+            onTap: () => ref.read(authProvider.notifier).logout(),
           ),
         ],
       ),

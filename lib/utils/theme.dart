@@ -26,6 +26,14 @@ ThemeData buildAppTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.lightGrey,
+      // v1.9.1 — PDF QA cycle-01 #2 / #6 / #16. Without this, Material3
+      // falls back to a near-black hint (~60% alpha on onSurface) which the
+      // farmer testers kept mistaking for real input. Use a soft neutral
+      // grey so placeholders read as guidance, not data.
+      hintStyle: const TextStyle(
+        color: Color(0xFF9CA3AF),
+        fontSize: 16,
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,

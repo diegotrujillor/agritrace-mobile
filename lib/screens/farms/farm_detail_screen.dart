@@ -28,6 +28,15 @@ class FarmDetailScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.lightGreen,
       appBar: AppBar(
+        // Explicit back leading: dashboard navigates here via `context.go`
+        // (stack-replacing), so Material would not auto-inject a back arrow.
+        // Mirrors the same pattern in `plot_form_screen.dart`.
+        // PDF QA cycle-01 #11.
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Volver',
+          onPressed: () => context.go(Routes.dashboard),
+        ),
         title: Text(farmAsync.valueOrNull?.name ?? 'Finca'),
         actions: [
           if (farmAsync.valueOrNull != null)

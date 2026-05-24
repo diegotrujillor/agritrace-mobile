@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -98,6 +99,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   keyboardType: TextInputType.name,
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
+                  // v1.9.1 — PDF QA cycle-01 #1. Autofill (Android) often
+                  // appends a trailing space that the submit-time `.trim()`
+                  // never reveals to the user, leaving them confused at the
+                  // visible whitespace. This formatter strips trailing
+                  // whitespace ONLY on paste/autofill bursts (length grew
+                  // by more than one character in a single change), so
+                  // typing "Diego Trujillo" letter-by-letter still works.
+                  inputFormatters: const [_TrimTrailingWhitespaceOnBurst()],
                 ),
                 const SizedBox(height: AppSpacing.md),
                 AppInput(
@@ -205,6 +214,34 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Strips trailing whitespace from the new value ONLY when the change looks
+/// like a paste or autofill burst — i.e. the length grew by more than one
+/// character in a single edit. Manual keystrokes (typing a space between two
+/// words) are left untouched, which preserves the ability to type names like
+/// "Diego Trujillo".
+///
+/// Added in v1.9.1 to fix PDF QA cycle-01 #1: Android autofill appended a
+/// trailing space that the submit-time `.trim()` never surfaced to the user.
+class _TrimTrailingWhitespaceOnBurst extends TextInputFormatter {
+  const _TrimTrailingWhitespaceOnBurst();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final grew = newValue.text.length - oldValue.text.length;
+    if (grew <= 1) return newValue; // single keystroke — never touch.
+    final trimmed = newValue.text.replaceFirst(RegExp(r'\s+$'), '');
+    if (trimmed == newValue.text) return newValue; // nothing to strip.
+    return TextEditingValue(
+      text: trimmed,
+      selection: TextSelection.collapsed(offset: trimmed.length),
+      composing: TextRange.empty,
     );
   }
 }

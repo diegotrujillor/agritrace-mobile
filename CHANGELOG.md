@@ -6,6 +6,48 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-05-23 — fix(qa-manual): back arrows + autofill trim + profile order + hint color
+
+### Fixed
+- **fix (PDF cycle-01 #11):** back arrow missing en `FarmDetailScreen`. El
+  dashboard navega con `context.go(Routes.farmDetail(...))` (stack-replacing),
+  por lo que Material no auto-inyecta el leading IconButton. Se agrega un
+  `leading: IconButton(arrow_back) → context.go(Routes.dashboard)`,
+  reutilizando el patrón de `plot_form_screen.dart`.
+  Dónde: `lib/screens/farms/farm_detail_screen.dart`.
+- **fix (PDF cycle-01 #21):** back arrow missing en `PlotDetailScreen`. Mismo
+  origen que #11 (farm detail navega con `context.go`). Se agrega un leading
+  IconButton que vuelve a `Routes.farmDetail(plot.farmId)` cuando el plot
+  está hidratado; fallback a `Routes.dashboard` cuando se entra por deep-link
+  y el `plot.farmId` aún no está disponible — el callback nunca crashea.
+  Dónde: `lib/screens/plots/plot_detail_screen.dart`.
+- **fix (PDF cycle-01 #1):** trailing whitespace de autofill en el campo
+  "Nombre completo" del `RegisterScreen` quedaba pegado tras el autocompletar
+  de Android, y el `.trim()` que corre en submit jamás se mostraba al
+  usuario. Nuevo `TextInputFormatter` `_TrimTrailingWhitespaceOnBurst` que
+  recorta whitespace final SOLO cuando la longitud crece por más de un
+  carácter en un solo cambio (paste / autofill burst). Escribir "Diego
+  Trujillo" letra por letra sigue funcionando sin tropiezos. Se extiende
+  `AppInput` con un parámetro opcional `inputFormatters` (default `null`,
+  backwards-compatible) para forwardearlo al `TextFormField` interno.
+  Dónde: `lib/widgets/common/app_input.dart`,
+  `lib/screens/auth/register_screen.dart`.
+- **fix (PDF cycle-01 #8):** orden de tiles en `ProfileScreen`. "Cerrar
+  sesión" pasa al final (acción menos destructiva, más frecuente). Nuevo
+  orden: Exportar mis datos → Reportar problema → Eliminar mi cuenta →
+  Cerrar sesión.
+  Dónde: `lib/screens/profile/profile_screen.dart`.
+- **fix (PDF cycle-01 #2 / #6 / #16):** placeholders demasiado fuertes
+  (Material3 caía a ~60% alpha sobre `onSurface`, casi negros, indistinguibles
+  del texto real). Se define `hintStyle` global en el `InputDecorationTheme`
+  con un neutro suave `Color(0xFF9CA3AF)` 16 px; se aplica a todos los
+  inputs de la app sin tocar `AppInput`.
+  Dónde: `lib/utils/theme.dart`.
+
+### Changed
+- **chore:** bump version `1.9.0+4` → `1.9.1+5` en `pubspec.yaml`. El build
+  number `+5` es monotónico (Android `versionCode` lo exige).
+
 ## [1.9.0] - 2026-05-23 — feat(uploads+gps+forms): photo capture, GPS, crop_type rules + 5 P1 fixes
 
 ### Added

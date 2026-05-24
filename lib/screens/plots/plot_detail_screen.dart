@@ -33,6 +33,23 @@ class PlotDetailScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.lightGreen,
       appBar: AppBar(
+        // Explicit back leading: farm detail navigates here via `context.go`
+        // (stack-replacing), so Material would not auto-inject a back arrow.
+        // Falls back to dashboard when arriving via a direct/deep link
+        // before `plot.farmId` is hydrated, so the callback never crashes.
+        // PDF QA cycle-01 #21.
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Volver',
+          onPressed: () {
+            final farmId = plotAsync.valueOrNull?.farmId;
+            if (farmId != null) {
+              context.go(Routes.farmDetail(farmId));
+            } else {
+              context.go(Routes.dashboard);
+            }
+          },
+        ),
         title: Text(plotAsync.valueOrNull?.name ?? 'Lote'),
         actions: [
           if (plotAsync.valueOrNull != null)
