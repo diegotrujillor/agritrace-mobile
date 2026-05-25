@@ -100,6 +100,25 @@ String _jwtExpired() => _jwt({
           DateTime.utc(2020, 1, 1).millisecondsSinceEpoch ~/ 1000,
     });
 
+/// v1.9.12 — refresh-token JWT with a 7-day-shaped TTL (matches the
+/// server-side configuration). Used as the cold-start trust gate.
+String _refreshJwtFresh() => _jwt({
+      'sub': 'user-1',
+      'exp': DateTime.now()
+              .toUtc()
+              .add(const Duration(days: 7))
+              .millisecondsSinceEpoch ~/
+          1000,
+    });
+
+/// v1.9.12 — refresh-token JWT whose `exp` is already in the past. Used to
+/// force the cold-start gate to fall back to the legacy active probe.
+String _refreshJwtExpired() => _jwt({
+      'sub': 'user-1',
+      'exp':
+          DateTime.utc(2020, 1, 1).millisecondsSinceEpoch ~/ 1000,
+    });
+
 void main() {
   late MockAuthService mockAuth;
   late MockStorageService mockStorage;
@@ -212,17 +231,24 @@ void main() {
     verifyNever(() => mockStorage.deleteAll());
   });
 
-  // ─── v1.9.11 — Offline-friendly cold start ──────────────────────────────
+  // ─── v1.9.11 / v1.9.12 — Offline-friendly cold start ───────────────────
+  //
+  // v1.9.12 — the cold-start gate is now the REFRESH token's `exp`
+  // (7-day TTL), not the access token's `exp` (15 min TTL). The tests
+  // below stub `getRefreshToken` with a real JWT so the parser inside
+  // `jwtIsExpired(refreshToken)` exercises the new gate path.
 
-  group('v1.9.11 offline-friendly cold start', () {
+  group('v1.9.12 offline-friendly cold start (refresh-token gate)', () {
     test(
       'returns Authenticated synchronously from cached snapshot without '
-      'awaiting refresh when snapshot + valid JWT exist',
+      'awaiting refresh when snapshot + valid refresh JWT exist',
       () async {
+        // v1.9.12 — access token can be ANY value (even expired); the gate
+        // only inspects the REFRESH token now.
         when(() => mockStorage.getAccessToken())
-            .thenAnswer((_) async => _jwtValid());
+            .thenAnswer((_) async => _jwtExpired());
         when(() => mockStorage.getRefreshToken())
-            .thenAnswer((_) async => 'refresh-X');
+            .thenAnswer((_) async => _refreshJwtFresh());
         when(() => mockStorage.getUserSnapshot())
             .thenAnswer((_) async => _testUser);
         // The background probe will eventually run; stub it so mocktail
@@ -248,12 +274,36 @@ void main() {
     );
 
     test(
+      'v1.9.12 — access expired but refresh fresh: still Authenticated '
+      'synchronously (was the v1.9.11 regression for pilot producers)',
+      () async {
+        when(() => mockStorage.getAccessToken())
+            .thenAnswer((_) async => _jwtExpired());
+        when(() => mockStorage.getRefreshToken())
+            .thenAnswer((_) async => _refreshJwtFresh());
+        when(() => mockStorage.getUserSnapshot())
+            .thenAnswer((_) async => _testUser);
+        when(() => mockAuth.refresh()).thenAnswer((_) async => _testAuth);
+
+        final container = makeContainer();
+        addTearDown(container.dispose);
+
+        await container.read(authProvider.future);
+
+        // The dashboard renders on the first frame even though the access
+        // token's 15 min TTL is long gone — the 7-day refresh window is
+        // still alive so the snapshot is trusted offline.
+        expect(container.read(authProvider).value, isA<AuthAuthenticated>());
+      },
+    );
+
+    test(
       'background probe success keeps state Authenticated and rotates tokens',
       () async {
         when(() => mockStorage.getAccessToken())
             .thenAnswer((_) async => _jwtValid());
         when(() => mockStorage.getRefreshToken())
-            .thenAnswer((_) async => 'refresh-X');
+            .thenAnswer((_) async => _refreshJwtFresh());
         when(() => mockStorage.getUserSnapshot())
             .thenAnswer((_) async => _testUser);
         when(() => mockAuth.refresh()).thenAnswer((_) async => _testAuth);
@@ -273,12 +323,42 @@ void main() {
     );
 
     test(
+      'v1.9.12 — access expired + refresh fresh + background probe success: '
+      'state stays Authenticated and refresh runs in background',
+      () async {
+        when(() => mockStorage.getAccessToken())
+            .thenAnswer((_) async => _jwtExpired());
+        when(() => mockStorage.getRefreshToken())
+            .thenAnswer((_) async => _refreshJwtFresh());
+        when(() => mockStorage.getUserSnapshot())
+            .thenAnswer((_) async => _testUser);
+        when(() => mockAuth.refresh()).thenAnswer((_) async => _testAuth);
+
+        final container = makeContainer();
+        addTearDown(container.dispose);
+
+        await container.read(authProvider.future);
+        // First frame: offline-friendly Authenticated even with stale access.
+        expect(container.read(authProvider).value, isA<AuthAuthenticated>());
+
+        // Drain microtasks so the background probe completes.
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+
+        // Background probe ran, tokens rotated (server-side), state held.
+        expect(container.read(authProvider).value, isA<AuthAuthenticated>());
+        verify(() => mockAuth.refresh()).called(1);
+        verifyNever(() => mockStorage.deleteAll());
+      },
+    );
+
+    test(
       'background probe 401 flips state to Unauthenticated and wipes storage',
       () async {
         when(() => mockStorage.getAccessToken())
             .thenAnswer((_) async => _jwtValid());
         when(() => mockStorage.getRefreshToken())
-            .thenAnswer((_) async => 'refresh-X');
+            .thenAnswer((_) async => _refreshJwtFresh());
         when(() => mockStorage.getUserSnapshot())
             .thenAnswer((_) async => _testUser);
         when(() => mockAuth.refresh()).thenThrow(_refreshHttpError(401));
@@ -305,7 +385,7 @@ void main() {
         when(() => mockStorage.getAccessToken())
             .thenAnswer((_) async => _jwtValid());
         when(() => mockStorage.getRefreshToken())
-            .thenAnswer((_) async => 'refresh-X');
+            .thenAnswer((_) async => _refreshJwtFresh());
         when(() => mockStorage.getUserSnapshot())
             .thenAnswer((_) async => _testUser);
         when(() => mockAuth.refresh()).thenThrow(_refreshNetworkError());
@@ -325,13 +405,13 @@ void main() {
     );
 
     test(
-      'snapshot present but JWT expired falls through to the legacy strict '
-      'active probe',
+      'v1.9.12 — access expired AND refresh expired: falls through to the '
+      'legacy strict active probe',
       () async {
         when(() => mockStorage.getAccessToken())
             .thenAnswer((_) async => _jwtExpired());
         when(() => mockStorage.getRefreshToken())
-            .thenAnswer((_) async => 'refresh-X');
+            .thenAnswer((_) async => _refreshJwtExpired());
         when(() => mockStorage.getUserSnapshot())
             .thenAnswer((_) async => _testUser);
         when(() => mockAuth.refresh()).thenAnswer((_) async => _testAuth);
@@ -353,7 +433,7 @@ void main() {
         when(() => mockStorage.getAccessToken())
             .thenAnswer((_) async => _jwtValid());
         when(() => mockStorage.getRefreshToken())
-            .thenAnswer((_) async => 'refresh-X');
+            .thenAnswer((_) async => _refreshJwtFresh());
         when(() => mockStorage.getUserSnapshot()).thenAnswer((_) async => null);
         when(() => mockAuth.refresh()).thenAnswer((_) async => _testAuth);
 

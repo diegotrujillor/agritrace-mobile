@@ -133,7 +133,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     // error would bounce the user to /login even though their tokens were
     // perfectly valid. The new two-phase flow:
     //   Phase 1 (synchronous, offline-safe): if a cached user snapshot
-    //     exists AND the access token's JWT `exp` claim is still in the
+    //     exists AND the refresh token's JWT `exp` claim is still in the
     //     future client-side, return `AuthAuthenticated` immediately so
     //     the router goes straight to the dashboard.
     //   Phase 2 (background, async): fire `authService.refresh()` AFTER
@@ -141,9 +141,21 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     //     storage; network/5xx → keep the current state (the next
     //     authenticated request retries via the Dio interceptor).
     // The strict active-probe path stays intact for the case where the
-    // snapshot is missing or the JWT has already expired client-side.
+    // snapshot is missing or the refresh token has already expired
+    // client-side.
+    //
+    // v1.9.12 — Gate is the REFRESH token's `exp` (7-day TTL with rolling
+    // renewal on every online refresh), NOT the access token's `exp`
+    // (15 min TTL). v1.9.11 used the 15 min access-token expiry, which
+    // kicked pilot producers back to the login screen at the end of a
+    // long day at the plot: they had logged in at sunrise with a fresh
+    // access token but by sunset the 15 min TTL had elapsed many times
+    // over, even though the refresh token was still valid for days.
+    // Using the refresh-token `exp` gives a full week of offline runway,
+    // which matches the cadence at which producers come back to town for
+    // signal.
     final snapshot = await storage.getUserSnapshot();
-    if (snapshot == null || jwtIsExpired(accessToken)) {
+    if (snapshot == null || jwtIsExpired(refreshToken)) {
       return _probeAndReturn(storage);
     }
 
