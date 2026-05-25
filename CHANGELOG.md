@@ -39,6 +39,111 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
   (sin él, `ApiService` lanza `StateError` y la suite no compila bajo
   `flutter test`).
 
+## [1.9.8] - 2026-05-25
+
+### Fixed
+- **P0 — Same-user re-login leaves dashboard empty.** v1.9.3 introduced
+  `wipeAllUserData()` on logout to close the cross-account PII/GPS leak on
+  shared devices. The wipe stays (privacy/Ley 1581), but a same-user
+  re-login no longer renders "No tienes fincas aún" indefinitely:
+  `AuthService.login()` and `.register()` now await a new injected
+  `RemotePuller` callback that hydrates the local Drift DB from
+  `GET /v1/sync/changes` (no `since` cursor → the backend returns every
+  row owned by the producer) BEFORE the `AuthNotifier` flips to
+  `AuthAuthenticated`. The previous fire-and-forget seed in
+  `AuthNotifier.login()/register()` raced with the first dashboard render
+  and is removed. Network failures during the pull are logged and
+  swallowed — login still completes so an offline producer can keep
+  creating local rows; `SyncNotifier` auto-retries when connectivity
+  returns. (Pilot QA verbatim: "I created farms, plots or activities and
+  is shown while session is open, once logout/login all screen are
+  empty.")
+- **P1 — Inactivity logout after 20 min of zero pointer activity.** New
+  `lib/services/inactivity_monitor.dart` runs a pure-Dart `Timer` armed
+  from `AuthNotifier` on every successful login/register/cold-start. A
+  root-level `Listener` in `main.dart` (`HitTestBehavior.translucent`)
+  pokes the timer on every `onPointerDown` / `onPointerMove` event. App
+  lifecycle is respected via `WidgetsBindingObserver`:
+  `AppLifecycleState.paused/hidden` records the wall-clock moment and
+  cancels the foreground timer; `resumed` re-evaluates and either fires
+  the callback immediately (≥ 20 min elapsed) or re-arms with the
+  remaining budget. On timeout: `AuthNotifier._handleInactivityTimeout`
+  increments `inactivityLogoutSignalProvider`, calls `logout()`, and
+  `_AgriTraceAppState` queues a "Sesión cerrada por inactividad" SnackBar
+  via a global `ScaffoldMessenger` key after the router routes to
+  `/welcome`. (Pilot QA verbatim: "the session is not ended by inactivity
+  after 20 mins")
+- **P3 — Logo center-align with FAB on Dashboard and Vista finca.** The
+  v1.9.4 implementation pinned both the logo and the FAB at `bottom: 16`
+  and the resulting 4 px center offset was visibly off on real devices
+  (pilot QA captures #25, #26, #27). Dashboard logo `bottom: 16 → 12`
+  (formula: `fabCenter − logoHeight/2 = (16 + 56/2) − 32 = 12`). Vista
+  finca logo `bottom: 0 → 4` — the v1.9.4 comment assumed the extended
+  FAB was 48 px tall, but the rendered height under Material 3 is 56 px,
+  so the centered position is `(16 + 56/2) − 80/2 = 4`. The new
+  `test/widget/logo_fab_alignment_test.dart` measures `tester.getRect`
+  for both widgets and asserts the center-Y delta is ≤ 2 px.
+
+### Added
+- `lib/services/inactivity_monitor.dart` — pure-Dart `Timer`-based
+  monitor (start / poke / stop / markBackgroundedAt /
+  resumeFromBackground). No Flutter or Riverpod imports — testable with
+  `fake_async`.
+- `lib/utils/constants.dart` — `kInactivityTimeoutMinutes = 20` const.
+- `lib/services/sync_orchestrator.dart` — `pullAllFromServer()` method
+  that calls `SyncService.syncNow()` with no `since` cursor and applies
+  every returned change via the existing `_applyPulledChange` LWW path.
+  Does NOT push local pending rows (pull-only contract — see method
+  docstring for rationale).
+- `lib/services/auth_service.dart` — `RemotePuller` typedef + optional
+  `pullRemoteData` constructor param. Awaited inside `login()` and
+  `register()` after token / `last_user_id` persistence. Errors caught
+  + logged via `dart:developer`.
+- `lib/providers/auth_provider.dart` — `inactivityMonitorProvider` and
+  `inactivityLogoutSignalProvider` (StateProvider counter that the root
+  widget watches to queue the inactivity SnackBar). `authServiceProvider`
+  now injects both the existing `DataWiper` and the new `RemotePuller`.
+
+### Changed
+- `lib/main.dart` — `AgriTraceApp` is now a `ConsumerStatefulWidget` with
+  `WidgetsBindingObserver`. The root tree wraps `MaterialApp.router` in a
+  `Listener` (gesture poke) and registers a global
+  `scaffoldMessengerKey` so the inactivity SnackBar has a stable mount
+  point across router transitions.
+- `lib/providers/auth_provider.dart` — removed the fire-and-forget
+  `_seedInBackground('login seed')` / `_seedInBackground('register seed')`
+  calls (the synchronous `RemotePuller` in `AuthService` covers the same
+  ground deterministically). Cold-start refresh still calls
+  `_seedInBackground('initial seed')` because the cold-start flow does
+  NOT wipe the DB and the local rows are already valid.
+
+### Tests
+- `test/unit/auth_service_test.dart` — +5 tests under the new
+  "remote hydration on login/register (P0)" group: (1) login awaits the
+  puller after tokens + last_user_id are saved (order asserted), (2)
+  register awaits the puller, (3) login completes when the puller
+  throws, (4) login still works without a puller (legacy callers), (5)
+  cross-user wipe runs BEFORE the puller.
+- `test/unit/sync_orchestrator_test.dart` — new file with 4 tests
+  covering `pullAllFromServer()`: (a) calls `syncNow` with no `since`,
+  (b) upserts every entity (2 farms + 1 plot + 1 activity + 1 alert),
+  (c) propagates transport errors so `AuthService` can log them, (d)
+  does NOT push pending local changes (pull-only contract).
+- `test/unit/inactivity_monitor_test.dart` — new file with 10 tests
+  using `fake_async`: timeout fires, poke resets indefinitely, stop
+  cancels, re-start works, no-op without start, background+resume after
+  full timeout fires immediately, background+resume before timeout
+  re-arms remaining budget, resume without a paired pause re-arms a
+  fresh timer, stop after background cleans up.
+- `test/widget/logo_fab_alignment_test.dart` — new file with 2 widget
+  tests: Dashboard 64 px logo vs 56 px FAB, Vista finca 80 px logo vs
+  extended FAB. 2 px center-Y tolerance.
+- `pubspec.yaml` — `fake_async: ^1.3.1` promoted from transitive to
+  explicit dev_dependency.
+
+Suite total: 319 → 340 (+21 new tests). `flutter test` green;
+`flutter analyze` clean.
+
 ## [1.9.7] - 2026-05-25
 
 ### Fixed
