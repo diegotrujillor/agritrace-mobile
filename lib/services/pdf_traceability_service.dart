@@ -1,6 +1,8 @@
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -10,24 +12,59 @@ import '../models/plot.dart';
 import '../utils/constants.dart';
 import '../utils/date_format.dart';
 
+/// Timeout for the per-photo remote fetch. Short enough to keep the PDF
+/// generation responsive when one photo is on a slow/dead URL; long enough
+/// to survive a typical rural mobile connection.
+const Duration kPdfPhotoFetchTimeout = Duration(seconds: 10);
+
+/// Placeholder text rendered in the "Foto" cell when a remote photo could
+/// not be retrieved (no network, timeout, 4xx/5xx). The PDF must still
+/// generate — a single failed photo never blocks the document. Surfaced
+/// to the producer so the missing thumbnail does not look like a bug.
+const String kPdfPhotoUnavailableLabel = 'Foto no disponible (sin conexión)';
+
 /// Client-side traceability PDF (W1c).
 ///
 /// Builds a one-document trace of producer → finca → lote → activity
 /// timeline and hands it to the platform share/print sheet via `printing`.
-/// No Flutter widget deps and no network — it is pure document generation so
-/// it can be unit-tested by inspecting the returned bytes.
+/// No Flutter widget deps — it is pure document generation so it can be
+/// unit-tested by inspecting the returned bytes.
 ///
-/// Producer contact fields ([producerPhone], [producerEmail]) and the
-/// producer name are supplied by the caller from auth state (nullable →
-/// omitted when empty/null).
+/// Photo resolution (v1.9.7): activities created on/after v0.6.0 of the
+/// backend store `photoUrl` as a remote OCI Object Storage URL
+/// (`https://objectstorage.sa-bogota-1.oraclecloud.com/…`), produced by
+/// `POST /v1/uploads/photos`. Older activities still carry local
+/// filesystem paths (optionally prefixed with `file://`). [_loadPhoto]
+/// branches on the URL scheme so both shapes render. Remote fetches use
+/// a dedicated [Dio] with NO API interceptors so the user's JWT is never
+/// leaked to an unrelated host.
 class PdfTraceabilityService {
-  const PdfTraceabilityService();
+  /// Default constructor uses a fresh, interceptor-free [Dio] with a 10 s
+  /// total timeout. Inject [httpClient] in tests to stub the remote fetch.
+  PdfTraceabilityService({Dio? httpClient})
+      : _http = httpClient ?? _defaultHttpClient();
+
+  final Dio _http;
+
+  static Dio _defaultHttpClient() {
+    // IMPORTANT: do NOT reuse the shared `ApiService` Dio here. That client
+    // attaches the user's Bearer token to every outbound request, which
+    // would leak the JWT to Oracle Object Storage on every photo fetch.
+    return Dio(BaseOptions(
+      connectTimeout: kPdfPhotoFetchTimeout,
+      receiveTimeout: kPdfPhotoFetchTimeout,
+      sendTimeout: kPdfPhotoFetchTimeout,
+      responseType: ResponseType.bytes,
+    ));
+  }
 
   /// Builds the PDF document bytes.
   ///
-  /// Photo bytes for activities with a local [Activity.photoUrl] are
-  /// resolved before the synchronous document build begins. Missing or
-  /// unreadable files are silently skipped — they never crash the PDF.
+  /// Photo bytes for activities with a non-null [Activity.photoUrl] are
+  /// resolved before the synchronous document build begins. Local files
+  /// that cannot be read and remote URLs that fail (network, timeout,
+  /// non-2xx) are silently excluded from the [photos] map — the build
+  /// continues and the corresponding row renders a "no photo" placeholder.
   Future<Uint8List> build({
     required Farm farm,
     required Plot plot,
@@ -103,10 +140,9 @@ class PdfTraceabilityService {
 
   /// Loads photo bytes for every activity that has a non-null [photoUrl].
   ///
-  /// `file://` prefixes are stripped before the path is passed to [File].
-  /// Any I/O error (file not found, permission denied) is caught and that
-  /// activity is excluded from the returned map — the PDF build continues
-  /// without that thumbnail.
+  /// Activities whose photo cannot be loaded are omitted from the returned
+  /// map — the PDF row will render the [kPdfPhotoUnavailableLabel]
+  /// placeholder instead of crashing.
   Future<Map<String, Uint8List>> _loadPhotos(
     List<Activity> activities,
   ) async {
@@ -114,15 +150,61 @@ class PdfTraceabilityService {
     for (final activity in activities) {
       final url = activity.photoUrl;
       if (url == null || url.isEmpty) continue;
-      final path =
-          url.startsWith('file://') ? url.replaceFirst('file://', '') : url;
-      try {
-        result[activity.id] = await File(path).readAsBytes();
-      } on IOException {
-        // File missing or unreadable — skip thumbnail for this activity.
+      final bytes = await _loadPhoto(url);
+      if (bytes != null) {
+        result[activity.id] = bytes;
       }
     }
     return result;
+  }
+
+  /// Resolves a single [pathOrUrl] to bytes.
+  ///
+  /// Branches on URL scheme:
+  ///   - `http://` / `https://` → fetched via [_http] (no API interceptors,
+  ///     so the user's JWT is NEVER attached to an OCI / external host).
+  ///     Returns null on any [DioException] (network, timeout, non-2xx).
+  ///   - `file://` and bare filesystem paths → read via [File].
+  ///     Returns null when the file is missing or unreadable.
+  ///
+  /// `null` here means: "render the row with a placeholder, do not crash
+  /// the rest of the PDF". This is intentional — a single missing photo
+  /// must never block the whole report (offline-first requirement).
+  Future<Uint8List?> _loadPhoto(String pathOrUrl) async {
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      try {
+        final response = await _http.get<List<int>>(
+          pathOrUrl,
+          options: Options(responseType: ResponseType.bytes),
+        );
+        final data = response.data;
+        if (data == null || data.isEmpty) {
+          developer.log(
+            'PDF photo fetch returned empty body for $pathOrUrl',
+            name: 'PdfTraceabilityService',
+          );
+          return null;
+        }
+        return Uint8List.fromList(data);
+      } on DioException catch (e) {
+        developer.log(
+          'PDF photo fetch failed for $pathOrUrl: ${e.type} ${e.message}',
+          name: 'PdfTraceabilityService',
+        );
+        return null;
+      }
+    }
+    final path = pathOrUrl.startsWith('file://')
+        ? pathOrUrl.replaceFirst('file://', '')
+        : pathOrUrl;
+    try {
+      final file = File(path);
+      if (!await file.exists()) return null;
+      return await file.readAsBytes();
+    } on IOException {
+      // File missing or unreadable — skip thumbnail for this activity.
+      return null;
+    }
   }
 
   pw.Widget _header() {
@@ -259,6 +341,12 @@ class PdfTraceabilityService {
           child: pw.Text(text, style: const pw.TextStyle(fontSize: 10)),
         );
 
+    // v1.9.7 — when bytes are present we render the thumbnail; when the
+    // activity carries a photoUrl that we could NOT resolve, surface the
+    // placeholder so the producer knows the data exists but is offline;
+    // otherwise leave the cell empty (activity simply had no photo).
+    final hasPhotoUrl =
+        activity.photoUrl != null && activity.photoUrl!.isNotEmpty;
     final photoCell = pw.Container(
       padding: const pw.EdgeInsets.all(4),
       child: photoBytes != null
@@ -268,7 +356,15 @@ class PdfTraceabilityService {
               height: 80,
               fit: pw.BoxFit.cover,
             )
-          : pw.SizedBox(),
+          : (hasPhotoUrl
+              ? pw.Text(
+                  kPdfPhotoUnavailableLabel,
+                  style: const pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.grey600,
+                  ),
+                )
+              : pw.SizedBox()),
     );
 
     final note =

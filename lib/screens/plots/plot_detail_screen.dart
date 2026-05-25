@@ -263,7 +263,7 @@ class _ExportPdfButtonState extends ConsumerState<_ExportPdfButton> {
       final auth = ref.read(authProvider).valueOrNull;
       final user = auth is AuthAuthenticated ? auth.user : null;
 
-      await const PdfTraceabilityService().buildAndShare(
+      await PdfTraceabilityService().buildAndShare(
         farm: farm,
         plot: widget.plot,
         activities: activities,
