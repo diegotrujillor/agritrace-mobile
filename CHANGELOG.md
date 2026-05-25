@@ -39,6 +39,19 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
   (sin él, `ApiService` lanza `StateError` y la suite no compila bajo
   `flutter test`).
 
+## [1.9.7] - 2026-05-25
+
+### Fixed
+- PDF de trazabilidad (CU-25): activity photos uploaded to OCI (`https://...` URLs from `POST /v1/uploads/photos`) now download and render correctly in the PDF. Previously they were silently absent because `_loadPhotos` only handled local `File(path)`. Closes #33.
+- PDF rendering no longer crashes when a single photo fetch fails — the row renders a placeholder (`Foto no disponible (sin conexión)`) and the rest of the PDF generates normally. Photo fetches use a dedicated, interceptor-free `Dio` (10 s connect/receive/send timeouts) so the user's JWT is never leaked to Oracle Object Storage.
+
+### Changed
+- `PdfTraceabilityService` constructor is no longer `const`; accepts an optional `Dio? httpClient` for test injection. Default factory builds a fresh, interceptor-free `Dio` with 10 s timeouts.
+- `lib/screens/plots/plot_detail_screen.dart` — drop `const` at the `PdfTraceabilityService()` call site to match the new constructor.
+
+### Tests
+- `test/unit/pdf_traceability_service_test.dart` extended with 8 new tests covering the v1.9.7 URL-scheme branch: https + http happy paths, connection-error / timeout / empty-body failure paths, "1 of 3 photos fails → PDF still generates", local-file branch isolation (verifies Dio is NOT hit), and a real-file round-trip via `Directory.systemTemp`. Uses `mocktail` `MockDio` per the existing `_helpers.dart` pattern.
+
 ## [1.9.6] - 2026-05-24
 
 ### Added
