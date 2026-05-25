@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:developer' as dev;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/plot.dart';
 import '../repositories/plot_repository.dart';
@@ -22,6 +25,17 @@ class PlotsNotifier extends FamilyAsyncNotifier<List<Plot>, String> {
   // `arg` (the family key) is the farmId.
   String get _farmId => arg;
   PlotRepository get _repo => ref.read(plotRepositoryProvider);
+
+  /// v1.9.9 — see `FarmsNotifier._autoSyncPush` for the rationale.
+  void _autoSyncPush(String op) {
+    unawaited(
+      ref.read(syncOrchestratorProvider).run().then((_) {}).catchError(
+        (Object e) {
+          dev.log('autoSync($op) failed: $e', name: 'sync');
+        },
+      ),
+    );
+  }
 
   @override
   Future<List<Plot>> build(String arg) async {
@@ -71,6 +85,8 @@ class PlotsNotifier extends FamilyAsyncNotifier<List<Plot>, String> {
       );
       return _repo.listByFarm(_farmId);
     });
+    if (state.hasError) return;
+    _autoSyncPush('createPlot');
   }
 
   Future<void> updatePlot({
@@ -95,6 +111,8 @@ class PlotsNotifier extends FamilyAsyncNotifier<List<Plot>, String> {
       );
       return _repo.listByFarm(_farmId);
     });
+    if (state.hasError) return;
+    _autoSyncPush('updatePlot');
   }
 
   Future<void> deletePlot(String id) async {
@@ -103,6 +121,8 @@ class PlotsNotifier extends FamilyAsyncNotifier<List<Plot>, String> {
       await _repo.delete(id);
       return _repo.listByFarm(_farmId);
     });
+    if (state.hasError) return;
+    _autoSyncPush('deletePlot');
   }
 }
 

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:developer' as dev;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/farm.dart';
 import '../repositories/farm_repository.dart';
@@ -22,6 +25,23 @@ final farmServiceProvider = Provider<FarmService>(
 /// first.
 class FarmsNotifier extends AsyncNotifier<List<Farm>> {
   FarmRepository get _repo => ref.read(farmRepositoryProvider);
+
+  /// v1.9.9 — P0 fix (continuation of v1.9.8). Fire-and-forget background
+  /// push after every successful local mutation so a `pendingCreate`/
+  /// `pendingUpdate` row is durable on the server before the user has any
+  /// chance to log out (which wipes Drift). Errors are logged and
+  /// swallowed — the row stays `pending*` in the local DB and the next
+  /// mutation / cold-start sync will retry. The push-before-wipe hook in
+  /// `AuthService.logout()` is the second layer of defense.
+  void _autoSyncPush(String op) {
+    unawaited(
+      ref.read(syncOrchestratorProvider).run().then((_) {}).catchError(
+        (Object e) {
+          dev.log('autoSync($op) failed: $e', name: 'sync');
+        },
+      ),
+    );
+  }
 
   @override
   Future<List<Farm>> build() async {
@@ -93,6 +113,7 @@ class FarmsNotifier extends AsyncNotifier<List<Farm>> {
       }
       throw StateError('FarmsNotifier.create() failed without an error');
     }
+    _autoSyncPush('createFarm');
     return result;
   }
 
@@ -119,6 +140,8 @@ class FarmsNotifier extends AsyncNotifier<List<Farm>> {
       );
       return _repo.listAll();
     });
+    if (state.hasError) return;
+    _autoSyncPush('updateFarm');
   }
 
   Future<void> delete(String id) async {
@@ -127,6 +150,8 @@ class FarmsNotifier extends AsyncNotifier<List<Farm>> {
       await _repo.delete(id);
       return _repo.listAll();
     });
+    if (state.hasError) return;
+    _autoSyncPush('deleteFarm');
   }
 }
 

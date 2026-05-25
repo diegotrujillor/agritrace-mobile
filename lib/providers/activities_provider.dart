@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:developer' as dev;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/activity.dart';
 import '../repositories/activity_repository.dart';
@@ -28,6 +31,17 @@ class ActivitiesNotifier
   // `arg` (the family key) is the plotId.
   String get _plotId => arg;
   ActivityRepository get _repo => ref.read(activityRepositoryProvider);
+
+  /// v1.9.9 — see `FarmsNotifier._autoSyncPush` for the rationale.
+  void _autoSyncPush(String op) {
+    unawaited(
+      ref.read(syncOrchestratorProvider).run().then((_) {}).catchError(
+        (Object e) {
+          dev.log('autoSync($op) failed: $e', name: 'sync');
+        },
+      ),
+    );
+  }
 
   @override
   Future<List<Activity>> build(String arg) async {
@@ -76,6 +90,8 @@ class ActivitiesNotifier
       );
       return _repo.listByPlot(_plotId);
     });
+    if (state.hasError) return;
+    _autoSyncPush('createActivity');
   }
 
   Future<void> updateActivity({
@@ -98,6 +114,8 @@ class ActivitiesNotifier
       );
       return _repo.listByPlot(_plotId);
     });
+    if (state.hasError) return;
+    _autoSyncPush('updateActivity');
   }
 
   /// Returns activities for [_plotId] matching [type] that occurred on the
@@ -137,6 +155,8 @@ class ActivitiesNotifier
       await _repo.delete(id);
       return _repo.listByPlot(_plotId);
     });
+    if (state.hasError) return;
+    _autoSyncPush('deleteActivity');
   }
 }
 

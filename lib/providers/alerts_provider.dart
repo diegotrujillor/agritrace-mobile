@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:developer' as dev;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/alert.dart';
 import '../repositories/alert_repository.dart';
@@ -21,6 +24,17 @@ final alertServiceProvider = Provider<AlertService>(
 /// `AsyncNotifier` built-ins.
 class AlertsNotifier extends AsyncNotifier<List<Alert>> {
   AlertRepository get _repo => ref.read(alertRepositoryProvider);
+
+  /// v1.9.9 — see `FarmsNotifier._autoSyncPush` for the rationale.
+  void _autoSyncPush(String op) {
+    unawaited(
+      ref.read(syncOrchestratorProvider).run().then((_) {}).catchError(
+        (Object e) {
+          dev.log('autoSync($op) failed: $e', name: 'sync');
+        },
+      ),
+    );
+  }
 
   @override
   Future<List<Alert>> build() async {
@@ -66,6 +80,8 @@ class AlertsNotifier extends AsyncNotifier<List<Alert>> {
       );
       return _repo.watchAll().first;
     });
+    if (state.hasError) return;
+    _autoSyncPush('createReminder');
   }
 
   Future<void> dismiss(String id) async {
@@ -76,6 +92,8 @@ class AlertsNotifier extends AsyncNotifier<List<Alert>> {
       await _repo.updateStatus(existing, AlertStatus.dismissed);
       return _repo.watchAll().first;
     });
+    if (state.hasError) return;
+    _autoSyncPush('dismissAlert');
   }
 
   Future<void> deleteAlert(String id) async {
@@ -84,6 +102,8 @@ class AlertsNotifier extends AsyncNotifier<List<Alert>> {
       await _repo.delete(id);
       return _repo.watchAll().first;
     });
+    if (state.hasError) return;
+    _autoSyncPush('deleteAlert');
   }
 
   /// Runs the server weather check for [plotId]; applies pulled weather alert

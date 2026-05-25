@@ -6,10 +6,21 @@ import 'package:agritrace_mobile/providers/activities_provider.dart';
 import 'package:agritrace_mobile/repositories/activity_repository.dart';
 import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/services/activity_service.dart';
+import 'package:agritrace_mobile/services/sync_orchestrator.dart';
+import 'package:agritrace_mobile/services/sync_service.dart';
 
 class MockActivityRepository extends Mock implements ActivityRepository {}
 
 class MockActivityService extends Mock implements ActivityService {}
+
+class MockSyncOrchestrator extends Mock implements SyncOrchestrator {}
+
+SyncResult _emptySyncResult() => SyncResult(
+      synced: 0,
+      conflicts: 0,
+      pulledChanges: const [],
+      timestamp: DateTime.utc(2026, 5, 25),
+    );
 
 const _plotId = 'plot-1';
 
@@ -30,16 +41,22 @@ void main() {
 
   late MockActivityRepository mockRepo;
   late MockActivityService mockService;
+  late MockSyncOrchestrator mockOrchestrator;
 
   setUp(() {
     mockRepo = MockActivityRepository();
     mockService = MockActivityService();
+    mockOrchestrator = MockSyncOrchestrator();
+    // v1.9.9 — every mutation now fires `unawaited(orchestrator.run())`.
+    when(() => mockOrchestrator.run(since: any(named: 'since')))
+        .thenAnswer((_) async => _emptySyncResult());
   });
 
   ProviderContainer makeContainer() => ProviderContainer(
         overrides: [
           activityRepositoryProvider.overrideWithValue(mockRepo),
           activityServiceProvider.overrideWithValue(mockService),
+          syncOrchestratorProvider.overrideWithValue(mockOrchestrator),
         ],
       );
 
@@ -185,5 +202,82 @@ void main() {
     final act = await container.read(activityProvider('act-9').future);
 
     expect(act.id, 'act-9');
+  });
+
+  // v1.9.9 — P0 fix. See farms_provider_test.dart for the rationale.
+  group('v1.9.9 auto-sync push on mutation (P0)', () {
+    test('createActivity() triggers background sync push', () async {
+      stubRepoDefaults([]);
+      when(() => mockRepo.create(
+            plotId: any(named: 'plotId'),
+            type: any(named: 'type'),
+            occurredAt: any(named: 'occurredAt'),
+            description: any(named: 'description'),
+            photoUrl: any(named: 'photoUrl'),
+          )).thenAnswer((_) async => _activity());
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(activitiesProvider(_plotId).future);
+
+      when(() => mockRepo.listByPlot(_plotId))
+          .thenAnswer((_) async => [_activity()]);
+      await container
+          .read(activitiesProvider(_plotId).notifier)
+          .createActivity(
+            type: ActivityType.sowing,
+            occurredAt: DateTime.utc(2026, 3, 1),
+          );
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => mockOrchestrator.run(since: any(named: 'since')))
+          .called(1);
+    });
+
+    test('updateActivity() triggers background sync push', () async {
+      stubRepoDefaults([_activity()]);
+      when(() => mockRepo.update(
+            any(),
+            type: any(named: 'type'),
+            occurredAt: any(named: 'occurredAt'),
+            description: any(named: 'description'),
+            photoUrl: any(named: 'photoUrl'),
+          )).thenAnswer((_) async => _activity());
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(activitiesProvider(_plotId).future);
+
+      await container
+          .read(activitiesProvider(_plotId).notifier)
+          .updateActivity(
+            id: 'act-1',
+            type: ActivityType.harvest,
+            occurredAt: DateTime.utc(2026, 3, 5),
+          );
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => mockOrchestrator.run(since: any(named: 'since')))
+          .called(1);
+    });
+
+    test('deleteActivity() triggers background sync push', () async {
+      stubRepoDefaults([_activity()]);
+      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(activitiesProvider(_plotId).future);
+
+      when(() => mockRepo.listByPlot(_plotId))
+          .thenAnswer((_) async => <Activity>[]);
+      await container
+          .read(activitiesProvider(_plotId).notifier)
+          .deleteActivity('act-1');
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => mockOrchestrator.run(since: any(named: 'since')))
+          .called(1);
+    });
   });
 }

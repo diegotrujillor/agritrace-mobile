@@ -6,10 +6,21 @@ import 'package:agritrace_mobile/providers/alerts_provider.dart';
 import 'package:agritrace_mobile/repositories/alert_repository.dart';
 import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/services/alert_service.dart';
+import 'package:agritrace_mobile/services/sync_orchestrator.dart';
+import 'package:agritrace_mobile/services/sync_service.dart';
 
 class MockAlertRepository extends Mock implements AlertRepository {}
 
 class MockAlertService extends Mock implements AlertService {}
+
+class MockSyncOrchestrator extends Mock implements SyncOrchestrator {}
+
+SyncResult _emptySyncResult() => SyncResult(
+      synced: 0,
+      conflicts: 0,
+      pulledChanges: const [],
+      timestamp: DateTime.utc(2026, 5, 25),
+    );
 
 Alert _alert({
   String id = 'alert-1',
@@ -33,16 +44,22 @@ void main() {
 
   late MockAlertRepository mockRepo;
   late MockAlertService mockService;
+  late MockSyncOrchestrator mockOrchestrator;
 
   setUp(() {
     mockRepo = MockAlertRepository();
     mockService = MockAlertService();
+    mockOrchestrator = MockSyncOrchestrator();
+    // v1.9.9 — every mutation now fires `unawaited(orchestrator.run())`.
+    when(() => mockOrchestrator.run(since: any(named: 'since')))
+        .thenAnswer((_) async => _emptySyncResult());
   });
 
   ProviderContainer makeContainer() => ProviderContainer(
         overrides: [
           alertRepositoryProvider.overrideWithValue(mockRepo),
           alertServiceProvider.overrideWithValue(mockService),
+          syncOrchestratorProvider.overrideWithValue(mockOrchestrator),
         ],
       );
 
@@ -180,5 +197,69 @@ void main() {
     await container.read(alertsProvider.notifier).deleteAlert('alert-1');
 
     expect(container.read(alertsProvider).hasError, isTrue);
+  });
+
+  // v1.9.9 — P0 fix. See farms_provider_test.dart for the rationale.
+  group('v1.9.9 auto-sync push on mutation (P0)', () {
+    test('createReminder() triggers background sync push', () async {
+      stubRepoDefaults([]);
+      when(() => mockRepo.createReminder(
+            title: any(named: 'title'),
+            scheduledFor: any(named: 'scheduledFor'),
+            body: any(named: 'body'),
+            plotId: any(named: 'plotId'),
+          )).thenAnswer((_) async => _alert());
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(alertsProvider.future);
+
+      when(() => mockRepo.watchAll())
+          .thenAnswer((_) => Stream.value([_alert()]));
+      await container.read(alertsProvider.notifier).createReminder(
+            title: 'Regar lote',
+            scheduledFor: DateTime.utc(2026, 4, 2, 8),
+          );
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => mockOrchestrator.run(since: any(named: 'since')))
+          .called(1);
+    });
+
+    test('dismiss() triggers background sync push', () async {
+      stubRepoDefaults([_alert()]);
+      when(() => mockRepo.updateStatus(any(), any()))
+          .thenAnswer((_) async => _alert(status: AlertStatus.dismissed));
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(alertsProvider.future);
+
+      when(() => mockRepo.watchAll()).thenAnswer(
+        (_) => Stream.value([_alert(status: AlertStatus.dismissed)]),
+      );
+      await container.read(alertsProvider.notifier).dismiss('alert-1');
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => mockOrchestrator.run(since: any(named: 'since')))
+          .called(1);
+    });
+
+    test('deleteAlert() triggers background sync push', () async {
+      stubRepoDefaults([_alert()]);
+      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(alertsProvider.future);
+
+      when(() => mockRepo.watchAll())
+          .thenAnswer((_) => Stream.value(<Alert>[]));
+      await container.read(alertsProvider.notifier).deleteAlert('alert-1');
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => mockOrchestrator.run(since: any(named: 'since')))
+          .called(1);
+    });
   });
 }

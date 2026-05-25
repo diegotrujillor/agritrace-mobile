@@ -6,10 +6,21 @@ import 'package:agritrace_mobile/providers/plots_provider.dart';
 import 'package:agritrace_mobile/repositories/plot_repository.dart';
 import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/services/plot_service.dart';
+import 'package:agritrace_mobile/services/sync_orchestrator.dart';
+import 'package:agritrace_mobile/services/sync_service.dart';
 
 class MockPlotRepository extends Mock implements PlotRepository {}
 
 class MockPlotService extends Mock implements PlotService {}
+
+class MockSyncOrchestrator extends Mock implements SyncOrchestrator {}
+
+SyncResult _emptySyncResult() => SyncResult(
+      synced: 0,
+      conflicts: 0,
+      pulledChanges: const [],
+      timestamp: DateTime.utc(2026, 5, 25),
+    );
 
 const _farmId = 'farm-1';
 
@@ -30,16 +41,22 @@ void main() {
 
   late MockPlotRepository mockRepo;
   late MockPlotService mockService;
+  late MockSyncOrchestrator mockOrchestrator;
 
   setUp(() {
     mockRepo = MockPlotRepository();
     mockService = MockPlotService();
+    mockOrchestrator = MockSyncOrchestrator();
+    // v1.9.9 — every mutation now fires `unawaited(orchestrator.run())`.
+    when(() => mockOrchestrator.run(since: any(named: 'since')))
+        .thenAnswer((_) async => _emptySyncResult());
   });
 
   ProviderContainer makeContainer() => ProviderContainer(
         overrides: [
           plotRepositoryProvider.overrideWithValue(mockRepo),
           plotServiceProvider.overrideWithValue(mockService),
+          syncOrchestratorProvider.overrideWithValue(mockOrchestrator),
         ],
       );
 
@@ -196,5 +213,84 @@ void main() {
 
     expect(plot.id, 'plot-local');
     verifyNever(() => mockService.get(any()));
+  });
+
+  // v1.9.9 — P0 fix. See farms_provider_test.dart for the rationale.
+  group('v1.9.9 auto-sync push on mutation (P0)', () {
+    test('create() triggers background sync push', () async {
+      stubRepoDefaults([]);
+      when(() => mockRepo.create(
+            farmId: any(named: 'farmId'),
+            name: any(named: 'name'),
+            cropType: any(named: 'cropType'),
+            status: any(named: 'status'),
+            variety: any(named: 'variety'),
+            areaHectares: any(named: 'areaHectares'),
+          )).thenAnswer((_) async => _plot());
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(plotsProvider(_farmId).future);
+
+      when(() => mockRepo.listByFarm(_farmId))
+          .thenAnswer((_) async => [_plot()]);
+      await container.read(plotsProvider(_farmId).notifier).create(
+            name: 'Lote Norte',
+            cropType: 'cacao',
+            status: PlotStatus.planning,
+          );
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => mockOrchestrator.run(since: any(named: 'since')))
+          .called(1);
+    });
+
+    test('updatePlot() triggers background sync push', () async {
+      stubRepoDefaults([_plot()]);
+      when(() => mockRepo.update(
+            any(),
+            name: any(named: 'name'),
+            cropType: any(named: 'cropType'),
+            status: any(named: 'status'),
+            variety: any(named: 'variety'),
+            areaHectares: any(named: 'areaHectares'),
+          )).thenAnswer((_) async => _plot(name: 'Lote Sur'));
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(plotsProvider(_farmId).future);
+
+      when(() => mockRepo.listByFarm(_farmId))
+          .thenAnswer((_) async => [_plot(name: 'Lote Sur')]);
+      await container.read(plotsProvider(_farmId).notifier).updatePlot(
+            id: 'plot-1',
+            name: 'Lote Sur',
+            cropType: 'cacao',
+            status: PlotStatus.ready,
+          );
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => mockOrchestrator.run(since: any(named: 'since')))
+          .called(1);
+    });
+
+    test('deletePlot() triggers background sync push', () async {
+      stubRepoDefaults([_plot()]);
+      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(plotsProvider(_farmId).future);
+
+      when(() => mockRepo.listByFarm(_farmId))
+          .thenAnswer((_) async => <Plot>[]);
+      await container
+          .read(plotsProvider(_farmId).notifier)
+          .deletePlot('plot-1');
+      await Future<void>.delayed(Duration.zero);
+
+      verify(() => mockOrchestrator.run(since: any(named: 'since')))
+          .called(1);
+    });
   });
 }
