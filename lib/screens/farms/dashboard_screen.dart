@@ -62,12 +62,16 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ],
           ),
-          // v1.9.2 — QA cycle-01 #9: brand mark bottom-left, mirroring
-          // the FAB on the right at the same 56px size + 16px margins.
+          // v1.9.4 — QA hotfix: bump brand mark 56 → 64 px so it stops
+          // reading as visually smaller than the 56 px FAB on the right.
+          // Both share the same `bottom: AppSpacing.md (16)` so the rows
+          // line up against the screen bottom; the 8 px center offset
+          // between a 64-tall logo and a 56-tall FAB is below the
+          // perceptual threshold per the v1.9.3 user-feedback captures.
           const Positioned(
             left: AppSpacing.md,
             bottom: AppSpacing.md,
-            child: AppLogoMark(size: 56),
+            child: AppLogoMark(size: 64),
           ),
         ],
       ),
