@@ -39,6 +39,14 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
   (sin él, `ApiService` lanza `StateError` y la suite no compila bajo
   `flutter test`).
 
+## [1.9.6] - 2026-05-24
+
+### Added
+- Soft duplicate warning on `Registrar actividad`: when type is `Siembra` and a prior Siembra exists for the same lote on the same calendar day, an AlertDialog asks the user to confirm before saving. Other activity types (Fertilización, Riego, Cosecha, Control de plagas, Otro) unaffected — they remain freely repeatable.
+- `kDuplicateWarnActivityTypes` constant in `lib/utils/constants.dart` to extend the warning to other types later (post-pilot data permitting).
+- New notifier method `ActivitiesNotifier.findByPlotTypeAndDate({type, date})` — local Drift cache only, in-memory year/month/day filter on local time.
+- 6 new widget tests in `test/widget/activity_duplicate_warn_test.dart` covering the dialog appearance, the Cancelar / Sí-continuar branches, the no-warn cases (different day, different plot, other activity type), and the edit-screen bypass. Suite total: 305 → 311.
+
 ## [1.9.5] - 2026-05-24
 
 ### Fixed
