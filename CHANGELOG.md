@@ -6,6 +6,39 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 
 ## [Unreleased]
 
+### Docs
+- **README.md** alineado a v1.9.4: agrega bloque "Highlights v1.9.0 → v1.9.4",
+  expande la tabla de Pantallas a 13 (incluye Alertas, Perfil ARCO y Reportar
+  problema), refresca la estructura de `lib/` (incluye `database/`,
+  `repositories/`, screens de `alerts/` y `profile/`, widgets `AppLogoMark`
+  / `SyncStatusBadge` / `AppErrorBanner`) y añade secciones de **Captura de
+  evidencia** (foto · GPS · PDF · feedback) y **Brand mark — `AppLogoMark`**
+  con política de tamaños por pantalla. Aclara que la wipe de Drift en logout +
+  cross-account login (v1.9.3) y la garantía 14-day offline siguen vigentes.
+- **CLAUDE.md** refrescado para v1.9.4: estructura `lib/` actualizada
+  (incluye `database/`, `repositories/`, `widgets/common/app_logo_mark.dart`,
+  `screens/profile/`, `screens/alerts/`); service layer documenta
+  `SyncOrchestrator`, `UploadsService`, `FeedbackService`,
+  `PdfTraceabilityService` y el invariante de seguridad `DataWiper` en
+  `AuthService` (P0 v1.9.3); sección "Sprint context" extendida a Sprints 5
+  y 6; nueva sección "UX conventions (locked in v1.9.4)" que codifica el
+  patrón **Activity card: tap = no-op, long-press → bottom sheet
+  Editar/Eliminar**, la política de tamaños de `AppLogoMark`, la higiene
+  de `clearError()` en mount de pantallas de auth, y la regla
+  "nunca borrar tokens sin invocar el `DataWiper`". Target de cobertura
+  subido a ≥80 % con referencia a `docs/COVERAGE.md`.
+- **docs/COVERAGE.md** reemplaza el baseline Sprint 5 (184 tests · 84.6 %
+  sobre 748 líneas) por el snapshot post-v1.9.4: **300 tests verdes**,
+  cobertura representativa **83.6 %** (1732 / 2072) sobre código a mano,
+  cobertura cruda 44.9 % (1762 / 3926) dominada por `app_database.g.dart`
+  (1398 líneas de codegen Drift, 0.9 %). Gap explícito reescrito para
+  enumerar los cinco grupos excluidos (`*.g.dart`, `repositories/`,
+  `database/app_database.dart`, `database/tables.dart`,
+  `sync_orchestrator.dart`) con su backlog Sprint 7. El comando de
+  reproducción ahora incluye `--dart-define=API_BASE_URL=http://localhost:3000/v1`
+  (sin él, `ApiService` lanza `StateError` y la suite no compila bajo
+  `flutter test`).
+
 ## [1.9.4] - 2026-05-24 — fix(ui+auth): logo alignment hotfixes + clear leaked auth error across screens
 
 ### Fixed
