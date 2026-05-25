@@ -87,56 +87,35 @@ class _PlotFormScreenState extends ConsumerState<PlotFormScreen> {
         ),
       ),
       body: SafeArea(
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                AppSpacing.xl,
-                AppSpacing.xl,
-                // Reserve room for the bottom-left logo overlay below
-                // (v1.9.3 — QA cycle-03: 56 → 80 px to match the bigger
-                // brand mark).
-                AppSpacing.xl + 80,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // v1.9.4 — QA hotfix: add a centered brand mark below
+              // the AppBar so this form matches the same "header logo"
+              // pattern introduced on `plot_edit_screen.dart` and the
+              // existing register/login screens.
+              // v1.9.5 — duplicate bottom-left logo removed; this is
+              // now the only AppLogoMark on the screen.
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                child: Center(
+                  child: AppLogoMark(size: 80),
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // v1.9.4 — QA hotfix: add a centered brand mark below
-                  // the AppBar so this form matches the same "header logo"
-                  // pattern introduced on `plot_edit_screen.dart` and the
-                  // existing register/login screens.
-                  const Padding(
-                    padding:
-                        EdgeInsets.symmetric(vertical: AppSpacing.md),
-                    child: Center(
-                      child: AppLogoMark(size: 80),
-                    ),
-                  ),
-                  PlotForm(
-                    submitLabel: 'Agregar lote',
-                    onSubmit: _submit,
-                    submitting: _submitting,
-                    errorMessage: _errorMessage,
-                    initialCropType:
-                        matchPlotCropType(widget.initialCropTypeSuggestion),
-                  ),
-                ],
+              PlotForm(
+                submitLabel: 'Agregar lote',
+                onSubmit: _submit,
+                submitting: _submitting,
+                errorMessage: _errorMessage,
+                initialCropType:
+                    matchPlotCropType(widget.initialCropTypeSuggestion),
               ),
-            ),
-            // v1.9.3 — QA cycle-03: bump brand mark 2× (40 → 80 px).
-            // Alignment + position unchanged (bottom-left).
-            const Align(
-              alignment: Alignment.bottomLeft,
-              child: Padding(
-                padding: EdgeInsets.all(AppSpacing.md),
-                child: AppLogoMark(size: 80),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
-

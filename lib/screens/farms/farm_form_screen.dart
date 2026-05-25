@@ -36,11 +36,11 @@ class FarmFormScreen extends ConsumerStatefulWidget {
 }
 
 class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
-  final _formKey            = GlobalKey<FormState>();
-  final _nameController     = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _cropTypeController = TextEditingController();
-  final _areaController     = TextEditingController();
-  final _addressController  = TextEditingController();
+  final _areaController = TextEditingController();
+  final _addressController = TextEditingController();
 
   bool _submitting = false;
   bool _capturingGps = false;
@@ -86,7 +86,8 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         messenger.showSnackBar(
-          const SnackBar(content: Text(
+          const SnackBar(
+              content: Text(
             'Activa la ubicación del dispositivo para capturar GPS.',
           )),
         );
@@ -100,7 +101,8 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
         messenger.showSnackBar(
-          const SnackBar(content: Text(
+          const SnackBar(
+              content: Text(
             'Permiso de ubicación requerido para capturar GPS.',
           )),
         );
@@ -143,8 +145,7 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
     // `capitalizeFirstLetter` returns null for empty input so the optional
     // backend field is preserved when the producer skipped it.
     final cropType = capitalizeFirstLetter(_cropTypeController.text);
-    final area =
-        double.parse(_areaController.text.trim().replaceAll(',', '.'));
+    final area = double.parse(_areaController.text.trim().replaceAll(',', '.'));
     final address = _addressController.text.trim();
     final notifier = ref.read(farmsProvider.notifier);
 
@@ -218,28 +219,19 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
         title: Text(_isEdit ? 'Editar finca' : 'Registrar finca'),
       ),
       body: SafeArea(
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                AppSpacing.xl,
-                AppSpacing.xl,
-                // Extra bottom padding so the form does not crash into the
-                // BottomLeftLogo overlay (v1.9.3 — QA cycle-03: logo
-                // bumped to 80 px, so the reserve grows from
-                // AppSpacing.xl + 56 → AppSpacing.xl + 80).
-                AppSpacing.xl + 80,
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 // v1.9.4 — QA hotfix: centered brand mark below the AppBar.
                 // Mirrors the same "header logo" pattern added to
                 // `plot_edit_screen.dart` so create + edit finca screens
                 // surface the same identity strip the producer expects.
+                // v1.9.5 — duplicate bottom-left logo removed; this is now
+                // the only AppLogoMark on the screen.
                 const Padding(
                   padding: EdgeInsets.only(bottom: AppSpacing.md),
                   child: Center(
@@ -324,24 +316,11 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
                   onPressed: _submitting ? null : _submit,
                   isLoading: _submitting,
                 ),
-                  ],
-                ),
-              ),
+              ],
             ),
-            // v1.9.3 — QA cycle-03: bump brand mark 2× (40 → 80 px).
-            // Alignment + position unchanged (bottom-left,
-            // AppSpacing.md padding). Scroll reserve above grew to match.
-            const Align(
-              alignment: Alignment.bottomLeft,
-              child: Padding(
-                padding: EdgeInsets.all(AppSpacing.md),
-                child: AppLogoMark(size: 80),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
-
