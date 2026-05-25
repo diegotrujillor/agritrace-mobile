@@ -59,6 +59,11 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
   drift_dev: ^2.20.0
   build_runner: ^2.4.11
+  # v1.9.8 — InactivityMonitor unit tests need to elapse 20 min of timer
+  # time without the test suite actually waiting 20 min. `fake_async` is a
+  # transitive dependency already (see pubspec.lock); declaring it
+  # explicitly here makes the import contract explicit.
+  fake_async: ^1.3.1
 
 flutter:
   uses-material-design: true

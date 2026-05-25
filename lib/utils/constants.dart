@@ -24,6 +24,18 @@ abstract final class AppSpacing {
   static const double xl = 32;
 }
 
+/// Minutes of zero user gesture activity that trigger a forced logout.
+///
+/// v1.9.8 — P1 fix. Pilot QA found that JWT access tokens auto-refreshed
+/// silently in the background, so a session left untouched on a shared
+/// device stayed signed in indefinitely. The client-side
+/// [InactivityMonitor] enforces this ceiling: after 20 minutes of no
+/// pointer events the monitor calls `AuthService.logout()` and routes
+/// the user back to the login screen. The threshold matches the Ley 1581
+/// "minimum exposure of personal data on shared devices" guidance for
+/// rural pilots where producers often hand-pass a single phone.
+const int kInactivityTimeoutMinutes = 20;
+
 /// Crop types offered in the **plot** form. Constrained to the MVP pilot
 /// region (Valle del Cauca) primary crops plus an `otro` escape hatch. The
 /// value is sent verbatim to the backend `cropType` field.

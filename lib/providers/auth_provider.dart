@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/inactivity_monitor.dart';
 import '../services/storage_service.dart';
 import 'database_provider.dart';
 
@@ -52,6 +53,28 @@ final apiServiceProvider = Provider<ApiService>(
   ),
 );
 
+/// Singleton [InactivityMonitor] for the app lifetime.
+///
+/// v1.9.8 — P1 fix. The monitor is held in a Riverpod `Provider` (NOT
+/// auto-dispose) so the same instance is shared between the root gesture
+/// wrapper in `main.dart`, the `AppLifecycle` observer, and the
+/// `AuthNotifier` (which arms it on login and stops it on logout).
+final inactivityMonitorProvider = Provider<InactivityMonitor>((ref) {
+  final monitor = InactivityMonitor();
+  ref.onDispose(monitor.stop);
+  return monitor;
+});
+
+/// Monotonically increasing counter incremented every time the
+/// [InactivityMonitor] fires a forced logout.
+///
+/// v1.9.8 — P1 fix. The root [_AgriTraceAppState] in `main.dart` watches
+/// this counter; a change is its cue to enqueue the "Sesión cerrada por
+/// inactividad" SnackBar. A counter (vs a boolean flag) means a fast
+/// back-to-back inactivity event after re-login still re-triggers the
+/// listener — Riverpod only fires on value change.
+final inactivityLogoutSignalProvider = StateProvider<int>((_) => 0);
+
 final authServiceProvider = Provider<AuthService>(
   (ref) => AuthService(
     ref.read(apiServiceProvider),
@@ -61,6 +84,14 @@ final authServiceProvider = Provider<AuthService>(
     // [AuthService] never imports Drift and stays pure-Dart-testable.
     wipeLocalData: () =>
         ref.read(appDatabaseProvider).wipeAllUserData(),
+    // v1.9.8 — P0 fix. Inject a RemotePuller that delegates to the
+    // shared [SyncOrchestrator]. AuthService awaits this BEFORE the
+    // notifier flips to `AuthAuthenticated`, so the dashboard rebuild
+    // observes a populated Drift DB on the very first frame after
+    // login/register (closes the v1.9.3 "empty dashboard after
+    // logout → re-login" regression).
+    pullRemoteData: () =>
+        ref.read(syncOrchestratorProvider).pullAllFromServer(),
   ),
 );
 
@@ -101,6 +132,10 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       // Seed local DB with server data on cold start. Fire-and-forget so a
       // network failure does not block the app from reaching the dashboard.
       _seedInBackground('initial seed');
+      // v1.9.8 — P1 fix. Arm the inactivity monitor on every authenticated
+      // cold-start so a user who never explicitly logs out still gets the
+      // 20 min ceiling on the very next session.
+      _armInactivityMonitor();
       return AuthAuthenticated(auth.user);
     } on DioException catch (e) {
       // 401/403 → refresh token rejected → unrecoverable. Any other status
@@ -163,11 +198,18 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   Future<void> login({required String email, required String password}) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
+      // v1.9.8 — P0 fix. `AuthService.login` now awaits a `RemotePuller`
+      // (wired in `authServiceProvider` → `SyncOrchestrator.pullAllFromServer`)
+      // before returning, so the local Drift DB is hydrated by the time
+      // this notifier flips to `AuthAuthenticated` and the router routes
+      // the user to the dashboard. The previous fire-and-forget
+      // `_seedInBackground('login seed')` raced with the first dashboard
+      // render and left "No tienes fincas aún" frozen on screen until
+      // the user manually pulled to refresh. Removed.
       final auth = await ref
           .read(authServiceProvider)
           .login(email: email, password: password);
-      // Seed local DB on fresh login. Fire-and-forget.
-      _seedInBackground('login seed');
+      _armInactivityMonitor();
       return AuthAuthenticated(auth.user);
     });
   }
@@ -181,6 +223,11 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
+      // v1.9.8 — P0 fix. Same as `login`: `AuthService.register` now
+      // awaits the `RemotePuller` synchronously. New accounts start
+      // with an empty server-side store so the pull returns an empty
+      // change set; the call still runs for symmetry and to support
+      // the rare "register against an existing account" recovery path.
       final auth = await ref.read(authServiceProvider).register(
             fullName: fullName,
             phone: phone,
@@ -188,16 +235,47 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
             password: password,
             privacyConsent: privacyConsent,
           );
-      // New account — local DB is empty; seed attempt is a no-op but
-      // marks the pattern consistent with login.
-      _seedInBackground('register seed');
+      _armInactivityMonitor();
       return AuthAuthenticated(auth.user);
     });
   }
 
   Future<void> logout() async {
+    // Stop the inactivity monitor BEFORE flipping the auth state so the
+    // post-logout login screen never has a stale timer that could trigger
+    // a second logout via [InactivityMonitor]'s callback. The same applies
+    // to the timer-driven path: [_handleInactivityTimeout] re-enters this
+    // method, and `stop()` here makes it idempotent.
+    ref.read(inactivityMonitorProvider).stop();
     await ref.read(authServiceProvider).logout();
     state = const AsyncData(AuthUnauthenticated());
+  }
+
+  /// Arms the inactivity monitor so the next 20 min of zero pointer
+  /// activity force a logout. Called from cold-start refresh, login and
+  /// register. Idempotent: replacing the callback is safe because the
+  /// monitor cancels its existing timer in `start()`.
+  void _armInactivityMonitor() {
+    ref.read(inactivityMonitorProvider).start(_handleInactivityTimeout);
+  }
+
+  /// Fires when [InactivityMonitor] times out. Triggers the regular
+  /// logout flow and emits a signal on [inactivityLogoutSignalProvider]
+  /// so the root widget in `main.dart` can queue a SnackBar after the
+  /// router routes back to `/welcome`.
+  void _handleInactivityTimeout() {
+    // Increment the signal counter BEFORE awaiting logout so the UI sees
+    // the change in the same microtask as the auth state flip. Using a
+    // counter (not a bool) ensures back-to-back timeouts after a fast
+    // re-login still re-trigger any state listeners.
+    ref.read(inactivityLogoutSignalProvider.notifier).state++;
+    // Fire-and-forget — the monitor lives outside the async boundary so
+    // we cannot await here. Errors are intentionally swallowed: a logout
+    // network failure must not crash the lifecycle observer / gesture
+    // wrapper thread.
+    logout().catchError((Object e) {
+      dev.log('AuthNotifier: inactivity logout failed: $e', name: 'auth');
+    });
   }
 }
 
