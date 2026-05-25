@@ -1,0 +1,114 @@
+name: Version sync
+
+# Daily check for drift between latest published mobile / backend versions
+# and the stamps marked `<!-- version-sync:* -->` inside this repo's docs.
+#
+# Source of truth:
+#   - mobile  -> latest GitHub Release on diegotrujillor/agritrace-mobile
+#   - backend -> latest GitHub Release on diegotrujillor/agritrace-backend,
+#                falling back to the highest semver git tag if no release exists
+#
+# Behavior is idempotent: if no drift, the job exits without committing.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC = 01:00 America/Bogota, daily
+  workflow_dispatch:
+    inputs:
+      mobile_override:
+        description: 'Override mobile tag (e.g. v1.9.12). Leave blank to auto-resolve.'
+        required: false
+        type: string
+      backend_override:
+        description: 'Override backend tag (e.g. v0.6.1). Leave blank to auto-resolve.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-sync-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Resolve latest versions
+        id: versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MOBILE_OVERRIDE: ${{ inputs.mobile_override }}
+          BACKEND_OVERRIDE: ${{ inputs.backend_override }}
+        run: |
+          set -euo pipefail
+
+          resolve_tag() {
+            local repo="$1"
+            # 1) Try the published GitHub Release.
+            local tag
+            tag=$(gh release view --repo "$repo" --json tagName --jq '.tagName' 2>/dev/null || true)
+            if [ -n "${tag:-}" ]; then
+              echo "$tag"
+              return 0
+            fi
+            # 2) Fall back to the highest semver git tag from the API.
+            tag=$(gh api "repos/${repo}/tags" --jq '[.[].name | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | .[0]' 2>/dev/null || true)
+            if [ -n "${tag:-}" ] && [ "$tag" != "null" ]; then
+              echo "$tag"
+              return 0
+            fi
+            return 1
+          }
+
+          if [ -n "${MOBILE_OVERRIDE:-}" ]; then
+            MOBILE="$MOBILE_OVERRIDE"
+          else
+            MOBILE=$(resolve_tag "diegotrujillor/agritrace-mobile")
+          fi
+
+          if [ -n "${BACKEND_OVERRIDE:-}" ]; then
+            BACKEND="$BACKEND_OVERRIDE"
+          else
+            BACKEND=$(resolve_tag "diegotrujillor/agritrace-backend")
+          fi
+
+          if [ -z "${MOBILE:-}" ] || [ -z "${BACKEND:-}" ]; then
+            echo "::error::could not resolve mobile=$MOBILE backend=$BACKEND"
+            exit 1
+          fi
+
+          case "$MOBILE"  in v*.*.*) ;; *) echo "::error::mobile tag malformed: $MOBILE";   exit 1 ;; esac
+          case "$BACKEND" in v*.*.*) ;; *) echo "::error::backend tag malformed: $BACKEND"; exit 1 ;; esac
+
+          echo "mobile=$MOBILE"   >> "$GITHUB_OUTPUT"
+          echo "backend=$BACKEND" >> "$GITHUB_OUTPUT"
+          echo "Resolved: mobile=$MOBILE backend=$BACKEND"
+
+      - name: Run version-sync (apply)
+        run: |
+          node scripts/version-sync.mjs \
+            --mobile=${{ steps.versions.outputs.mobile }} \
+            --backend=${{ steps.versions.outputs.backend }}
+
+      - name: Commit + push if drift detected
+        env:
+          MOBILE: ${{ steps.versions.outputs.mobile }}
+          BACKEND: ${{ steps.versions.outputs.backend }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No drift, nothing to commit."
+            exit 0
+          fi
+          git config user.name  "agritrace-version-sync[bot]"
+          git config user.email "agritrace-version-sync@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(version-sync): bump stamps to mobile ${MOBILE} / backend ${BACKEND}"
+          git push origin HEAD:main
