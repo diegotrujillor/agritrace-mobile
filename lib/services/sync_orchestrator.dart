@@ -48,6 +48,35 @@ class SyncOrchestrator {
     return result;
   }
 
+  /// Hydrates the local Drift DB with the authenticated user's full remote
+  /// state.
+  ///
+  /// v1.9.8 — P0 fix. Called by [AuthService] (via the `RemotePuller`
+  /// callback wired in `authServiceProvider`) after every successful
+  /// login/register so that:
+  ///   - same-user re-login restores farms/plots/activities/alerts that
+  ///     `logout()`'s `wipeAllUserData` cleared from the device, and
+  ///   - any cross-device additions made since the user last opened the
+  ///     app land on the dashboard immediately.
+  ///
+  /// Uses the existing `GET /v1/sync/changes` endpoint with no `since`
+  /// cursor → the backend returns ALL rows owned by the producer (see
+  /// `agritrace-backend/src/services/sync.service.ts`: `getChanges`
+  /// returns every row when `since` is null). Server-pulled rows are
+  /// upserted with Last-Write-Wins on `updated_at`, identical to the
+  /// regular `run()` cycle. Local pending rows are NOT pushed here — that
+  /// is the responsibility of the next [run] call; on a freshly wiped
+  /// device there are no pending rows anyway.
+  ///
+  /// Throws on network/HTTP failure so the caller (AuthService) can log
+  /// and decide whether to block the login flow.
+  Future<void> pullAllFromServer() async {
+    final result = await syncService.syncNow();
+    for (final change in result.pulledChanges) {
+      await _applyPulledChange(change);
+    }
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   Future<List<SyncChange>> _collectPending() async {

@@ -1,3 +1,5 @@
+import 'dart:developer' as dev;
+
 import '../models/user.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
@@ -11,20 +13,39 @@ import 'storage_service.dart';
 /// `AppDatabase.wipeAllUserData`.
 typedef DataWiper = Future<void> Function();
 
+/// Callback invoked after a successful login/register to hydrate the local
+/// Drift DB with the authenticated user's remote state.
+///
+/// v1.9.8 — P0 fix. After v1.9.3 wipe-on-logout, a same-user re-login left
+/// the dashboard empty because nothing pulled remote state back. The
+/// `RemotePuller` is awaited as part of the login/register flow so the
+/// dashboard rebuild sees a populated DB. Errors must NOT propagate — the
+/// caller logs and continues so an offline login still completes.
+typedef RemotePuller = Future<void> Function();
+
 class AuthService {
   /// [wipeLocalData] is `null`-safe: when omitted (e.g. in legacy tests
   /// that only exercise the network surface) the wipe step is silently
   /// skipped. Production callers always supply it through
   /// `authServiceProvider`.
+  ///
+  /// [pullRemoteData] is `null`-safe too. When supplied, it is called
+  /// AWAITED after every successful login/register so the local Drift DB
+  /// is hydrated before the auth state flips to authenticated. Errors are
+  /// caught and logged — an offline login still completes and the user can
+  /// create local data while the pull retries later.
   const AuthService(
     this._api,
     this._storage, {
     DataWiper? wipeLocalData,
-  }) : _wipeLocalData = wipeLocalData;
+    RemotePuller? pullRemoteData,
+  })  : _wipeLocalData = wipeLocalData,
+        _pullRemoteData = pullRemoteData;
 
   final ApiService _api;
   final StorageService _storage;
   final DataWiper? _wipeLocalData;
+  final RemotePuller? _pullRemoteData;
 
   Future<AuthResponse> register({
     required String fullName,
@@ -54,6 +75,12 @@ class AuthService {
       refreshToken: auth.refreshToken,
     );
     await _storage.saveLastUserId(auth.user.id);
+    // v1.9.8 — P0 fix. Hydrate the local Drift DB from the server before
+    // returning. A fresh account starts empty server-side so this is a
+    // no-op for the happy path, but keeping the call here mirrors the
+    // login flow (and protects the rare case where a producer registers
+    // again to recover a session against an existing account).
+    await _hydrateFromRemote();
     return auth;
   }
 
@@ -77,7 +104,34 @@ class AuthService {
       refreshToken: auth.refreshToken,
     );
     await _storage.saveLastUserId(auth.user.id);
+    // v1.9.8 — P0 fix. Pull the authenticated user's farms/plots/activities/
+    // alerts from the server INTO the local Drift DB before returning so the
+    // dashboard (which reads local-first) sees a populated state on the
+    // very first frame after login. Required because logout wipes Drift —
+    // without this hydration step a same-user re-login renders "No tienes
+    // fincas aún" indefinitely until the user manually triggers a sync.
+    await _hydrateFromRemote();
     return auth;
+  }
+
+  /// Awaits the injected [RemotePuller] when present and swallows any
+  /// error. Logging is intentional — a producer logging in on a flaky
+  /// connection must still reach the dashboard (where they can keep
+  /// creating local-only rows; the next online sync will push them).
+  ///
+  /// No-op when the host did not supply a puller (legacy unit-test
+  /// constructions of `AuthService` that don't exercise sync).
+  Future<void> _hydrateFromRemote() async {
+    final puller = _pullRemoteData;
+    if (puller == null) return;
+    try {
+      await puller();
+    } catch (e) {
+      dev.log(
+        'AuthService: remote hydration failed on login/register: $e',
+        name: 'auth',
+      );
+    }
   }
 
   /// Wipes the local Drift DB iff the cached `last_user_id` is set AND

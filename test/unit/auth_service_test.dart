@@ -320,4 +320,119 @@ void main() {
           reason: 'registering a new account on a hand-me-down device wipes');
     });
   });
+
+  // v1.9.8 — P0 fix. After a successful login/register, AuthService must
+  // hydrate the local Drift DB by awaiting the injected `RemotePuller`.
+  // The previous fire-and-forget seed in `AuthNotifier` raced with the
+  // first dashboard render, leaving the screen empty after a same-user
+  // re-login (where the wipe-on-logout had emptied Drift).
+  group('remote hydration on login/register (P0)', () {
+    test('login awaits the puller after persisting tokens', () async {
+      int pullCalls = 0;
+      final order = <String>[];
+      Future<void> puller() async {
+        pullCalls++;
+        order.add('pull');
+      }
+
+      when(() => storage.saveTokens(
+            accessToken: any(named: 'accessToken'),
+            refreshToken: any(named: 'refreshToken'),
+          )).thenAnswer((_) async {
+        order.add('saveTokens');
+      });
+      when(() => storage.saveLastUserId(any())).thenAnswer((_) async {
+        order.add('saveLastUserId');
+      });
+      when(() => dio.post('/auth/login', data: any(named: 'data')))
+          .thenAnswer((_) async => okResponse(_authEnvelope()));
+
+      final svc = AuthService(api, storage, pullRemoteData: puller);
+      await svc.login(email: 'a@b.com', password: 'pwd-12345');
+
+      expect(pullCalls, 1, reason: 'puller must run exactly once per login');
+      // Order: tokens persisted, last_user_id saved, THEN remote pull.
+      // Pulling before persisting last_user_id would lose track of which
+      // user the freshly pulled rows belong to if the pull crashed.
+      expect(order, ['saveTokens', 'saveLastUserId', 'pull']);
+    });
+
+    test('register awaits the puller after persisting tokens', () async {
+      int pullCalls = 0;
+      Future<void> puller() async => pullCalls++;
+
+      when(() => dio.post('/auth/register', data: any(named: 'data')))
+          .thenAnswer((_) async => okResponse(_authEnvelope()));
+
+      final svc = AuthService(api, storage, pullRemoteData: puller);
+      await svc.register(
+        fullName: 'Ana',
+        phone: '+57 300',
+        email: 'a@b.com',
+        password: 'pwd-12345',
+        privacyConsent: true,
+      );
+
+      expect(pullCalls, 1,
+          reason: 'puller must run exactly once per register');
+    });
+
+    test('login completes even when the puller throws (offline-tolerant)',
+        () async {
+      Future<void> puller() async => throw Exception('network down');
+
+      when(() => dio.post('/auth/login', data: any(named: 'data')))
+          .thenAnswer((_) async => okResponse(_authEnvelope()));
+
+      final svc = AuthService(api, storage, pullRemoteData: puller);
+
+      // Must NOT throw — login completes, user reaches the dashboard,
+      // SyncProvider auto-retries when connectivity returns.
+      final auth = await svc.login(
+        email: 'a@b.com',
+        password: 'pwd-12345',
+      );
+      expect(auth.user.email, 'a@b.com');
+    });
+
+    test('login still works when no puller is injected (legacy callers)',
+        () async {
+      when(() => dio.post('/auth/login', data: any(named: 'data')))
+          .thenAnswer((_) async => okResponse(_authEnvelope()));
+
+      // No `pullRemoteData` — the legacy unit-test constructor path
+      // must keep working so the service stays pure-Dart-testable.
+      final svc = AuthService(api, storage);
+      final auth = await svc.login(
+        email: 'a@b.com',
+        password: 'pwd-12345',
+      );
+      expect(auth.user.email, 'a@b.com');
+    });
+
+    test(
+        'cross-user wipe runs BEFORE the puller so we never pull into stale rows',
+        () async {
+      final order = <String>[];
+      Future<void> wiper() async => order.add('wipe');
+      Future<void> puller() async => order.add('pull');
+
+      when(() => storage.getLastUserId())
+          .thenAnswer((_) async => 'OTHER-USER');
+      when(() => dio.post('/auth/login', data: any(named: 'data')))
+          .thenAnswer((_) async => okResponse(_authEnvelope()));
+
+      final svc = AuthService(
+        api,
+        storage,
+        wipeLocalData: wiper,
+        pullRemoteData: puller,
+      );
+      await svc.login(email: 'a@b.com', password: 'pwd-12345');
+
+      // Wipe must run first; otherwise pulled rows could collide with
+      // the previous user's residual rows under LWW.
+      expect(order, ['wipe', 'pull']);
+    });
+  });
 }
