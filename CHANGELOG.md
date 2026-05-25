@@ -39,6 +39,42 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
   (sin él, `ApiService` lanza `StateError` y la suite no compila bajo
   `flutter test`).
 
+## [1.9.9] - 2026-05-25
+
+### Fixed
+- **P0 (continuation of v1.9.8)**: v1.9.8 added pull-on-login but missed
+  that local creates never auto-pushed. Same-user re-login still saw an
+  empty dashboard because the user's farms/plots/activities/alerts never
+  made it to the server before logout's `wipeAllUserData` destroyed them.
+  Now every successful mutation (create/update/delete on
+  `FarmsNotifier`, `PlotsNotifier`, `ActivitiesNotifier`,
+  `AlertsNotifier`) fires a background `unawaited(SyncOrchestrator.run())`
+  push. Logout additionally attempts ONE final push (5 s timeout) BEFORE
+  wiping local Drift, so even mid-session offline-to-online transitions
+  don't lose data. The privacy invariant (next user must not see prior
+  user's rows) still wins over the convenience invariant — push failures
+  and timeouts are logged and swallowed; the wipe always runs.
+
+### Added
+- `PendingPusher` typedef on `AuthService` (mirrors `DataWiper` /
+  `RemotePuller`) — constructor injection keeps the service pure-Dart-
+  testable and Drift-free. Wired in `authServiceProvider` to
+  `() => ref.read(syncOrchestratorProvider).run()`.
+- `unawaited(...)` background sync hooks in all mutation methods of the
+  four domain providers (`farms_provider.dart`, `plots_provider.dart`,
+  `activities_provider.dart`, `alerts_provider.dart`). Each provider
+  exposes a private `_autoSyncPush(op)` helper that logs failures via
+  `dart:developer` so a flaky network produces structured logs instead
+  of silent drops.
+
+### Tests
+- +17 unit tests: 3 push-before-wipe assertions in
+  `test/unit/auth_service_test.dart` (order, error-tolerance,
+  legacy-callers) and 14 auto-sync mutation assertions across
+  `farms_provider_test.dart`, `plots_provider_test.dart`,
+  `activities_provider_test.dart`, `alerts_provider_test.dart`. Total
+  suite: 340 → 357 green.
+
 ## [1.9.8] - 2026-05-25
 
 ### Fixed
