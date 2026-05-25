@@ -107,6 +107,10 @@ class AuthService {
       refreshToken: auth.refreshToken,
     );
     await _storage.saveLastUserId(auth.user.id);
+    // v1.9.11 — Persist a snapshot of the authenticated user alongside the
+    // tokens so the next cold start can short-circuit the active refresh
+    // probe and route the user straight to the dashboard while offline.
+    await _storage.saveUserSnapshot(auth.user);
     // v1.9.8 — P0 fix. Hydrate the local Drift DB from the server before
     // returning. A fresh account starts empty server-side so this is a
     // no-op for the happy path, but keeping the call here mirrors the
@@ -136,6 +140,10 @@ class AuthService {
       refreshToken: auth.refreshToken,
     );
     await _storage.saveLastUserId(auth.user.id);
+    // v1.9.11 — Persist a snapshot of the authenticated user alongside the
+    // tokens (see [StorageService.saveUserSnapshot]). Powers the offline-
+    // friendly cold-start path in [AuthNotifier.build].
+    await _storage.saveUserSnapshot(auth.user);
     // v1.9.8 — P0 fix. Pull the authenticated user's farms/plots/activities/
     // alerts from the server INTO the local Drift DB before returning so the
     // dashboard (which reads local-first) sees a populated state on the
@@ -212,6 +220,11 @@ class AuthService {
     // backup-restore) would never seed the marker and the cross-account
     // check on the next login could miss.
     await _storage.saveLastUserId(auth.user.id);
+    // v1.9.11 — refresh also rotates the persisted user snapshot. The
+    // payload rarely changes (id/email/role are stable across token
+    // rotations) but writing on every refresh keeps the snapshot in
+    // sync if the backend ever updates `fullName` / `phone` server-side.
+    await _storage.saveUserSnapshot(auth.user);
     return auth;
   }
 

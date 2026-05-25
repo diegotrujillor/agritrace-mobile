@@ -1,12 +1,25 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:agritrace_mobile/models/user.dart';
 import 'package:agritrace_mobile/services/auth_service.dart';
 import 'package:agritrace_mobile/services/storage_service.dart';
 
 import '_helpers.dart';
 
 class _MockStorageService extends Mock implements StorageService {}
+
+/// v1.9.11 — mocktail needs a fallback value registered before `any()`
+/// can be used on a non-primitive `User` argument. The snapshot is written
+/// on every login/register/refresh so the stub for `saveUserSnapshot`
+/// uses `any()` to match arbitrary `User` instances.
+const _fallbackUser = User(
+  id: '__fallback__',
+  email: 'fallback@example.com',
+  fullName: 'Fallback',
+  phone: '',
+  role: UserRole.producer,
+);
 
 Map<String, dynamic> _authEnvelope({
   String accessToken = 'acc',
@@ -28,6 +41,10 @@ Map<String, dynamic> _authEnvelope({
     };
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(_fallbackUser);
+  });
+
   late MockApiService api;
   late MockDio dio;
   late _MockStorageService storage;
@@ -50,6 +67,10 @@ void main() {
     when(() => storage.saveLastUserId(any())).thenAnswer((_) async {});
     when(() => storage.getLastUserId()).thenAnswer((_) async => null);
     when(() => storage.deleteAll()).thenAnswer((_) async {});
+    // v1.9.11 — login/register/refresh now persist a user snapshot
+    // alongside the tokens. Stub the new method so the legacy auth-service
+    // tests don't fail when mocktail sees an unstubbed invocation.
+    when(() => storage.saveUserSnapshot(any())).thenAnswer((_) async {});
     service = AuthService(api, storage);
   });
 
@@ -344,6 +365,12 @@ void main() {
       when(() => storage.saveLastUserId(any())).thenAnswer((_) async {
         order.add('saveLastUserId');
       });
+      // v1.9.11 — the user snapshot is written between `saveLastUserId`
+      // and the remote pull so the next cold start can short-circuit the
+      // active probe even if the pull crashes.
+      when(() => storage.saveUserSnapshot(any())).thenAnswer((_) async {
+        order.add('saveUserSnapshot');
+      });
       when(() => dio.post('/auth/login', data: any(named: 'data')))
           .thenAnswer((_) async => okResponse(_authEnvelope()));
 
@@ -351,10 +378,18 @@ void main() {
       await svc.login(email: 'a@b.com', password: 'pwd-12345');
 
       expect(pullCalls, 1, reason: 'puller must run exactly once per login');
-      // Order: tokens persisted, last_user_id saved, THEN remote pull.
-      // Pulling before persisting last_user_id would lose track of which
-      // user the freshly pulled rows belong to if the pull crashed.
-      expect(order, ['saveTokens', 'saveLastUserId', 'pull']);
+      // Order: tokens persisted, last_user_id saved, snapshot saved, THEN
+      // remote pull. Pulling before persisting last_user_id would lose
+      // track of which user the freshly pulled rows belong to if the pull
+      // crashed. Persisting the snapshot before the pull means a network
+      // failure mid-pull still leaves the next cold start with a valid
+      // offline-friendly entry path.
+      expect(order, [
+        'saveTokens',
+        'saveLastUserId',
+        'saveUserSnapshot',
+        'pull',
+      ]);
     });
 
     test('register awaits the puller after persisting tokens', () async {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:dio/dio.dart';
@@ -9,6 +10,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/inactivity_monitor.dart';
 import '../services/storage_service.dart';
+import '../utils/jwt_utils.dart';
 import 'database_provider.dart';
 
 /// `flutter_secure_storage` backed by:
@@ -125,45 +127,113 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     final refreshToken = await storage.getRefreshToken();
     if (refreshToken == null) return const AuthUnauthenticated();
 
-    // Active cold-start probe: hit `/auth/refresh` with the stored refresh
-    // token. This is the lightest authenticated endpoint that proves both
-    // (a) the refresh token is still alive server-side and (b) the JWT
-    // secret has not been rotated. The previous client-only `exp` check
-    // could not detect either condition, so a user could land on the
-    // dashboard with a session the server would reject on the first
-    // domain call — surfacing as "Credenciales incorrectas" banners.
-    //
-    // Backend has no `/auth/me` (see agritrace-backend/src/api/auth/auth.routes.ts);
-    // `refresh()` is the closest equivalent and is rate-limited (`authLimiter`).
+    // v1.9.11 — Offline-friendly cold start. Pilot farmers regularly open
+    // the app at a remote plot with no coverage; the previous v1.9.10
+    // behaviour ran an ACTIVE `/auth/refresh` probe here and any network
+    // error would bounce the user to /login even though their tokens were
+    // perfectly valid. The new two-phase flow:
+    //   Phase 1 (synchronous, offline-safe): if a cached user snapshot
+    //     exists AND the access token's JWT `exp` claim is still in the
+    //     future client-side, return `AuthAuthenticated` immediately so
+    //     the router goes straight to the dashboard.
+    //   Phase 2 (background, async): fire `authService.refresh()` AFTER
+    //     returning. 401/403 → flip to `AuthUnauthenticated` + wipe
+    //     storage; network/5xx → keep the current state (the next
+    //     authenticated request retries via the Dio interceptor).
+    // The strict active-probe path stays intact for the case where the
+    // snapshot is missing or the JWT has already expired client-side.
+    final snapshot = await storage.getUserSnapshot();
+    if (snapshot == null || jwtIsExpired(accessToken)) {
+      return _probeAndReturn(storage);
+    }
+
+    // Arm session services synchronously — the device may already be
+    // online and we want the inactivity timer running from the first frame.
+    _armSessionBackgroundServices();
+
+    // Schedule the background probe AFTER returning Authenticated so the
+    // router routes the user to the dashboard with zero waiting time.
+    // `Future.microtask` defers the call until the current async frame
+    // resolves, which is when `build()` returns and the notifier publishes
+    // the new state. `unawaited` is intentional — we want fire-and-forget.
+    unawaited(Future.microtask(() => _backgroundProbe(storage)));
+
+    return AuthAuthenticated(snapshot);
+  }
+
+  /// Legacy strict cold-start probe — the v1.9.10 behaviour. Used as the
+  /// fallback when there is no cached snapshot to trust or the access
+  /// token has already expired client-side. Behaviour:
+  ///  - success: persists rotated tokens, seeds Drift in background, arms
+  ///    session services, returns `AuthAuthenticated`.
+  ///  - 401/403: refresh token rejected — delete tokens, return
+  ///    `AuthUnauthenticated`.
+  ///  - other DioException (5xx / network / timeout): preserve tokens,
+  ///    return `AuthUnauthenticated` for this cold start; the next launch
+  ///    retries.
+  ///  - any other error (malformed envelope, etc.): fail closed.
+  Future<AuthState> _probeAndReturn(StorageService storage) async {
     try {
       final auth = await ref.read(authServiceProvider).refresh();
-      // Seed local DB with server data on cold start. Fire-and-forget so a
-      // network failure does not block the app from reaching the dashboard.
       _seedInBackground('initial seed');
-      // v1.9.8 — P1 fix. Arm the inactivity monitor on every authenticated
-      // cold-start so a user who never explicitly logs out still gets the
-      // 20 min ceiling on the very next session.
-      // v1.9.10 — extend with the connectivity bridge so offline mutations
-      // auto-sync on the next reconnect (see `_armSessionBackgroundServices`).
       _armSessionBackgroundServices();
       return AuthAuthenticated(auth.user);
     } on DioException catch (e) {
-      // 401/403 → refresh token rejected → unrecoverable. Any other status
-      // (5xx, network) → assume transient and treat as unauthenticated for
-      // this cold start; the user can retry. Either way: do not crash.
       final status = e.response?.statusCode;
       if (status == 401 || status == 403) {
-        await storage.deleteTokens();
+        await storage.deleteAll();
       }
       return const AuthUnauthenticated();
     } on StateError {
-      // refresh() guards on a missing token — should not happen here because
-      // we already null-checked above, but treat defensively.
       return const AuthUnauthenticated();
     } catch (_) {
-      // Malformed envelope, etc. Fail closed.
-      await storage.deleteTokens();
+      await storage.deleteAll();
       return const AuthUnauthenticated();
+    }
+  }
+
+  /// Phase 2 of the v1.9.11 cold-start. Runs AFTER [build] has already
+  /// returned `AuthAuthenticated` from the cached snapshot. Three outcomes:
+  ///   - success: silently rotate tokens; state stays authenticated. We
+  ///     also fire a background sync so the dashboard catches up with the
+  ///     server in the same session.
+  ///   - 401/403: refresh token rejected by the server — flip state to
+  ///     `AuthUnauthenticated`, wipe storage, stop session services.
+  ///   - other DioException (network/5xx/timeout): keep current state.
+  ///     The user is offline or the backend is having a moment; the next
+  ///     authenticated request will retry through the Dio interceptor.
+  ///
+  /// Errors that are NOT [DioException] / [StateError] are logged and
+  /// swallowed — a background probe must never crash the app.
+  Future<void> _backgroundProbe(StorageService storage) async {
+    try {
+      await ref.read(authServiceProvider).refresh();
+      _seedInBackground('background probe seed');
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 401 || status == 403) {
+        await storage.deleteAll();
+        state = const AsyncData(AuthUnauthenticated());
+        ref.read(inactivityMonitorProvider).stop();
+        ref.read(connectivitySyncBridgeProvider).stop();
+        return;
+      }
+      // Network / 5xx — keep the optimistic Authenticated state.
+      dev.log(
+        'AuthNotifier: background probe transient failure (keeping session): '
+        'status=$status err=${e.type}',
+        name: 'auth',
+      );
+    } on StateError {
+      // No refresh token in storage. `build()` already guarded against
+      // this, but treat defensively as a dead session.
+      await storage.deleteAll();
+      state = const AsyncData(AuthUnauthenticated());
+    } catch (e) {
+      dev.log(
+        'AuthNotifier: background probe unexpected error: $e',
+        name: 'auth',
+      );
     }
   }
 

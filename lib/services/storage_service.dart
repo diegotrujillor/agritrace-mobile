@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../models/user.dart';
 
 class StorageService {
   const StorageService(this._storage);
@@ -12,6 +16,13 @@ class StorageService {
   // (different user id than the cached one) and wipe the local Drift DB
   // before mounting the new session.
   static const _lastUserIdKey   = 'last_user_id';
+  // v1.9.11 — Offline-friendly cold start. Persists the most recently
+  // authenticated [User] alongside the tokens so [AuthNotifier.build] can
+  // hand the dashboard a populated user object on the first frame even
+  // when the device has no network (no `/auth/refresh` round trip).
+  // Encrypted at rest by `flutter_secure_storage` (Android EncryptedSharedPreferences,
+  // iOS/macOS Keychain).
+  static const _userSnapshotKey = 'user_snapshot';
 
   Future<void> saveTokens({
     required String accessToken,
@@ -46,7 +57,47 @@ class StorageService {
   Future<void> saveLastUserId(String userId) =>
       _storage.write(key: _lastUserIdKey, value: userId);
 
-  /// Clears every key owned by the app (tokens + `last_user_id`).
+  /// Persists a JSON-encoded snapshot of the authenticated [User].
+  ///
+  /// v1.9.11 — Offline-friendly cold start. `AuthNotifier.build` reads
+  /// this snapshot to materialize an `AuthAuthenticated` state without a
+  /// network round trip. Written on every successful login / register /
+  /// cold-start refresh so the snapshot stays in lock-step with the
+  /// tokens. Encrypted at rest by `flutter_secure_storage`.
+  Future<void> saveUserSnapshot(User user) =>
+      _storage.write(
+        key: _userSnapshotKey,
+        value: jsonEncode(user.toJson()),
+      );
+
+  /// Reads the persisted [User] snapshot, or `null` on a fresh install /
+  /// after a wipe / on a corrupted blob.
+  ///
+  /// v1.9.11 — Decoding failures (older schema, hand-edited keychain,
+  /// partially-written value) are swallowed so a bad snapshot can never
+  /// crash the cold-start path; the auth notifier simply falls back to
+  /// the strict active-refresh probe.
+  Future<User?> getUserSnapshot() async {
+    final raw = await _storage.read(key: _userSnapshotKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return User.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Removes the persisted snapshot.
+  ///
+  /// v1.9.11 — Called from [deleteAll] on logout. Exposed individually so
+  /// callers that need to invalidate the snapshot without touching the
+  /// tokens (none today) can do so without a race against the rest of the
+  /// keychain.
+  Future<void> deleteUserSnapshot() =>
+      _storage.delete(key: _userSnapshotKey);
+
+  /// Clears every key owned by the app (tokens + `last_user_id` +
+  /// `user_snapshot`).
   ///
   /// Used by [AuthService.logout] so a logged-out device retains no
   /// trace of which account most recently used it.
@@ -55,6 +106,7 @@ class StorageService {
       _storage.delete(key: _accessTokenKey),
       _storage.delete(key: _refreshTokenKey),
       _storage.delete(key: _lastUserIdKey),
+      _storage.delete(key: _userSnapshotKey),
     ]);
   }
 }
