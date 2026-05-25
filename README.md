@@ -2,9 +2,23 @@
 
 App móvil del MVP de **AgriTrace** — plataforma de trazabilidad agrícola para pequeños y medianos productores en Colombia.
 
+> Versión actual: **v1.9.4** (pubspec `1.9.4+8`, tag `v1.9.4`). Ver [`CHANGELOG.md`](CHANGELOG.md).
+
 > Estrategia MVP: **Farmer-First · Mobile-Only · Offline-First**. El agricultor registra actividades sin conexión durante 14+ días. Marketplace con compradores internacionales es later release.
 >
 > **Validación comercial MVP**: Valle del Cauca, modelo híbrido Mes 1 gratis + $29.990 COP/mes Mes 2. Demo navegable: [`agritrace-demo`](https://github.com/diegotrujillor/agritrace-demo). Estrategia: [`agritrace-docs/01-preparacion-mvp/10-comercial-gtm/`](https://github.com/diegotrujillor/agritrace-docs/tree/main/01-preparacion-mvp/10-comercial-gtm).
+
+## Highlights v1.9.0 → v1.9.4
+
+| Versión | Qué entrega |
+|---------|-------------|
+| v1.9.0 | Captura de foto (`image_picker`) + GPS (`geolocator`) en Actividad; multipart `POST /v1/uploads/photos`; reglas `crop_type` por lote. |
+| v1.9.1 | Back arrows + autofill trim + orden de perfil + hint color (QA manual). |
+| v1.9.2 | Display de `crop_type` (lote) en label humano, capitalización de `crop_type` (finca), `AppLogoMark` reutilizable en 7 pantallas. |
+| v1.9.3 | **P0 seguridad**: `AppDatabase.wipeAllUserData()` en logout + cross-account login (cierra fuga de fincas/PII/GPS entre cuentas en el mismo device). Refresh de detalle de finca tras editar `cropType`. Bump de logos por pantalla. |
+| v1.9.4 | Hotfix de alineación de logos (Dashboard 64 px bottom-aligned al FAB; Finca detail 80 px center-aligned al extended FAB; forms 80 px centered top) + `clearError()` en mount de Login y Register para no filtrar el banner 401 entre pantallas. |
+
+> Patrón confirmado en v1.9.4 — Activity card: **tap = no-op** (las actividades son eventos inmutables a nivel de lista); **long-press → bottom sheet con Editar / Eliminar**. Documentado en [`CLAUDE.md`](CLAUDE.md).
 
 ## Stack Técnico
 
@@ -83,22 +97,25 @@ flowchart TB
 
 > Foto-instantánea: los tokens nunca dejan `flutter_secure_storage`. Si la APK es decompilada, el atacante NO obtiene credenciales de GitHub ni del backend. El backend valida cada request con JWT firmado HS256.
 
-## Pantallas MVP (10 pantallas — Flujo Productor)
+## Pantallas MVP (Flujo Productor)
 
-| # | Pantalla | Sprint |
-|---|----------|--------|
-| 1 | Bienvenida | 1 |
-| 2 | Registro | 1 |
-| 3 | Login | 1 |
-| 4 | Dashboard vacío | 1 |
-| 5 | Dashboard con fincas | 2 |
-| 6 | Registrar finca | 2 |
-| 7 | Vista finca | 2 |
-| 8 | Registrar lote | 2 |
-| 9 | **Vista lote + timeline actividades** ⭐ | 3 |
-| 10 | **Registrar actividad** ⭐ | 3 |
+| # | Pantalla | Sprint / versión | Notas v1.9.4 |
+|---|----------|------------------|--------------|
+| 1 | Bienvenida | 1 | — |
+| 2 | Registro | 1 | `clearError()` en `initState` (v1.9.4) |
+| 3 | Login | 1 | `clearError()` en `initState` (v1.9.4) |
+| 4 | Dashboard vacío | 1 | — |
+| 5 | Dashboard "Mis fincas" | 2 | Brand mark 64 px bottom-left alineado al FAB (v1.9.4) |
+| 6 | Registrar / Editar finca | 2 | Brand mark 80 px centered top (v1.9.3) |
+| 7 | Vista finca + listado de lotes | 2 | Brand mark 80 px center-aligned al extended FAB "Agregar lote" (v1.9.4) |
+| 8 | Registrar / Editar lote | 2 | Brand mark 80 px centered top (v1.9.3/4) |
+| 9 | Vista lote + timeline de actividades | 3 | Tap = no-op, long-press → bottom sheet Editar/Eliminar |
+| 10 | Registrar / Editar actividad | 3 | + Captura de foto (`image_picker`) + GPS (`geolocator`) (v1.9.0) |
+| 11 | Alertas (clima + recordatorios) | 4 | Consume `/v1/alerts` + `/v1/alerts/weather/check` |
+| 12 | Mi perfil (ARCO) | 5 (v1.7.0) | Exportar datos · Eliminar cuenta · Reportar problema · Logout |
+| 13 | Reportar problema | 5 (v1.8.0) | `POST /v1/feedback` → GitHub Issues (CU-28) |
 
-> Pantallas later release (Generar QR, Trazabilidad pública) diferidas hasta validar demanda con compradores.
+> Pantallas later release (Generar QR, Trazabilidad pública navegable) diferidas hasta validar demanda con compradores. La trazabilidad **sí** se entrega en MVP vía PDF firmado generado on-device (`pdf` + `printing`) compartido con `share_plus` (CU-25).
 
 ## Flujo de Navegación
 
@@ -135,31 +152,43 @@ agritrace-mobile/
 │   ├── screens/
 │   │   ├── auth/          # welcome, login, register
 │   │   ├── farms/         # dashboard, farm_form, farm_detail
-│   │   ├── plots/         # plot_form, plot_detail
-│   │   └── activities/    # activity_form, activity_timeline
+│   │   ├── plots/         # plot_form, plot_detail, plot_edit
+│   │   ├── activities/    # activity_form, activity_edit, activity_timeline
+│   │   ├── alerts/        # alerts_screen (clima + recordatorios)
+│   │   └── profile/       # profile, report_issue
 │   ├── widgets/
-│   │   ├── common/        # AppButton, AppInput, AppCard, OfflineIndicator
-│   │   └── domain/        # FarmCard, ActivityListItem
+│   │   ├── common/        # AppButton, AppInput, AppCard, OfflineIndicator,
+│   │   │                  # AppLogoMark (brand mark SVG, variants mark|white),
+│   │   │                  # AppErrorBanner, SyncStatusBadge
+│   │   └── domain/        # FarmCard, ActivityListItem, AlertListItem
 │   ├── navigation/        # GoRouter setup, route names
 │   ├── services/
-│   │   ├── api_service.dart
-│   │   ├── auth_service.dart
-│   │   ├── sync_service.dart   # Sync Drift ↔ backend
-│   │   └── storage_service.dart
+│   │   ├── api_service.dart        # Dio + _AuthInterceptor (single-flight refresh)
+│   │   ├── auth_service.dart       # logout/login wired to DataWiper
+│   │   ├── storage_service.dart    # FlutterSecureStorage + last_user_id
+│   │   ├── farm_service.dart, plot_service.dart, activity_service.dart,
+│   │   ├── alert_service.dart, uploads_service.dart, feedback_service.dart,
+│   │   ├── sync_orchestrator.dart  # push → mark synced → pull
+│   │   └── pdf_traceability_service.dart  # PDF on-device (pdf + printing)
 │   ├── database/
-│   │   ├── database.dart       # Drift DB init
-│   │   ├── models/             # Farm, Plot, Activity (modelos locales)
-│   │   └── migrations/
-│   ├── providers/              # Riverpod providers por dominio
-│   │   ├── auth_provider.dart
-│   │   ├── farms_provider.dart
-│   │   └── sync_provider.dart
-│   ├── utils/                  # validators, formatters, constants
+│   │   ├── tables.dart             # Drift table defs (Farms, Plots, Activities, Alerts)
+│   │   ├── app_database.dart       # Drift DB + wipeAllUserData() (P0 v1.9.3)
+│   │   └── app_database.g.dart     # codegen
+│   ├── repositories/               # Drift-backed repos (Farm/Plot/Activity/Alert)
+│   ├── providers/                  # Riverpod AsyncNotifier por dominio
+│   │   ├── auth_provider.dart, farms_provider.dart, plots_provider.dart,
+│   │   ├── activities_provider.dart, alerts_provider.dart,
+│   │   ├── sync_provider.dart, uploads_provider.dart, feedback_provider.dart
+│   ├── models/                     # User, Farm, Plot, Activity, Alert, Upload, Feedback
+│   ├── utils/                      # validators, text_format, error_parser, constants
 │   └── main.dart
 ├── test/
-│   ├── unit/
-│   └── widget/
-├── pubspec.yaml
+│   ├── unit/                       # 41 archivos — providers, services, models
+│   └── widget/                     # auth, forms, timelines, edit screens
+├── assets/brand/                   # agritrace-logo-mark.svg, agritrace-logo-white.svg,
+│                                   # icon-1024.png, play/{icon-512.png, feature-graphic.*}
+├── docs/                           # COVERAGE.md, PLAY_CONSOLE_SETUP.md
+├── pubspec.yaml                    # version: 1.9.4+8
 └── README.md
 ```
 
@@ -478,9 +507,31 @@ sequenceDiagram
 
 El app usa **Drift** como base de datos local (SQLite):
 - Todos los datos se guardan localmente primero
-- `sync_service` sincroniza con el backend al recuperar conexión (`POST /v1/sync`)
-- `OfflineIndicator` muestra estado de conexión en tiempo real
+- `sync_orchestrator` sincroniza con el backend al recuperar conexión (`POST /v1/sync` push, `GET /v1/sync/changes` pull, conflict resolution LWW por `updatedAt`)
+- `OfflineIndicator` muestra estado de conexión en tiempo real; `SyncStatusBadge` muestra el contador de cambios pendientes
 - Garantía: **14+ días sin conexión** sin pérdida de datos
+- **Seguridad multi-cuenta (v1.9.3)**: `AppDatabase.wipeAllUserData()` corre en logout y en login cross-account (cuando el `user.id` no coincide con `last_user_id`). Cierra la fuga de PII/GPS entre cuentas que comparten el mismo device. SQLCipher per-user queda en backlog Sprint 6+.
+
+## Captura de evidencia (v1.9.0+)
+
+| Capacidad | Paquete | Cómo entra al backend |
+|-----------|---------|------------------------|
+| Foto de actividad | `image_picker` | multipart `POST /v1/uploads/photos` → URL persistida en `activities.photoUrl` |
+| GPS de actividad | `geolocator` | lat/lon embebidos en el `POST /v1/activities` |
+| PDF de trazabilidad (CU-25) | `pdf` + `printing` | render on-device, share con `share_plus` (NO usa `pandoc`; render HTML/Canvas vía Flutter) |
+| Reportar problema (CU-13/CU-28) | `dio` | `POST /v1/feedback` → GitHub Issues |
+
+## Brand mark — `AppLogoMark` widget
+
+Reusable en todas las pantallas (`lib/widgets/common/app_logo_mark.dart`).
+Variants:
+
+| Variant | Asset | Uso |
+|---------|-------|-----|
+| `mark` (default) | `assets/brand/agritrace-logo-mark.svg` | Default sobre fondo claro |
+| `white` | `assets/brand/agritrace-logo-white.svg` | Sobre fondo oscuro/imagen |
+
+Política de tamaños vigente (post v1.9.3/v1.9.4): formularios `80 px centered top`, Dashboard `64 px bottom-left` (alineado al FAB de 56 px), Vista finca `80 px bottom-left` (center-aligned al extended FAB de 48 px). Login `96 px`, Register `80 px`. Ver detalle en [`CHANGELOG.md`](CHANGELOG.md) (`[1.9.3]` y `[1.9.4]`).
 
 ## Testing
 
