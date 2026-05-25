@@ -27,7 +27,7 @@ dart fix --apply                     # auto-fix lint issues
 
 ## Architecture
 
-### Layer structure
+### Layer structure (current as of v1.9.4)
 
 ```
 lib/
@@ -35,12 +35,26 @@ lib/
   navigation/
     app_router.dart          # GoRouter with auth redirect logic
     route_names.dart         # Route constants (Routes.welcome, .login, etc.)
-  models/                    # Pure data classes (User, AuthResponse)
-  providers/                 # Riverpod providers + state notifiers
-  services/                  # Network and storage (no Flutter deps)
+  models/                    # Pure data classes (User, AuthResponse, Farm, Plot,
+                             #   Activity, Alert, Upload, Feedback)
+  providers/                 # Riverpod AsyncNotifier per domain
+                             # (auth, farms, plots, activities, alerts, sync,
+                             #  uploads, feedback)
+  services/                  # Network + storage + sync (no Flutter widget deps).
+                             # api_service · auth_service · storage_service ·
+                             # farm/plot/activity/alert/uploads/feedback_service ·
+                             # sync_orchestrator · pdf_traceability_service
+  database/                  # Drift SQLite — tables.dart · app_database.dart
+                             # (includes wipeAllUserData) · app_database.g.dart
+  repositories/              # Drift-backed repos (Farm/Plot/Activity/Alert)
   screens/<domain>/          # One subfolder per feature domain
-  widgets/common/            # Reusable UI components (AppButton, AppCard, AppInput)
-  utils/                     # constants.dart, theme.dart, validators.dart
+                             # (auth, farms, plots, activities, alerts, profile)
+  widgets/
+    common/                  # AppButton, AppCard, AppInput, AppLogoMark,
+                             # OfflineIndicator, AppErrorBanner, SyncStatusBadge
+    domain/                  # FarmCard, ActivityListItem, AlertListItem
+  utils/                     # constants.dart, theme.dart, validators.dart,
+                             # text_format.dart, error_parser.dart
 ```
 
 ### State management
@@ -61,11 +75,15 @@ GoRouter (`routerProvider` in `app_router.dart`). Auth redirect runs on every na
 
 ### Service layer
 
-- **`ApiService`** — Dio client, base URL via `--dart-define=API_BASE_URL` (default: `http://10.0.2.2:3000/v1`). `_AuthInterceptor` attaches Bearer token on every request and auto-refreshes on 401.
-- **`StorageService`** — `FlutterSecureStorage` wrapper for `access_token` / `refresh_token` keys only.
-- **`AuthService`** — thin wrapper over `ApiService` calls for `/auth/*` endpoints; always saves tokens via `StorageService`.
+- **`ApiService`** — Dio client, base URL via `--dart-define=API_BASE_URL` (default: `http://10.0.2.2:3000/v1`). `_AuthInterceptor` attaches Bearer token on every request, auto-refreshes on 401, and uses a single-flight lock to avoid refresh-storms when multiple requests fail concurrently.
+- **`StorageService`** — `FlutterSecureStorage` wrapper for `access_token`, `refresh_token`, and `last_user_id` keys. Exposes `deleteAll()` for full logout teardown.
+- **`AuthService`** — wrapper over `ApiService` calls for `/auth/*` endpoints; always saves tokens via `StorageService`. Accepts a `DataWiper` callback in its constructor (wired in `authServiceProvider` to `AppDatabase.wipeAllUserData`). **Security invariant (v1.9.3 P0)**: `logout()` always wipes local Drift in `try/finally` even if the server round-trip fails; `login()` / `register()` wipe iff `user.id != last_user_id`. Closes cross-account PII/GPS leak on shared devices.
+- **`SyncOrchestrator`** — push (`POST /v1/sync`) → mark synced → pull (`GET /v1/sync/changes`) with LWW conflict resolution on `updatedAt`.
+- **`UploadsService`** — multipart `POST /v1/uploads/photos` for activity photos captured via `image_picker`.
+- **`FeedbackService`** — `POST /v1/feedback` (→ GitHub Issues) for in-app problem reporting (CU-28).
+- **`PdfTraceabilityService`** — on-device PDF generation (`pdf` + `printing`); shared via `share_plus`. **No `pandoc`**, no native renderer dependency.
 
-Services receive dependencies via constructor — no global singletons. Providers wire them at `lib/providers/auth_provider.dart`.
+Services receive dependencies via constructor — no global singletons. Providers wire them in `lib/providers/<domain>_provider.dart`.
 
 ### API response envelope
 
@@ -124,14 +142,21 @@ Drift sync fields on every model: `syncStatus TEXT` (`'synced'`|`'pendingCreate'
 
 ## Sprint context
 
-- **Sprint 1 (done):** Auth screens (welcome, login, register), GoRouter, Riverpod auth state, ApiService + token interceptor, StorageService, OfflineIndicator widget, design tokens
-- **Sprint 2 (done):** Farm + plot screens (`/farms/new`, `/plots`)
-- **Sprint 3 (done):** Activity timeline screen, sync service, PDF traceability
-- **Sprint 4 (done):** Alerts (`/alerts`, weather + reminders), sync status
-  badge, alerts entry on dashboard; consumes `/v1/alerts` +
-  `/v1/alerts/weather/check`
+- **Sprint 1 (done):** Auth screens (welcome, login, register), GoRouter, Riverpod auth state, ApiService + token interceptor, StorageService, OfflineIndicator widget, design tokens.
+- **Sprint 2 (done):** Farm + plot screens (`/farms/new`, `/plots`).
+- **Sprint 3 (done):** Activity timeline screen, Drift SQLite offline-first persistence (Sprint 3 pivot — Drift chosen over WatermelonDB), `SyncOrchestrator`, PDF traceability on-device (`pdf` + `printing`).
+- **Sprint 4 (done):** Alerts (`/alerts`, weather + reminders), `SyncStatusBadge`, alerts entry on dashboard; consumes `/v1/alerts` + `/v1/alerts/weather/check`.
+- **Sprint 5 (done — v1.6.0 → v1.8.0):** Profile screen (ARCO compliance — Ley 1581), export data, delete account, in-app issue reporting (CU-28) via `POST /v1/feedback` → GitHub Issues; PDF traceability now includes phone, email, GPS, photos (CU-25).
+- **Sprint 6 (done — v1.9.0 → v1.9.4):** Photo capture (`image_picker`) + GPS (`geolocator`) on activities + multipart `POST /v1/uploads/photos`. `AppLogoMark` reusable widget across 13 screens with per-screen size policy. P0 security fix: `AppDatabase.wipeAllUserData()` on logout + cross-account login. UX hotfixes (logo alignment, auth banner leak across screens, back arrows, autofill trim).
 
-New feature screens go in `lib/screens/<domain>/`, providers in `lib/providers/<domain>_provider.dart`, services in `lib/services/<domain>_service.dart`.
+New feature screens go in `lib/screens/<domain>/`, providers in `lib/providers/<domain>_provider.dart`, services in `lib/services/<domain>_service.dart`, Drift repos in `lib/repositories/<domain>_repository.dart`.
+
+## UX conventions (locked in v1.9.4)
+
+- **Activity card on plot detail / timeline:** **tap = no-op** (activities are immutable trace events at the list level). **Long-press → bottom sheet** with `Editar / Eliminar` actions. There is no dedicated `activity_detail_screen.dart`; edit reaches `ActivityEditScreen` via `Routes.activityEdit('/activities/:id/edit')`. Do not add a single-tap navigation without explicit product decision.
+- **`AppLogoMark` placement:** form screens use 80 px centered top under the AppBar; Dashboard uses 64 px bottom-left aligned to the 56 px FAB; Vista finca uses 80 px bottom-left center-aligned to the 48 px extended FAB; Login uses 96 px; Register 80 px. Always reuse `lib/widgets/common/app_logo_mark.dart` — never inline the SVG.
+- **Auth banner hygiene:** every auth-touching screen must call `ref.read(authProvider.notifier).clearError()` in `initState` via a post-frame callback to avoid leaking a 401 banner across GoRouter transitions (v1.9.4 fix). Already wired in `login_screen.dart` and `register_screen.dart`.
+- **Logout / cross-account login:** never call `_storage.deleteAll()` without also invoking the Drift wiper. The `AuthService` constructor takes a `DataWiper` for this — keep that contract intact.
 
 ## Business context
 
@@ -176,7 +201,8 @@ Business logic inside widgets, untyped (`dynamic`) props, God widgets, magic num
 
 ### Testing
 
-- `flutter test`, coverage target ≥ 70% (project rule: aim 80%+).
+- `flutter test`, coverage target **≥ 80%** on hand-written code (see [`docs/COVERAGE.md`](docs/COVERAGE.md)). Current as of v1.9.4: **83.6 %** (1732 / 2072 lines, 300 tests passing), excluding Drift codegen (`*.g.dart`), `repositories/`, `database/app_database.dart`, `database/tables.dart` and `sync_orchestrator.dart` — pending coverage tracked in `COVERAGE.md`.
+- Always run `flutter test` with `--dart-define=API_BASE_URL=http://localhost:3000/v1` so `ApiService` does not throw `StateError` from `String.fromEnvironment`.
 - AAA structure, descriptive test names per behavior. Unit + widget tests.
 
 ### Pre-commit checklist
