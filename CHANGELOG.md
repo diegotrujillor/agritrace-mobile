@@ -6,6 +6,68 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 
 ## [Unreleased]
 
+## [1.9.4] - 2026-05-24 — fix(ui+auth): logo alignment hotfixes + clear leaked auth error across screens
+
+### Fixed
+- **Dashboard:** bottom-left brand mark size bumped 56 → 64 px so it stops
+  reading as visually smaller than the 56 px FAB on the right. Both rows
+  still share `bottom: AppSpacing.md (16)`. Pantalla 15 in the v1.9.3
+  user-feedback captures.
+- **Farm detail (Lote list):** vertically center-align the 80 px brand mark
+  with the "Agregar lote" extended FAB. The extended FAB is 48 px tall at
+  `bottom: 16`, so the logo's `bottom` was changed from 16 → 0 to satisfy
+  `logoBottom = fabBottom + (fabHeight - logoHeight) / 2 = 0`. The logo
+  size itself is unchanged. Pantalla 16.
+- **Form screens — centered brand mark header:** plot edit, plot create,
+  finca create + edit, activity create + edit all gained a centered
+  80 px `AppLogoMark` directly under the AppBar so the producer never
+  loses the identity strip while filling a form. `plot_edit_screen.dart`
+  had no logo at all; the rest gain the header in addition to the existing
+  bottom-left mark. Pantalla 18 (Editar lote had no logo) covers the
+  hard miss; the rest is consistency follow-through per the spec
+  "rest of screens: do the same with the logo size, the alignment and
+  the position".
+- **Auth — error state no longer leaks across screens:**
+  `_LoginScreenState.initState` and `_RegisterScreenState.initState` now
+  schedule `ref.read(authProvider.notifier).clearError()` via a
+  post-frame callback. Previously, a failed login (HTTP 401 ⇒
+  "Credenciales incorrectas") parked the AsyncNotifier in `AsyncError`
+  and the banner survived the GoRouter navigation to the register screen,
+  surfacing the misleading text on a page that had nothing to do with the
+  failure. The notifier's `clearError()` is idempotent on `AsyncData`, so
+  the same-user re-mount path is a no-op. Pantalla 19.
+
+  Dónde:
+  `lib/screens/auth/login_screen.dart`,
+  `lib/screens/auth/register_screen.dart`,
+  `lib/screens/farms/dashboard_screen.dart`,
+  `lib/screens/farms/farm_detail_screen.dart`,
+  `lib/screens/farms/farm_form_screen.dart`,
+  `lib/screens/plots/plot_edit_screen.dart`,
+  `lib/screens/plots/plot_form_screen.dart`,
+  `lib/screens/activities/activity_edit_screen.dart`,
+  `lib/screens/activities/activity_form_screen.dart`.
+
+### Investigated (no change)
+- **Activity tap on plot detail (Pantalla 17):** the user asked whether
+  the lack of view/edit/delete on a single-tap of a recent activity is
+  intentional. Confirmed intentional for the MVP — activities are
+  immutable trace events at the list level; edit/delete is reachable via
+  **long-press → contextual bottom sheet** ("Editar / Eliminar"), the same
+  pattern surfaced by the dedicated `ActivityTimelineScreen`. No dedicated
+  `activity_detail_screen.dart` exists; the GoRouter route for
+  `Routes.activityEdit('/activities/:id/edit')` is the only edit entry
+  point. Discoverability is a known follow-up — improving the single-tap
+  affordance (small chevron, toast hint, or promoting the long-press to
+  an explicit overflow menu) is deferred to post-Día 0.
+
+### Tests
+- New: `test/widget/auth_error_clear_on_mount_test.dart` — pre-seeds an
+  `AsyncError` on `authProvider` via `AuthNotifier.login()` with a stubbed
+  401, then asserts both `RegisterScreen` and `LoginScreen` render no
+  `AppErrorBanner` after `pumpAndSettle`. Locks in the cross-screen
+  leak fix.
+
 ## [1.9.3] - 2026-05-24 — fix(security): clear Drift on logout (P0 data leak) + farm detail refresh + activity edit/delete + logo sizes
 
 ### Security
