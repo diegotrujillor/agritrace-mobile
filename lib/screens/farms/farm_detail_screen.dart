@@ -102,15 +102,17 @@ class FarmDetailScreen extends ConsumerWidget {
               ],
             ),
           ),
-          // v1.9.3 — QA cycle-03: bump brand mark (56 → 80 px). 112 px
-          // (true 2×) would overflow on small phones and overlap the
-          // floating "Agregar lote" FAB on the opposite corner, so 80
-          // is the sweet spot the spec explicitly authorized as fallback
-          // ("80-90px" if 112 breaks layout). Alignment + position
-          // unchanged (bottom-left, AppSpacing.md margins).
+          // v1.9.4 — QA hotfix: vertically center-align the 80 px brand
+          // mark with the "Agregar lote" extended FAB on the right. The
+          // extended FAB is 48 px tall and sits at `bottom: 16` (Scaffold
+          // default), so its center is at `16 + 24 = 40`. To put the
+          // 80 px logo's center at the same height we need
+          // `logoBottom = fabBottom + (fabHeight - logoHeight) / 2 =
+          // 16 + (48 - 80) / 2 = 0`. Size unchanged from v1.9.3
+          // (80 px keeps clearance from the extended FAB label).
           const Positioned(
             left: AppSpacing.md,
-            bottom: AppSpacing.md,
+            bottom: 0,
             child: AppLogoMark(size: 80),
           ),
         ],
