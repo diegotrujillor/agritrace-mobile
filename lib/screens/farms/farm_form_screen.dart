@@ -236,6 +236,16 @@ class _FarmFormScreenState extends ConsumerState<FarmFormScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                // v1.9.4 — QA hotfix: centered brand mark below the AppBar.
+                // Mirrors the same "header logo" pattern added to
+                // `plot_edit_screen.dart` so create + edit finca screens
+                // surface the same identity strip the producer expects.
+                const Padding(
+                  padding: EdgeInsets.only(bottom: AppSpacing.md),
+                  child: Center(
+                    child: AppLogoMark(size: 80),
+                  ),
+                ),
                 AppInput(
                   label: 'Nombre de la finca',
                   hint: 'Finca El Roble',

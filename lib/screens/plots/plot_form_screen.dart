@@ -99,13 +99,29 @@ class _PlotFormScreenState extends ConsumerState<PlotFormScreen> {
                 // brand mark).
                 AppSpacing.xl + 80,
               ),
-              child: PlotForm(
-                submitLabel: 'Agregar lote',
-                onSubmit: _submit,
-                submitting: _submitting,
-                errorMessage: _errorMessage,
-                initialCropType:
-                    matchPlotCropType(widget.initialCropTypeSuggestion),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // v1.9.4 — QA hotfix: add a centered brand mark below
+                  // the AppBar so this form matches the same "header logo"
+                  // pattern introduced on `plot_edit_screen.dart` and the
+                  // existing register/login screens.
+                  const Padding(
+                    padding:
+                        EdgeInsets.symmetric(vertical: AppSpacing.md),
+                    child: Center(
+                      child: AppLogoMark(size: 80),
+                    ),
+                  ),
+                  PlotForm(
+                    submitLabel: 'Agregar lote',
+                    onSubmit: _submit,
+                    submitting: _submitting,
+                    errorMessage: _errorMessage,
+                    initialCropType:
+                        matchPlotCropType(widget.initialCropTypeSuggestion),
+                  ),
+                ],
               ),
             ),
             // v1.9.3 — QA cycle-03: bump brand mark 2× (40 → 80 px).

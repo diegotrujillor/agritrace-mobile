@@ -5,6 +5,7 @@ import '../../models/plot.dart';
 import '../../providers/plots_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/error_parser.dart';
+import '../../widgets/common/app_logo_mark.dart';
 import 'widgets/plot_form.dart';
 
 /// Edit an existing plot identified by [plotId].
@@ -106,12 +107,29 @@ class _EditBodyState extends ConsumerState<_EditBody> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.xl),
-      child: PlotForm(
-        submitLabel: 'Guardar cambios',
-        onSubmit: _submit,
-        initial: widget.plot,
-        submitting: _submitting,
-        errorMessage: _errorMessage,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // v1.9.4 — QA hotfix: brand mark was missing from this screen
+          // entirely (Pantalla 18 in the v1.9.3 user-feedback captures).
+          // Place a centered 80 px mark directly under the AppBar, before
+          // the first form field, mirroring the size used on the other
+          // form screens. `vertical: 16` keeps it from crashing into the
+          // field row that follows.
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: Center(
+              child: AppLogoMark(size: 80),
+            ),
+          ),
+          PlotForm(
+            submitLabel: 'Guardar cambios',
+            onSubmit: _submit,
+            initial: widget.plot,
+            submitting: _submitting,
+            errorMessage: _errorMessage,
+          ),
+        ],
       ),
     );
   }

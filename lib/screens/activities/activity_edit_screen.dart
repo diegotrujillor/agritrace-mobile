@@ -5,6 +5,7 @@ import '../../models/activity.dart';
 import '../../providers/activities_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/error_parser.dart';
+import '../../widgets/common/app_logo_mark.dart';
 import 'widgets/activity_form.dart';
 
 /// Edit an existing activity identified by [activityId].
@@ -60,39 +61,54 @@ class _EditBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.xl),
-      child: ActivityForm(
-        submitLabel: 'Guardar cambios',
-        initialType: activity.type,
-        initialOccurredAt: activity.occurredAt,
-        initialDescription: activity.description,
-        initialPhotoUrl: activity.photoUrl,
-        onSubmit: ({
-          required ActivityType type,
-          required DateTime occurredAt,
-          String? description,
-          String? photoUrl,
-        }) async {
-          // Capture before await to avoid use_build_context_synchronously.
-          final messenger = ScaffoldMessenger.of(context);
-          final router = GoRouter.of(context);
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // v1.9.4 — QA hotfix: centered brand mark below the AppBar to
+          // match the new "header logo" pattern shipped across every form
+          // screen in this release (plot edit/create, finca edit/create,
+          // activity create).
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: Center(
+              child: AppLogoMark(size: 80),
+            ),
+          ),
+          ActivityForm(
+            submitLabel: 'Guardar cambios',
+            initialType: activity.type,
+            initialOccurredAt: activity.occurredAt,
+            initialDescription: activity.description,
+            initialPhotoUrl: activity.photoUrl,
+            onSubmit: ({
+              required ActivityType type,
+              required DateTime occurredAt,
+              String? description,
+              String? photoUrl,
+            }) async {
+              // Capture before await to avoid use_build_context_synchronously.
+              final messenger = ScaffoldMessenger.of(context);
+              final router = GoRouter.of(context);
 
-          await ref
-              .read(activitiesProvider(activity.plotId).notifier)
-              .updateActivity(
-                id: activity.id,
-                type: type,
-                occurredAt: occurredAt,
-                description: description,
-                photoUrl: photoUrl,
+              await ref
+                  .read(activitiesProvider(activity.plotId).notifier)
+                  .updateActivity(
+                    id: activity.id,
+                    type: type,
+                    occurredAt: occurredAt,
+                    description: description,
+                    photoUrl: photoUrl,
+                  );
+              // Invalidate the single-activity lookup so a future open of the
+              // edit screen reflects the freshly persisted values.
+              ref.invalidate(activityProvider(activity.id));
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Actividad actualizada')),
               );
-          // Invalidate the single-activity lookup so a future open of the
-          // edit screen reflects the freshly persisted values.
-          ref.invalidate(activityProvider(activity.id));
-          messenger.showSnackBar(
-            const SnackBar(content: Text('Actividad actualizada')),
-          );
-          router.pop();
-        },
+              router.pop();
+            },
+          ),
+        ],
       ),
     );
   }

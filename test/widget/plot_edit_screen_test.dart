@@ -123,7 +123,14 @@ void main() {
       find.byType(TextFormField).first,
       'Lote Sur',
     );
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Guardar cambios'));
+    // v1.9.4 — the centered brand mark added below the AppBar pushed the
+    // "Guardar cambios" CTA below the 800×600 test surface, so `tap`
+    // would warn-and-miss. Scroll the button into view first (mirrors
+    // the `cu_01_register_test.dart` pattern).
+    final submit = find.widgetWithText(ElevatedButton, 'Guardar cambios');
+    await tester.ensureVisible(submit);
+    await tester.pump();
+    await tester.tap(submit);
     await tester.pumpAndSettle();
 
     // Assert — repo update called with edited name; snackbar shown.
