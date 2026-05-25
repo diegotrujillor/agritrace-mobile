@@ -62,15 +62,19 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ],
           ),
-          // v1.9.4 — QA hotfix: bump brand mark 56 → 64 px so it stops
-          // reading as visually smaller than the 56 px FAB on the right.
-          // Both share the same `bottom: AppSpacing.md (16)` so the rows
-          // line up against the screen bottom; the 8 px center offset
-          // between a 64-tall logo and a 56-tall FAB is below the
-          // perceptual threshold per the v1.9.3 user-feedback captures.
+          // v1.9.8 — P3 fix. Center-align the 64 px logo with the 56 px
+          // FAB on the right. The FAB sits at `bottom: 16` (Scaffold
+          // default for `endFloat`), so its vertical center is at
+          // `16 + 56/2 = 44 px` from the screen bottom. To put the logo's
+          // 64 px-tall center at the same height we need
+          // `logoBottom = fabCenter - logoHeight/2 = 44 − 32 = 12`. The
+          // previous v1.9.4 value of `AppSpacing.md` (16) left a visible
+          // 4 px offset on real devices — the pilot captures (#26, #27)
+          // showed the logo reading "above" the FAB. 2 px tolerance is
+          // enforced in `test/widget/logo_fab_alignment_test.dart`.
           const Positioned(
             left: AppSpacing.md,
-            bottom: AppSpacing.md,
+            bottom: 12,
             child: AppLogoMark(size: 64),
           ),
         ],

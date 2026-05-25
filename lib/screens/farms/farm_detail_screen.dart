@@ -102,17 +102,21 @@ class FarmDetailScreen extends ConsumerWidget {
               ],
             ),
           ),
-          // v1.9.4 — QA hotfix: vertically center-align the 80 px brand
-          // mark with the "Agregar lote" extended FAB on the right. The
-          // extended FAB is 48 px tall and sits at `bottom: 16` (Scaffold
-          // default), so its center is at `16 + 24 = 40`. To put the
-          // 80 px logo's center at the same height we need
-          // `logoBottom = fabBottom + (fabHeight - logoHeight) / 2 =
-          // 16 + (48 - 80) / 2 = 0`. Size unchanged from v1.9.3
-          // (80 px keeps clearance from the extended FAB label).
+          // v1.9.8 — P3 fix. Center-align the 80 px brand mark with the
+          // "Agregar lote" extended FAB on the right. The v1.9.4 comment
+          // assumed the extended FAB was 48 px tall, but the rendered
+          // height under Material 3 is 56 px (same as the standard FAB).
+          // With the FAB at `bottom: 16`, its center is at
+          // `16 + 56/2 = 44`. To put the 80 px logo's center at the same
+          // height we need
+          // `logoBottom = fabCenter - logoHeight/2 = 44 - 40 = 4`. The
+          // previous value of 0 left the logo 4 px below the FAB, which
+          // the pilot QA capture (#25) flagged as visibly misaligned.
+          // Empirically verified against the widget test in
+          // `test/widget/logo_fab_alignment_test.dart` (2 px tolerance).
           const Positioned(
             left: AppSpacing.md,
-            bottom: 0,
+            bottom: 4,
             child: AppLogoMark(size: 80),
           ),
         ],
