@@ -39,6 +39,79 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
   (sin él, `ApiService` lanza `StateError` y la suite no compila bajo
   `flutter test`).
 
+## [1.9.11] - 2026-05-25
+
+### Changed
+- **Offline-friendly cold-start** (pilot-critical). `AuthNotifier.build()`
+  (`lib/providers/auth_provider.dart`) no longer blocks the cold-start on
+  an active `/auth/refresh` round trip. The two-phase flow:
+  1. Phase 1 (synchronous, offline-safe): if a cached user snapshot is
+     present AND the access token's JWT `exp` is still in the future
+     client-side, the notifier returns `AuthAuthenticated` immediately
+     and the router goes straight to the dashboard. Session services
+     (inactivity monitor + `ConnectivitySyncBridge`) are armed on the
+     first frame.
+  2. Phase 2 (background, via `Future.microtask`): the same
+     `authService.refresh()` probe still runs, AFTER the dashboard has
+     rendered. On 401/403 the state flips to `AuthUnauthenticated` and
+     storage is wiped; on network/5xx/timeout the current `Authenticated`
+     state is preserved (the next authenticated request retries via the
+     Dio interceptor).
+  Pilot farmers re-opening the app at a remote plot without coverage no
+  longer get bounced to the login screen — they keep working offline as
+  long as their access token has not expired client-side. Previous
+  v1.9.10 behaviour locked them out after the OS killed the app under
+  memory pressure.
+- **Strict probe fallback preserved.** When no snapshot is cached or the
+  JWT has already expired, `AuthNotifier.build()` falls back to the
+  legacy v1.9.10 active-probe path (`_probeAndReturn`). On 401/403 the
+  fallback now wipes the entire keychain via `storage.deleteAll()`
+  (tokens + `last_user_id` + `user_snapshot`) instead of `deleteTokens()`
+  alone, so a rejected refresh token also evicts the stale snapshot.
+
+### Added
+- **`lib/utils/jwt_utils.dart`** — `jwtExpiry(token)` returns the `exp`
+  claim as a UTC `DateTime`; `jwtIsExpired(token, {skew})` returns true
+  when the claim is in the past (default 30 s skew). Signature is
+  intentionally NOT verified — this is a client-side heuristic used to
+  gate the offline-friendly fast path only; every authenticated request
+  still goes through the backend.
+- **`StorageService.saveUserSnapshot(User)` / `getUserSnapshot()` /
+  `deleteUserSnapshot()`** (`lib/services/storage_service.dart`) — JSON-
+  encoded snapshot persisted alongside the tokens under the new
+  `user_snapshot` key. Encrypted at rest via the existing
+  `flutter_secure_storage` instance (Android EncryptedSharedPreferences,
+  iOS/macOS Keychain). `deleteAll()` now also clears this key so a
+  logged-out device retains no trace of the previous account.
+- **Snapshot write hooks** in `AuthService.login`, `register`, and
+  `refresh` (`lib/services/auth_service.dart`) — the snapshot is written
+  right after `saveTokens` / `saveLastUserId` on every successful
+  authentication event so it stays in lock-step with the tokens.
+
+### Tests
+- `test/unit/utils/jwt_utils_test.dart` — 10 cases covering future/past
+  `exp`, malformed tokens, missing-claim, un-padded base64Url, signature
+  ignored, skew handling.
+- `test/unit/storage_service_test.dart` — 5 new cases for the snapshot
+  helpers plus an updated `deleteAll` assertion covering the new
+  `user_snapshot` key.
+- `test/unit/auth_provider_test.dart` — 6 new cases under the v1.9.11
+  group: synchronous Authenticated from cached snapshot, background
+  probe success / 401 / network error, snapshot-but-expired-JWT fallback
+  to the legacy probe, missing-snapshot fallback to the legacy probe.
+- `test/unit/auth_service_test.dart` — added `saveUserSnapshot` stub
+  + `User` fallback registration; updated the login-order test to
+  expect `saveTokens → saveLastUserId → saveUserSnapshot → pull`.
+
+### Security note
+- The JWT signature is NOT verified client-side; the `exp` heuristic
+  only gates the FIRST FRAME of a cold start. Every authenticated API
+  call still validates server-side. A rotated JWT secret on the backend
+  will still close zombie sessions on the next request, just one frame
+  later than the v1.9.10 active probe. The snapshot is encrypted at rest
+  by `flutter_secure_storage` and is wiped by `deleteAll()` on logout
+  and on 401/403 from the refresh probe.
+
 ## [1.9.10] - 2026-05-25
 
 ### Added
