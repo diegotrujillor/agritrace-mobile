@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/activity.dart';
+
 abstract final class AppColors {
   static const primaryGreen  = Color(0xFF2D7A3E);
   static const darkGreen     = Color(0xFF1B5028);
@@ -51,6 +53,26 @@ String cropTypeLabel(String wireValue) => switch (wireValue) {
       'otro' => 'Otro',
       _ => wireValue,
     };
+
+/// Activity types that trigger the soft duplicate-detection warning on
+/// `Registrar actividad` (CU-15). When a producer tries to register one of
+/// these activity types for a lote on a calendar day that already has a
+/// matching record, the form opens a confirmation [AlertDialog] before
+/// persisting. The warning is **soft** — the user can always override and
+/// continue.
+///
+/// **v1.9.6 — pilot QA.** Image #24 from the Valle del Cauca pilot caught a
+/// producer logging two `Siembra` rows for the same lote on the same day
+/// (user error: thought the first save failed). Siembra is expected once per
+/// growing cycle, so a same-day duplicate is almost certainly noise.
+///
+/// Other activity types (Fertilización, Riego, Control de plagas, Cosecha,
+/// Otra) are legitimately repeated within a day on large lotes and stay
+/// unrestricted. Add to this set if post-pilot data shows another type with
+/// the same pattern (e.g. a future `cosecha_total` once-per-cycle event).
+const Set<ActivityType> kDuplicateWarnActivityTypes = <ActivityType>{
+  ActivityType.sowing,
+};
 
 /// Maps a free-text farm `cropType` suggestion to a plot enum value when
 /// the strings line up (case-insensitive, accent-folded). Returns `null`

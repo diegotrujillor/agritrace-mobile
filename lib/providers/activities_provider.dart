@@ -100,6 +100,37 @@ class ActivitiesNotifier
     });
   }
 
+  /// Returns activities for [_plotId] matching [type] that occurred on the
+  /// same calendar day as [date] (compared in local time — the form's
+  /// `occurredAt` is the user's picked date, which is already local).
+  ///
+  /// Used by the create form to surface a **soft** duplicate warning
+  /// (v1.9.6): when a producer tries to log a second `Siembra` for the same
+  /// lote on the same day, we ask "¿Continuar de todas formas?" rather
+  /// than hard-blocking. The set of warned-on types is centralised in
+  /// `kDuplicateWarnActivityTypes`.
+  ///
+  /// Reads the local Drift cache only — no network call. Filtering happens
+  /// in Dart against [ActivityRepository.listByPlot] (the existing
+  /// per-plot fetch) instead of pushing a new SQL query into the repo:
+  /// the plot-scoped list is short (a few dozen rows tops for a pilot
+  /// farmer) and reusing the existing path keeps the offline-first
+  /// contract symmetrical with the rest of the notifier.
+  Future<List<Activity>> findByPlotTypeAndDate({
+    required ActivityType type,
+    required DateTime date,
+  }) async {
+    final localDay = date.toLocal();
+    final all = await _repo.listByPlot(_plotId);
+    return all.where((a) {
+      if (a.type != type) return false;
+      final occurred = a.occurredAt.toLocal();
+      return occurred.year == localDay.year &&
+          occurred.month == localDay.month &&
+          occurred.day == localDay.day;
+    }).toList();
+  }
+
   Future<void> deleteActivity(String id) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {

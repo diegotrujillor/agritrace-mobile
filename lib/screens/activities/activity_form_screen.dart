@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/activity.dart';
 import '../../providers/activities_provider.dart';
 import '../../utils/constants.dart';
+import '../../utils/date_format.dart';
 import '../../widgets/common/app_logo_mark.dart';
 import 'widgets/activity_form.dart';
 
@@ -53,6 +54,48 @@ class ActivityFormScreen extends ConsumerWidget {
                   // Capture router before await to avoid
                   // use_build_context_synchronously across the network call.
                   final router = GoRouter.of(context);
+
+                  // v1.9.6 — soft duplicate warning. Only types in
+                  // `kDuplicateWarnActivityTypes` trigger the prompt; this
+                  // screen is create-only (edit lives in
+                  // [ActivityEditScreen]), so the implicit "create" guard
+                  // is already satisfied by being here. Hard-blocking is
+                  // explicitly out of scope — the user can always answer
+                  // "Sí, continuar" and persist anyway.
+                  if (kDuplicateWarnActivityTypes.contains(type)) {
+                    final duplicates = await ref
+                        .read(activitiesProvider(plotId).notifier)
+                        .findByPlotTypeAndDate(
+                          type: type,
+                          date: occurredAt,
+                        );
+                    if (duplicates.isNotEmpty) {
+                      if (!context.mounted) return;
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text('Ya registraste ${type.label}'),
+                          content: Text(
+                            'Ya hay un registro de ${type.label} para este '
+                            'lote en la fecha ${formatLocalDate(occurredAt)}. '
+                            '¿Continuar de todas formas?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancelar'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Sí, continuar'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed != true) return;
+                    }
+                  }
+
                   await ref
                       .read(activitiesProvider(plotId).notifier)
                       .createActivity(
