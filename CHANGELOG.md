@@ -39,6 +39,40 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
   (sin él, `ApiService` lanza `StateError` y la suite no compila bajo
   `flutter test`).
 
+## [1.9.10] - 2026-05-25
+
+### Added
+- **`ConnectivitySyncBridge`** (`lib/services/connectivity_sync_bridge.dart`):
+  subscribes to `connectivity_plus`'s `onConnectivityChanged` while the user
+  is authenticated and fires `SyncOrchestrator.run()` automatically on every
+  offline → online transition. Local creates made while offline now reach the
+  server within seconds of reconnect, without requiring a cold-start or a
+  manual sync. Seeds the initial state via `checkConnectivity()` so a user
+  who boots already online does not misfire on the first event. Idempotent
+  `start()` / `stop()`.
+- **`connectivitySyncBridgeProvider`** (`lib/providers/database_provider.dart`):
+  singleton Riverpod `Provider` that wires the bridge with the real
+  `Connectivity()` and `ref.read(syncOrchestratorProvider).run()` as the
+  reconnect hook. `ref.onDispose` cancels the subscription so test
+  containers tear down cleanly.
+- **Auth lifecycle hook** (`lib/providers/auth_provider.dart`): new
+  `_armSessionBackgroundServices()` helper starts BOTH the inactivity
+  monitor and the connectivity bridge in lock-step on all three
+  authenticated entry points — cold-start refresh, `login()`, `register()`.
+  `logout()` now also stops the bridge so a reconnect after Drift has been
+  wiped does not push stale rows or ping the server with an absent session.
+- **7 unit tests** (`test/unit/services/connectivity_sync_bridge_test.dart`)
+  pinning the transition logic with a mocked `Connectivity` driven by a
+  `StreamController`: offline→online fires; online→offline→online fires;
+  always-online never fires; offline-from-boot→online fires; `start()` is
+  idempotent; `stop()` cancels and `start()` works again; a throwing
+  callback does not poison the subscription.
+
+### Changed
+- Auth provider tests now override `connectivitySyncBridgeProvider` with a
+  no-op subclass so the suite does not touch the missing `connectivity_plus`
+  platform channel.
+
 ## [1.9.9] - 2026-05-25
 
 ### Fixed
