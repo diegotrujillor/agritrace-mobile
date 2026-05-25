@@ -25,6 +25,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // v1.9.4 — QA hotfix (Pantalla 19 / FIX #5). Wipe any AsyncError still
+    // held by `authProvider` when this screen is pushed. Without this, an
+    // earlier failed register on the previous screen (or a previous failed
+    // login that the user navigated away from without typing again) keeps
+    // its banner glued to this screen because the notifier's state survives
+    // navigation. `clearError()` is idempotent (no-op when the state is
+    // already `AsyncData`). Scheduled post-frame so the read happens after
+    // the widget tree is mounted — avoids "modified during build" loops.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(authProvider.notifier).clearError();
+    });
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();

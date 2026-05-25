@@ -40,6 +40,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // v1.9.4 — QA hotfix (Pantalla 19 / FIX #5). Wipe any AsyncError held by
+    // `authProvider` on mount. Without this, a previous failed login on the
+    // login screen leaks its "Credenciales incorrectas" banner onto this
+    // register screen because the AsyncNotifier state survives navigation.
+    // `parseApiError` for a 401 sourced from `/auth/login` returns that
+    // exact string regardless of which screen is rendering the banner, so
+    // the leak is visible even though the message origin is correct.
+    // `clearError()` is idempotent on `AsyncData`. Scheduled post-frame so
+    // the read happens after the widget is mounted (no "modified during
+    // build" loops). Tests that intentionally surface errors do so AFTER
+    // pumpAndSettle, so this no-op-on-data clear does not disturb them.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(authProvider.notifier).clearError();
+    });
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
