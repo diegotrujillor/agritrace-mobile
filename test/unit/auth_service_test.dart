@@ -435,4 +435,71 @@ void main() {
       expect(order, ['wipe', 'pull']);
     });
   });
+
+  // v1.9.9 — P0 fix (continuation of v1.9.8). Logout must push any
+  // local pending changes BEFORE wiping the Drift DB, otherwise a row
+  // created in the session that has not yet been auto-synced is destroyed
+  // before reaching the server. The push is bounded by a hard 5 s timeout
+  // so a slow/offline backend cannot block logout.
+  group('push-before-wipe on logout (P0)', () {
+    test('logout pushes BEFORE wiping local data', () async {
+      final order = <String>[];
+      Future<void> pusher() async => order.add('push');
+      Future<void> wiper() async => order.add('wipe');
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R-X');
+      when(() => storage.deleteAll()).thenAnswer((_) async {
+        order.add('deleteAll');
+      });
+      when(() => dio.post('/auth/logout', data: any(named: 'data')))
+          .thenAnswer((_) async => okResponse({'success': true}));
+
+      final svc = AuthService(
+        api,
+        storage,
+        wipeLocalData: wiper,
+        pushPending: pusher,
+      );
+      await svc.logout();
+
+      // Push runs first, then the server logout call, then secure storage
+      // is cleared, then the Drift wipe runs. Any other order risks
+      // destroying unsynced rows before they reach the server.
+      expect(order, ['push', 'deleteAll', 'wipe']);
+    });
+
+    test('wipe still runs when the pusher throws', () async {
+      int wipeCalls = 0;
+      Future<void> pusher() async => throw Exception('network down');
+      Future<void> wiper() async => wipeCalls++;
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
+
+      final svc = AuthService(
+        api,
+        storage,
+        wipeLocalData: wiper,
+        pushPending: pusher,
+      );
+
+      // Must NOT propagate — logout always completes and always wipes.
+      await svc.logout();
+
+      expect(wipeCalls, 1,
+          reason: 'privacy invariant (wipe) wins over push failure');
+      verify(() => storage.deleteAll()).called(1);
+    });
+
+    test('logout works without a pusher (legacy callers)', () async {
+      int wipeCalls = 0;
+      Future<void> wiper() async => wipeCalls++;
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
+
+      // No `pushPending` — must behave exactly like pre-v1.9.9.
+      final svc = AuthService(api, storage, wipeLocalData: wiper);
+
+      await svc.logout();
+
+      expect(wipeCalls, 1);
+      verify(() => storage.deleteAll()).called(1);
+    });
+  });
 }

@@ -23,6 +23,24 @@ typedef DataWiper = Future<void> Function();
 /// caller logs and continues so an offline login still completes.
 typedef RemotePuller = Future<void> Function();
 
+/// Callback invoked BEFORE [AuthService.logout] wipes the local Drift DB,
+/// to give the orchestrator one last chance to flush pending local rows
+/// to the server.
+///
+/// v1.9.9 — P0 continuation. v1.9.8 fixed the same-user re-login empty
+/// dashboard by pulling on login, but the symmetric hole on the push side
+/// remained: a `pendingCreate` row created in the session was destroyed by
+/// `wipeAllUserData` BEFORE ever reaching the server, so the next login
+/// pulled an empty change-set. Combined with the auto-push hooks in every
+/// provider mutation, this final push is defense in depth for the
+/// "create then logout immediately" race.
+///
+/// The pusher is fire-and-forget WITH A TIMEOUT — a slow or offline
+/// backend must NOT block logout. The privacy invariant (next user must
+/// not see the previous user's rows) ALWAYS wins over the convenience
+/// invariant (preserve unsynced changes).
+typedef PendingPusher = Future<void> Function();
+
 class AuthService {
   /// [wipeLocalData] is `null`-safe: when omitted (e.g. in legacy tests
   /// that only exercise the network surface) the wipe step is silently
@@ -34,18 +52,32 @@ class AuthService {
   /// is hydrated before the auth state flips to authenticated. Errors are
   /// caught and logged — an offline login still completes and the user can
   /// create local data while the pull retries later.
+  ///
+  /// [pushPending] is `null`-safe too. v1.9.9. When supplied, [logout]
+  /// awaits ONE final push (capped by a 5 s timeout) BEFORE wiping the
+  /// local Drift DB and clearing secure storage. Failures are logged and
+  /// swallowed — the wipe always runs.
   const AuthService(
     this._api,
     this._storage, {
     DataWiper? wipeLocalData,
     RemotePuller? pullRemoteData,
+    PendingPusher? pushPending,
   })  : _wipeLocalData = wipeLocalData,
-        _pullRemoteData = pullRemoteData;
+        _pullRemoteData = pullRemoteData,
+        _pushPending = pushPending;
 
   final ApiService _api;
   final StorageService _storage;
   final DataWiper? _wipeLocalData;
   final RemotePuller? _pullRemoteData;
+  final PendingPusher? _pushPending;
+
+  /// Hard ceiling on the final push performed by [logout]. A slow or
+  /// offline backend must NOT keep the user staring at a spinner while
+  /// they wait to log out; 5 s matches the existing Dio default connect
+  /// timeout and is comfortably long enough on a healthy LTE link.
+  static const Duration _logoutPushTimeout = Duration(seconds: 5);
 
   Future<AuthResponse> register({
     required String fullName,
@@ -185,6 +217,25 @@ class AuthService {
 
   Future<void> logout() async {
     try {
+      // v1.9.9 — P0 fix (continuation of v1.9.8). Push any local pending
+      // changes BEFORE wiping the Drift DB. Without this, a farm/plot/
+      // activity/alert created in the same session that has not yet been
+      // auto-synced (e.g. created offline; created online then logged out
+      // within the same second) would be destroyed by the `wipeLocalData`
+      // call below, and the next login's `pullAllFromServer` would return
+      // an empty change-set — the dashboard renders "No tienes fincas
+      // aún" again, even though the user "saw" them right up to logout.
+      //
+      // Fire-and-forget with a hard 5 s timeout: a slow or offline backend
+      // must NOT block logout. If the push fails or times out, the wipe
+      // still runs because the privacy invariant (next user must not see
+      // the previous user's rows) ALWAYS wins over the convenience
+      // invariant (preserve unsynced changes). Combined with the
+      // auto-push hooks added to every provider mutation in v1.9.9, this
+      // is defense in depth for the residual "mutate then logout same
+      // second" race.
+      await _pushPendingBeforeLogout();
+
       final refreshToken = await _storage.getRefreshToken();
       // Skip the network call entirely when there is nothing to revoke
       // server-side; this keeps the request log clean and matches the
@@ -211,6 +262,25 @@ class AuthService {
       await _storage.deleteAll();
       final wiper = _wipeLocalData;
       if (wiper != null) await wiper();
+    }
+  }
+
+  /// Awaits the injected [PendingPusher] (when present) with a hard
+  /// [_logoutPushTimeout]. Always returns; errors and timeouts are logged
+  /// and swallowed so the wipe step in [logout] cannot be skipped.
+  ///
+  /// No-op when no pusher is wired (legacy unit-test constructions of
+  /// `AuthService`).
+  Future<void> _pushPendingBeforeLogout() async {
+    final pusher = _pushPending;
+    if (pusher == null) return;
+    try {
+      await pusher().timeout(_logoutPushTimeout);
+    } catch (e) {
+      dev.log(
+        'AuthService: final push before logout failed (wiping anyway): $e',
+        name: 'auth',
+      );
     }
   }
 }

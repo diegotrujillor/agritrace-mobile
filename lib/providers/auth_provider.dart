@@ -92,6 +92,14 @@ final authServiceProvider = Provider<AuthService>(
     // logout → re-login" regression).
     pullRemoteData: () =>
         ref.read(syncOrchestratorProvider).pullAllFromServer(),
+    // v1.9.9 — P0 fix (continuation of v1.9.8). Inject a PendingPusher
+    // that runs the full push leg of `SyncOrchestrator.run()` so any
+    // `pendingCreate`/`pendingUpdate` rows reach the server BEFORE
+    // `logout()` wipes the local Drift DB. Combined with the per-mutation
+    // `unawaited(syncOrchestrator.run())` hooks in the domain providers,
+    // this closes the "create then logout same-second" race that left
+    // the next login pulling an empty change-set.
+    pushPending: () => ref.read(syncOrchestratorProvider).run(),
   ),
 );
 
