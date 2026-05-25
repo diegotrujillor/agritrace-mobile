@@ -6,13 +6,33 @@ import 'package:agritrace_mobile/models/user.dart';
 import 'package:agritrace_mobile/providers/auth_provider.dart';
 import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/services/auth_service.dart';
+import 'package:agritrace_mobile/services/connectivity_sync_bridge.dart';
 import 'package:agritrace_mobile/services/storage_service.dart';
 import 'package:agritrace_mobile/services/sync_orchestrator.dart';
 import 'package:agritrace_mobile/services/sync_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class MockAuthService extends Mock implements AuthService {}
 class MockStorageService extends Mock implements StorageService {}
 class MockSyncOrchestrator extends Mock implements SyncOrchestrator {}
+
+/// v1.9.10 — `AuthNotifier` arms a `ConnectivitySyncBridge` on every
+/// authenticated entry point. Tests don't have a platform channel for
+/// `connectivity_plus`, so we substitute a no-op bridge backed by a
+/// `Connectivity` instance that is never actually invoked.
+class _NoOpConnectivitySyncBridge extends ConnectivitySyncBridge {
+  _NoOpConnectivitySyncBridge()
+      : super(
+          connectivity: Connectivity(),
+          onReconnected: () async {},
+        );
+
+  @override
+  void start() {}
+
+  @override
+  void stop() {}
+}
 
 const _testUser = User(
   id: 'user-1',
@@ -70,6 +90,11 @@ void main() {
           authServiceProvider.overrideWithValue(mockAuth),
           storageServiceProvider.overrideWithValue(mockStorage),
           syncOrchestratorProvider.overrideWithValue(mockOrchestrator),
+          // v1.9.10 — auth notifier starts/stops the connectivity bridge
+          // on every authenticated entry point. Override with a no-op so
+          // tests do not hit the missing `connectivity_plus` platform channel.
+          connectivitySyncBridgeProvider
+              .overrideWithValue(_NoOpConnectivitySyncBridge()),
         ],
       );
 

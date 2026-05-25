@@ -143,7 +143,9 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       // v1.9.8 — P1 fix. Arm the inactivity monitor on every authenticated
       // cold-start so a user who never explicitly logs out still gets the
       // 20 min ceiling on the very next session.
-      _armInactivityMonitor();
+      // v1.9.10 — extend with the connectivity bridge so offline mutations
+      // auto-sync on the next reconnect (see `_armSessionBackgroundServices`).
+      _armSessionBackgroundServices();
       return AuthAuthenticated(auth.user);
     } on DioException catch (e) {
       // 401/403 → refresh token rejected → unrecoverable. Any other status
@@ -217,7 +219,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       final auth = await ref
           .read(authServiceProvider)
           .login(email: email, password: password);
-      _armInactivityMonitor();
+      _armSessionBackgroundServices();
       return AuthAuthenticated(auth.user);
     });
   }
@@ -243,7 +245,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
             password: password,
             privacyConsent: privacyConsent,
           );
-      _armInactivityMonitor();
+      _armSessionBackgroundServices();
       return AuthAuthenticated(auth.user);
     });
   }
@@ -255,8 +257,25 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     // to the timer-driven path: [_handleInactivityTimeout] re-enters this
     // method, and `stop()` here makes it idempotent.
     ref.read(inactivityMonitorProvider).stop();
+    // v1.9.10 — also stop the connectivity bridge so a reconnect after
+    // logout (which has just wiped Drift) does not push stale rows or
+    // ping the server with an absent session.
+    ref.read(connectivitySyncBridgeProvider).stop();
     await ref.read(authServiceProvider).logout();
     state = const AsyncData(AuthUnauthenticated());
+  }
+
+  /// Arms ALL session-scoped background services in one place so the
+  /// three authenticated entry points (cold-start refresh, login,
+  /// register) stay in lock-step.
+  ///
+  /// Currently: the inactivity monitor (20 min auto-logout) and the
+  /// [ConnectivitySyncBridge] (auto-push on reconnect — v1.9.10).
+  /// Both calls are idempotent so re-arming on every successful auth
+  /// is safe.
+  void _armSessionBackgroundServices() {
+    _armInactivityMonitor();
+    ref.read(connectivitySyncBridgeProvider).start();
   }
 
   /// Arms the inactivity monitor so the next 20 min of zero pointer

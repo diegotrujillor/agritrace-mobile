@@ -1,3 +1,4 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/app_database.dart';
@@ -5,6 +6,7 @@ import '../repositories/activity_repository.dart';
 import '../repositories/alert_repository.dart';
 import '../repositories/farm_repository.dart';
 import '../repositories/plot_repository.dart';
+import '../services/connectivity_sync_bridge.dart';
 import '../services/sync_orchestrator.dart';
 import 'sync_provider.dart';
 
@@ -46,3 +48,24 @@ final syncOrchestratorProvider = Provider<SyncOrchestrator>(
     alertRepo: ref.watch(alertRepositoryProvider),
   ),
 );
+
+/// Singleton [ConnectivitySyncBridge] for the app lifetime.
+///
+/// v1.9.10 — closes the offline-mutation race: when the user mutates
+/// fincas/lotes/actividades while offline, the bridge auto-fires
+/// [SyncOrchestrator.run] the moment connectivity is restored, so
+/// `pendingCreate`/`pendingUpdate` rows reach the server without
+/// waiting for a cold-start or manual sync.
+///
+/// The bridge is held as a non-auto-dispose [Provider] so the same
+/// instance survives across navigation rebuilds. Lifecycle (start /
+/// stop) is driven by [AuthNotifier] on login / register / cold-start
+/// refresh / logout.
+final connectivitySyncBridgeProvider = Provider<ConnectivitySyncBridge>((ref) {
+  final bridge = ConnectivitySyncBridge(
+    connectivity: Connectivity(),
+    onReconnected: () => ref.read(syncOrchestratorProvider).run(),
+  );
+  ref.onDispose(bridge.stop);
+  return bridge;
+});
