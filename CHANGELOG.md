@@ -39,6 +39,46 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
   (sin él, `ApiService` lanza `StateError` y la suite no compila bajo
   `flutter test`).
 
+## [1.9.12] - 2026-05-25
+
+### Changed
+- **Offline cold-start window: 15 min → 7 days.** v1.9.11 used the access
+  token's `exp` (15 min TTL) as the gate for trusting the local user
+  snapshot at cold-start, which was too narrow for pilot producers
+  spending the day at the plot without coverage: they logged in at
+  sunrise with a fresh access token, walked all day, and on their first
+  cold-start at sunset the 15 min TTL had elapsed many times over so the
+  app bounced them to /login even though the refresh token was still
+  valid for days. v1.9.12 switches the gate (`AuthNotifier.build()` in
+  `lib/providers/auth_provider.dart`) to the refresh token's `exp` (7
+  day TTL with rolling renewal on every successful online refresh). A
+  producer who last successfully refreshed within the past week can now
+  open the app fully offline and reach the dashboard without a login
+  round trip.
+
+### Security
+- No reduction in server-side security: the refresh token TTL stays at
+  7 days, the `exp` is still checked client-side without signature
+  verification, every authenticated API call still validates against the
+  server's signing key, and a 401/403 from the background probe still
+  deletes tokens + flips `Unauthenticated`. The Dio refresh interceptor
+  also still kicks in for any 401 during normal usage.
+
+### Tests
+- `test/unit/auth_provider_test.dart` — group renamed to
+  `v1.9.12 offline-friendly cold start (refresh-token gate)`; existing
+  v1.9.11 cases re-anchored on a real 7-day-shaped refresh JWT instead
+  of the literal placeholder; two new cases added:
+  (1) "access expired but refresh fresh: still Authenticated
+       synchronously" — the load-bearing regression test for the pilot
+       sunset-cold-start scenario.
+  (2) "access expired + refresh fresh + background probe success: state
+       stays Authenticated and refresh runs in background" — guards the
+       rotation path through `_backgroundProbe`.
+  The "snapshot present but JWT expired" fallback case is now driven by
+  an EXPIRED refresh-token JWT (was previously driven by the access
+  token), matching the new gate. 388 tests passing (was 386 in v1.9.11).
+
 ## [1.9.11] - 2026-05-25
 
 ### Changed
