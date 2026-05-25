@@ -39,6 +39,11 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
   (sin él, `ApiService` lanza `StateError` y la suite no compila bajo
   `flutter test`).
 
+## [1.9.5] - 2026-05-24
+
+### Fixed
+- Form screens (Registrar actividad / Agregar lote / Registrar finca + edit variants): removed duplicate bottom-left logo. Only the top-centered 80px header logo remains, per user feedback on v1.9.4.
+
 ## [1.9.4] - 2026-05-24 — fix(ui+auth): logo alignment hotfixes + clear leaked auth error across screens
 
 ### Fixed
