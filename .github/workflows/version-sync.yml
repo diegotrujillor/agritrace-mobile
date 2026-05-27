@@ -1,6 +1,6 @@
 name: Version sync
 
-# Daily check for drift between latest published mobile / backend versions
+# Weekly check for drift between latest published mobile / backend versions
 # and the stamps marked `<!-- version-sync:* -->` inside this repo's docs.
 #
 # Source of truth:
@@ -12,7 +12,7 @@ name: Version sync
 
 on:
   schedule:
-    - cron: '0 6 * * *'   # 06:00 UTC = 01:00 America/Bogota, daily
+    - cron: '0 5 * * 1'   # 05:00 UTC Monday = 00:00 Monday America/Bogota (UTC-5, no DST)
   workflow_dispatch:
     inputs:
       mobile_override:
