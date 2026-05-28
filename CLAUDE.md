@@ -89,6 +89,14 @@ Services receive dependencies via constructor — no global singletons. Provider
 
 All backend responses: `{ success: bool, data: T }` or `{ success: false, error: string }`. `AuthResponse.fromJson` unwraps the `data` key automatically.
 
+### API protocol policy
+
+- **REST + JSON over HTTP/1.1 via Dio is the only sanctioned transport.** Do not introduce `graphql_flutter`, gRPC, or any non-REST client. Required for ETag/304 caching, presigned-upload flow (CU2 plan), and rural-network reliability (HTTP/2 obligatorio = roto en CO rural).
+- **Photos**: uploads will migrate from multipart to **presigned PUT against OCI Object Storage** in CU2 (M2.1). Still REST — no SDK shortcuts.
+- **Realtime / push**: no SSE, no long-poll, no WebSocket. If immediacy is required post-MVP, use FCM push notifications (not a new transport).
+- Any proposal to deviate must open an ADR proving commercial trigger + REST evaluation + back-compat plan. Default = REST via Dio.
+- Canonical reference: [`agritrace-docs/01-preparacion-mvp/06-infraestructura/05-plan-escalado-concurrencia.md §10`](https://github.com/diegotrujillor/agritrace-docs/blob/main/01-preparacion-mvp/06-infraestructura/05-plan-escalado-concurrencia.md#10-protocolo-de-api-cross-tier).
+
 ## Design system
 
 ### Colors (`AppColors` in `lib/utils/constants.dart`)
