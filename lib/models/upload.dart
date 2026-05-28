@@ -1,26 +1,31 @@
-/// DTOs for the `POST /v1/uploads/photos` photo-upload endpoint (frozen
-/// contract — coordinated with `agritrace-backend` v0.6.0).
+/// DTOs for the `POST /v1/uploads/photos` photo-upload endpoint
+/// (contract v0.7.0 — coordinated with `agritrace-backend`).
 ///
 /// Wire shape:
 /// ```
-/// 201: { success: true, data: { url, key, size, contentType } }
+/// 201: { success: true, data: { id, key, size, contentType } }
 /// ```
+///
+/// The OCI bucket is private since v0.7.0. The caller persists
+/// `<API_BASE>/uploads/photos/<id>` (built via `UploadsService.urlFor`)
+/// in `activity.photoUrl` and renders it through
+/// `AuthenticatedNetworkImage` which attaches the JWT via `ApiService`.
 library;
 
-/// Successful result of [UploadsService.uploadPhoto]. The `url` is a public
-/// (or pre-signed) HTTPS URL that callers persist into the owning entity
-/// (e.g. `activity.photoUrl`) before issuing the domain create/update.
+/// Successful result of [UploadsService.uploadPhoto]. Holds the opaque
+/// photo id; the read URL is constructed by the caller as
+/// `<API_BASE>/uploads/photos/<id>` (helper: `UploadsService.urlFor(id)`).
 class UploadResponse {
   const UploadResponse({
-    required this.url,
+    required this.id,
     required this.key,
     required this.size,
     required this.contentType,
   });
 
-  /// Resolvable URL the client can render in an `Image.network` widget and
-  /// the backend can serve back as part of the activity payload.
-  final String url;
+  /// Opaque UUID v4 the backend assigned to this photo. The mobile client
+  /// uses it to construct the authenticated read URL.
+  final String id;
 
   /// Opaque storage key (S3 object key on the prod stack). Persisted to the
   /// upstream record so the backend can clean up orphans.
@@ -37,13 +42,13 @@ class UploadResponse {
   /// Parses the inner `data` payload of the `{ success, data }` envelope.
   /// Throws [FormatException] on missing or mistyped fields.
   factory UploadResponse.fromJson(Map<String, dynamic> json) {
-    final url = json['url'];
+    final id = json['id'];
     final key = json['key'];
     final size = json['size'];
     final contentType = json['contentType'] ?? json['content_type'];
-    if (url is! String || url.isEmpty) {
+    if (id is! String || id.isEmpty) {
       throw const FormatException(
-        'Invalid upload response: url is missing or empty',
+        'Invalid upload response: id is missing or empty',
       );
     }
     if (key is! String || key.isEmpty) {
@@ -62,7 +67,7 @@ class UploadResponse {
       );
     }
     return UploadResponse(
-      url: url,
+      id: id,
       key: key,
       size: size.toInt(),
       contentType: contentType,

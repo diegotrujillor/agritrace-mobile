@@ -29,21 +29,34 @@ const int kMaxUploadBytes = 5 * 1024 * 1024;
 /// envelope unwrapping via `api_envelope.dart`. The Bearer token and
 /// 401-refresh flow are owned by `_AuthInterceptor`.
 ///
-/// Contract (frozen — coordinated with backend v0.6.0):
+/// Contract (v0.7.0 — coordinated with backend; bucket now private):
 /// ```
 /// POST /v1/uploads/photos          (Bearer JWT, multipart/form-data)
 /// Body field: photo (image/jpeg | image/png; max 5 MB)
-/// 201:  { success: true, data: { url, key, size, contentType } }
+/// 201:  { success: true, data: { id, key, size, contentType } }
 /// 400:  no file / wrong mime / too big (server-side detection)
 /// 401:  missing / expired token
 /// 413:  payload exceeds the multer limit
 /// 429:  rate-limited (10 uploads / 5 min)
 /// 502:  S3 upstream failure
+///
+/// GET  /v1/uploads/photos/{id}     (Bearer JWT)
+/// 200:  binary image/jpeg|png with Cache-Control: private, no-store
+/// 401:  missing / expired token
+/// 403:  belongs to another user
+/// 404:  not found
 /// ```
 class UploadsService {
   const UploadsService(this._api);
 
   final ApiService _api;
+
+  /// Builds the authenticated read URL for the photo identified by [id].
+  /// Mirrors the path mounted by the backend router; clients persist this
+  /// string in `activity.photoUrl` so that rendering layers can recognise
+  /// "this is our own backend → JWT required" via the
+  /// `AuthenticatedNetworkImage` widget.
+  String urlFor(String id) => '${_api.client.options.baseUrl}/uploads/photos/$id';
 
   /// Uploads [bytes] to the photos endpoint and returns the parsed
   /// [UploadResponse] on HTTP 201.

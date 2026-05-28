@@ -263,7 +263,12 @@ class _ExportPdfButtonState extends ConsumerState<_ExportPdfButton> {
       final auth = ref.read(authProvider).valueOrNull;
       final user = auth is AuthAuthenticated ? auth.user : null;
 
-      await PdfTraceabilityService().buildAndShare(
+      // Use the authenticated Dio so photo fetches against
+      // `<API_BASE>/uploads/photos/<id>` carry the JWT. The OCI bucket is
+      // private since backend v0.7.0; an interceptor-free Dio would 401.
+      await PdfTraceabilityService(
+        httpClient: ref.read(apiServiceProvider).client,
+      ).buildAndShare(
         farm: farm,
         plot: widget.plot,
         activities: activities,

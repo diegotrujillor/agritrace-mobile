@@ -13,6 +13,7 @@ import '../../../widgets/common/app_date_field.dart';
 import '../../../widgets/common/app_error_banner.dart';
 import '../../../widgets/common/app_input.dart';
 import '../../../widgets/common/app_labeled_dropdown.dart';
+import '../../../widgets/common/authenticated_network_image.dart';
 
 /// Shared form body for creating and editing an activity. Renders the 4
 /// fields (type / occurred-on date / optional note / optional photo) and
@@ -183,15 +184,19 @@ class _ActivityFormState extends ConsumerState<ActivityForm> {
       if (picked != null) {
         try {
           final bytes = await File(picked.path).readAsBytes();
-          final result =
-              await ref.read(uploadsServiceProvider).uploadPhoto(
-                    bytes: bytes,
-                    filename: picked.name,
-                    contentType: _inferContentType(picked.name),
-                  );
-          photoUrl = result.url;
+          final uploads = ref.read(uploadsServiceProvider);
+          final result = await uploads.uploadPhoto(
+            bytes: bytes,
+            filename: picked.name,
+            contentType: _inferContentType(picked.name),
+          );
+          // Persist the authenticated read URL (`<API_BASE>/uploads/
+          // photos/<id>`) — never the direct OCI path. The bucket is
+          // private since backend v0.7.0; reads go through the backend
+          // with JWT + ownership check (Ley 1581).
+          photoUrl = uploads.urlFor(result.id);
           // Cache so a retry of the form does not re-upload.
-          _uploadedUrl = result.url;
+          _uploadedUrl = photoUrl;
         } on UploadRateLimitException catch (e) {
           if (!mounted) return;
           setState(() {
@@ -268,18 +273,10 @@ class _ActivityFormState extends ConsumerState<ActivityForm> {
                     width: double.infinity,
                     fit: BoxFit.cover,
                   )
-                : Image.network(
-                    existingUrl!,
+                : AuthenticatedNetworkImage(
+                    url: existingUrl!,
                     height: 160,
                     width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 160,
-                      color: AppColors.lightGrey,
-                      child: const Center(
-                        child: Icon(Icons.broken_image_outlined),
-                      ),
-                    ),
                   ),
           ),
         if (hasPhoto) const SizedBox(height: AppSpacing.sm),

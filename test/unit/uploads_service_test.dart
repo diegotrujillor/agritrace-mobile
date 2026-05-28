@@ -51,8 +51,8 @@ void main() {
             options: any(named: 'options'),
           )).thenAnswer(
         (_) async => _createdResponse(envelope({
-          'url': 'https://cdn.agritrace.co/photos/abc.jpg',
-          'key': 'photos/abc.jpg',
+          'id': '11111111-1111-4111-8111-111111111111',
+          'key': 'photos/11111111-1111-4111-8111-111111111111.jpg',
           'size': 12345,
           'contentType': 'image/jpeg',
         })),
@@ -86,8 +86,8 @@ void main() {
             options: any(named: 'options'),
           )).thenAnswer(
         (_) async => _createdResponse(envelope({
-          'url': 'https://cdn.agritrace.co/photos/x.jpg',
-          'key': 'photos/x.jpg',
+          'id': '22222222-2222-4222-8222-222222222222',
+          'key': 'photos/22222222-2222-4222-8222-222222222222.jpg',
           'size': 42,
           'contentType': 'image/jpeg',
         })),
@@ -99,8 +99,11 @@ void main() {
         contentType: 'image/jpeg',
       );
 
-      expect(result.url, 'https://cdn.agritrace.co/photos/x.jpg');
-      expect(result.key, 'photos/x.jpg');
+      expect(result.id, '22222222-2222-4222-8222-222222222222');
+      expect(
+        result.key,
+        'photos/22222222-2222-4222-8222-222222222222.jpg',
+      );
       expect(result.size, 42);
       expect(result.contentType, 'image/jpeg');
     });
@@ -239,17 +242,17 @@ void main() {
   group('UploadResponse.fromJson', () {
     test('parses the contracted fields', () {
       final r = UploadResponse.fromJson({
-        'url': 'https://cdn/x.jpg',
-        'key': 'x.jpg',
+        'id': '33333333-3333-4333-8333-333333333333',
+        'key': 'photos/33333333-3333-4333-8333-333333333333.png',
         'size': 100,
         'contentType': 'image/png',
       });
-      expect(r.url, 'https://cdn/x.jpg');
+      expect(r.id, '33333333-3333-4333-8333-333333333333');
       expect(r.size, 100);
       expect(r.contentType, 'image/png');
     });
 
-    test('throws when url is missing', () {
+    test('throws when id is missing', () {
       expect(
         () => UploadResponse.fromJson({
           'key': 'x.jpg',
@@ -262,12 +265,30 @@ void main() {
 
     test('tolerates num size (Dio sometimes hands back num for big ints)', () {
       final r = UploadResponse.fromJson({
-        'url': 'https://cdn/x.jpg',
-        'key': 'x.jpg',
+        'id': '44444444-4444-4444-8444-444444444444',
+        'key': 'photos/44444444-4444-4444-8444-444444444444.jpg',
         'size': 12345.0,
         'contentType': 'image/jpeg',
       });
       expect(r.size, 12345);
+    });
+  });
+
+  group('urlFor()', () {
+    test('constructs `<baseUrl>/uploads/photos/<id>` from ApiService client',
+        () {
+      final dio2 = MockDio();
+      when(() => dio2.options).thenReturn(
+        BaseOptions(baseUrl: 'https://api.test/v1'),
+      );
+      final apiMock = MockApiService();
+      when(() => apiMock.client).thenReturn(dio2);
+      final svc = UploadsService(apiMock);
+
+      expect(
+        svc.urlFor('55555555-5555-4555-8555-555555555555'),
+        'https://api.test/v1/uploads/photos/55555555-5555-4555-8555-555555555555',
+      );
     });
   });
 }

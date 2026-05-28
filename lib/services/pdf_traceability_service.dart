@@ -30,26 +30,30 @@ const String kPdfPhotoUnavailableLabel = 'Foto no disponible (sin conexión)';
 /// No Flutter widget deps — it is pure document generation so it can be
 /// unit-tested by inspecting the returned bytes.
 ///
-/// Photo resolution (v1.9.7): activities created on/after v0.6.0 of the
-/// backend store `photoUrl` as a remote OCI Object Storage URL
-/// (`https://objectstorage.sa-bogota-1.oraclecloud.com/…`), produced by
-/// `POST /v1/uploads/photos`. Older activities still carry local
-/// filesystem paths (optionally prefixed with `file://`). [_loadPhoto]
-/// branches on the URL scheme so both shapes render. Remote fetches use
-/// a dedicated [Dio] with NO API interceptors so the user's JWT is never
-/// leaked to an unrelated host.
+/// Photo resolution (v1.10.0): activities created on/after backend
+/// v0.7.0 store `photoUrl` as the authenticated read URL of our own
+/// backend (`<API_BASE>/uploads/photos/<id>`). The OCI bucket is private,
+/// so the fetch MUST carry the JWT — callers pass the shared
+/// `apiServiceProvider.client` (Dio with `_AuthInterceptor`) so that the
+/// Bearer token is attached and refreshed-on-401 just like every other
+/// API request. Older activities may still carry local filesystem paths
+/// (optionally prefixed with `file://`); [_loadPhoto] branches on the
+/// URL scheme so both shapes render. The previous concern (leaking the
+/// JWT to OCI) no longer applies: the URL belongs to our backend, not a
+/// third party.
 class PdfTraceabilityService {
-  /// Default constructor uses a fresh, interceptor-free [Dio] with a 10 s
-  /// total timeout. Inject [httpClient] in tests to stub the remote fetch.
+  /// [httpClient] should be the authenticated [Dio] from
+  /// `apiServiceProvider`. Passing a fresh, interceptor-free Dio is still
+  /// accepted (e.g. in unit tests that stub fetches) but production
+  /// callers MUST pass the auth client or the photo fetches will 401.
   PdfTraceabilityService({Dio? httpClient})
       : _http = httpClient ?? _defaultHttpClient();
 
   final Dio _http;
 
   static Dio _defaultHttpClient() {
-    // IMPORTANT: do NOT reuse the shared `ApiService` Dio here. That client
-    // attaches the user's Bearer token to every outbound request, which
-    // would leak the JWT to Oracle Object Storage on every photo fetch.
+    // Fallback used only when the caller did not inject a client (tests
+    // or legacy code paths). Tuned for short, bytes-only photo fetches.
     return Dio(BaseOptions(
       connectTimeout: kPdfPhotoFetchTimeout,
       receiveTimeout: kPdfPhotoFetchTimeout,

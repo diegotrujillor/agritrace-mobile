@@ -6,6 +6,41 @@ tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 
 ## [Unreleased]
 
+### Changed
+- **security (Ley 1581 / CU-14):** las fotos de actividades se leen ahora
+  a través del endpoint autenticado del backend
+  (`GET /v1/uploads/photos/{id}`). El bucket OCI `agritrace-uploads` es
+  privado desde backend v0.7.0; nunca más se construyen URLs públicas
+  en el cliente. La APK persiste `activity.photoUrl` como
+  `<API_BASE>/uploads/photos/<id>` (built via
+  `UploadsService.urlFor(id)`).
+- **UploadResponse:** el campo `url` desapareció del modelo; se reemplaza
+  por `id` (UUID v4). Dónde:
+  `lib/models/upload.dart`, `lib/services/uploads_service.dart`,
+  `lib/screens/activities/widgets/activity_form.dart`.
+- **PdfTraceabilityService:** el cliente Dio inyectado ahora **debe** ser
+  el autenticado (`apiServiceProvider.client`) — antes era explícitamente
+  interceptor-free para no filtrar JWT a OCI; ahora el URL apunta a
+  nuestro backend, así que el Bearer va y los 401/refresh se manejan
+  con el flujo estándar. `plot_detail_screen.dart` pasa el cliente
+  correcto en la única llamada `buildAndShare`.
+
+### Added
+- **widget:** `AuthenticatedNetworkImage`
+  (`lib/widgets/common/authenticated_network_image.dart`) — fetcha bytes
+  vía `apiServiceProvider`, renderiza `Image.memory` con placeholder
+  estático mientras carga y `broken_image` en error. Usado como
+  reemplazo de `Image.network` para previsualizar fotos existentes en
+  el formulario de actividad.
+- **tests:** +1 caso para `UploadsService.urlFor()`; ajustes en el resto
+  de uploads_service_test para el nuevo shape (`id` en lugar de `url`).
+
+### Coordination
+- Requiere backend ≥ v0.7.0 corriendo y el bucket OCI
+  `agritrace-uploads` configurado como private. Ver
+  `agritrace-backend/CHANGELOG.md` [Unreleased] y
+  `agritrace-infrastructure/docs/runbook.md → Bucket de fotos privado`.
+
 ### Docs
 - **README.md** alineado a v1.9.4: agrega bloque "Highlights v1.9.0 → v1.9.4",
   expande la tabla de Pantallas a 13 (incluye Alertas, Perfil ARCO y Reportar
