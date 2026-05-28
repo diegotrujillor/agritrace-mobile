@@ -4,7 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
-## [Unreleased]
+## [1.10.0] - 2026-05-27 — security: bucket privado + lectura autenticada de fotos
 
 ### Changed
 - **security (Ley 1581 / CU-14):** las fotos de actividades se leen ahora

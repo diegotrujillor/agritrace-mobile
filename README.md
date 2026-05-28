@@ -2,7 +2,7 @@
 
 App móvil del MVP de **AgriTrace** — plataforma de trazabilidad agrícola para pequeños y medianos productores en Colombia.
 
-> Versión actual: **v1.9.12** (pubspec `1.9.4+8`, tag `v1.9.12`). Ver [`CHANGELOG.md`](CHANGELOG.md). <!-- version-sync:mobile -->
+> Versión actual: **v1.10.0** (pubspec `1.10.0+17`, tag `v1.10.0`). Ver [`CHANGELOG.md`](CHANGELOG.md). <!-- version-sync:mobile -->
 
 > Estrategia MVP: **Farmer-First · Mobile-Only · Offline-First**. El agricultor registra actividades sin conexión durante 14+ días. Marketplace con compradores internacionales es later release.
 >
