@@ -23,7 +23,14 @@ name: Email Diego when a user-report issue is opened
 
 on:
   issues:
-    types: [opened]
+    # `opened` fires when the issue is created with labels already
+    # attached (the typical backend path: `POST /v1/feedback` sends
+    # title + body + labels atomically). `labeled` is a safety net for
+    # cases where the label is applied in a second call (e.g. gh CLI
+    # smoke tests, manual triage). The `if:` guard prevents double
+    # emails — when both events fire we only act on the one that
+    # already has the label.
+    types: [opened, labeled]
 
 permissions:
   contents: read
