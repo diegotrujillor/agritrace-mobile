@@ -76,6 +76,12 @@ void main() {
         .thenAnswer((_) => Stream.value([_seedActivity()]));
     when(() => mockActivityRepo.listByPlot(any()))
         .thenAnswer((_) async => [_seedActivity()]);
+    // v1.10.1 fix #34: `activityProvider` is local-first; getById must
+    // resolve. Returning the same seed keeps the screen prefill while
+    // exercising the local path (no need to stub mockService.get(...)
+    // for these tests anymore, but keeping it doesn't hurt).
+    when(() => mockActivityRepo.getById(any()))
+        .thenAnswer((_) async => _seedActivity());
   });
 
   Widget wrap() => ProviderScope(

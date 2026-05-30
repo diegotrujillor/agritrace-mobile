@@ -94,6 +94,15 @@ class ActivityRepository {
   /// Deletes an activity from the local DB immediately.
   Future<void> delete(String id) => _db.deleteActivity(id);
 
+  /// One-shot read from local Drift by primary key. Returns `null` when
+  /// the activity is unknown locally (e.g. deep-link to an id that was
+  /// never pulled). Callers that need a remote round-trip on miss should
+  /// fall back to [ActivityService.get] explicitly.
+  Future<Activity?> getById(String id) async {
+    final row = await _db.getActivity(id);
+    return row == null ? null : _fromRow(row);
+  }
+
   // ── Sync helpers ──────────────────────────────────────────────────────────
 
   /// Returns all rows whose [syncStatus] is not `'synced'`.

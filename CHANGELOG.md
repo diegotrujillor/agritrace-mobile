@@ -4,6 +4,25 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased]
+
+### Fixed
+- **fix #34 (user-report Ana V.):** al re-abrir la pantalla de edición
+  de una actividad recién guardada, el form mostraba los valores
+  pre-edit. Causa: `activityProvider(id)` consultaba el backend
+  (`ActivityService.get`) en vez de Drift. Como la mutación es
+  offline-first (Drift + cola sync), el siguiente round-trip al
+  backend devolvía datos previos al push. Ahora el provider es
+  **local-first**: lee `activityRepositoryProvider.getById(id)`
+  primero y sólo cae al backend cuando el id no está en cache local
+  (deep-link a actividad nunca pulled). Dónde:
+  `lib/providers/activities_provider.dart`,
+  `lib/repositories/activity_repository.dart` (nuevo `getById`),
+  `lib/database/app_database.dart` (nuevo `getActivity`).
+- **tests:** +1 caso para fallback service-on-miss; ajustes en
+  uploads_service/activity_edit_screen/activity_duplicate_warn/
+  form_screens_single_logo para stub de `getById`. Suite: 390 pasan.
+
 ## [1.10.0] - 2026-05-27 — security: bucket privado + lectura autenticada de fotos
 
 ### Changed

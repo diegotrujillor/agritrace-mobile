@@ -173,6 +173,19 @@ final _activitiesStreamProvider =
 );
 
 /// Single activity lookup by id, used by the edit form when deep-linked.
+///
+/// **Local-first** (offline-first + LWW correctness — closes #34):
+/// reads the row from Drift first; only falls back to the backend if
+/// the activity is not in the local cache (e.g. a deep-link to an id
+/// the device has never pulled). Before the local-first switch the
+/// edit screen would re-show pre-edit values after a save because the
+/// optimistic local mutation was already in Drift but the backend had
+/// not yet received the sync push, so the next round-trip returned
+/// stale data.
 final activityProvider = FutureProvider.family<Activity, String>(
-  (ref, id) => ref.read(activityServiceProvider).get(id),
+  (ref, id) async {
+    final local = await ref.read(activityRepositoryProvider).getById(id);
+    if (local != null) return local;
+    return ref.read(activityServiceProvider).get(id);
+  },
 );

@@ -193,8 +193,10 @@ void main() {
     expect(container.read(activitiesProvider(_plotId)).hasError, isTrue);
   });
 
-  test('activityProvider.family looks up a single activity by id', () async {
-    when(() => mockService.get('act-9'))
+  test('activityProvider.family — local-first hit short-circuits service', () async {
+    // v1.10.1 fix #34: local Drift is the source of truth for the
+    // edit screen; the service is only consulted on a local miss.
+    when(() => mockRepo.getById('act-9'))
         .thenAnswer((_) async => _activity(id: 'act-9'));
     final container = makeContainer();
     addTearDown(container.dispose);
@@ -202,6 +204,21 @@ void main() {
     final act = await container.read(activityProvider('act-9').future);
 
     expect(act.id, 'act-9');
+    verifyNever(() => mockService.get(any()));
+  });
+
+  test('activityProvider.family — falls back to service on local miss', () async {
+    when(() => mockRepo.getById('act-remote'))
+        .thenAnswer((_) async => null);
+    when(() => mockService.get('act-remote'))
+        .thenAnswer((_) async => _activity(id: 'act-remote'));
+    final container = makeContainer();
+    addTearDown(container.dispose);
+
+    final act = await container.read(activityProvider('act-remote').future);
+
+    expect(act.id, 'act-remote');
+    verify(() => mockService.get('act-remote')).called(1);
   });
 
   // v1.9.9 — P0 fix. See farms_provider_test.dart for the rationale.

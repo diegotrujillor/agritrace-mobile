@@ -128,9 +128,10 @@ void main() {
         .thenAnswer((_) => Stream.value([_seedActivity()]));
     when(() => mockRepo.listByPlot(any()))
         .thenAnswer((_) async => [_seedActivity()]);
-    // Note: activityProvider(id) fetches from ActivityService.get — the
-    // ActivityRepository has no getById, so we only need to stub the
-    // service for the single-activity lookup.
+    // v1.10.1 fix #34: `activityProvider(id)` is local-first; getById
+    // must resolve before the screen renders.
+    when(() => mockRepo.getById(any()))
+        .thenAnswer((_) async => _seedActivity());
 
     await tester.pumpWidget(_host(
       child: const ActivityEditScreen(activityId: _activityId),

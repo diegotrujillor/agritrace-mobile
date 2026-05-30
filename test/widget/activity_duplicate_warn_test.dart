@@ -132,6 +132,15 @@ void main() {
         orElse: () => seeded.first,
       ),
     );
+    // v1.10.1 fix #34: `activityProvider` is local-first; resolve
+    // getById against the same seeded list so the edit-screen path
+    // exercised in this group still finds the activity locally.
+    when(() => mockRepo.getById(any())).thenAnswer(
+      (inv) async => seeded.firstWhere(
+        (a) => a.id == inv.positionalArguments.first,
+        orElse: () => seeded.first,
+      ),
+    );
 
     return ProviderScope(
       overrides: [

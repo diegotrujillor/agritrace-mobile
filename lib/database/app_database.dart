@@ -87,6 +87,9 @@ class AppDatabase extends _$AppDatabase {
   Future<void> upsertActivity(ActivitiesTableCompanion activity) =>
       into(activitiesTable).insertOnConflictUpdate(activity);
 
+  Future<ActivitiesTableData?> getActivity(String id) =>
+      (select(activitiesTable)..where((t) => t.id.equals(id))).getSingleOrNull();
+
   Future<void> deleteActivity(String id) =>
       (delete(activitiesTable)..where((t) => t.id.equals(id))).go();
 
