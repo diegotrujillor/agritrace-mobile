@@ -4,7 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
-## [Unreleased]
+## [1.10.1] - 2026-05-30 — fix: editar actividad refleja cambios en re-open (#34)
 
 ### Fixed
 - **fix #34 (user-report Ana V.):** al re-abrir la pantalla de edición
