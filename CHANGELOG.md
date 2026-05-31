@@ -4,6 +4,23 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.10.2] - 2026-05-31 — fix: inactivity logout navega a /welcome inmediato
+
+### Fixed
+- **fix (user-report Ana V.):** el auto-logout por inactividad (20 min)
+  apagaba la sesión correctamente pero la UI seguía en la pantalla
+  activa hasta que el productor tocaba algo, y entonces aparecía un
+  error (token revocado). Causa: `AuthNotifier.logout()` flipaba el
+  `state` a `Unauthenticated` **después** de `await
+  authService.logout()`, que puede tardar varios segundos (push de
+  cambios pendientes con timeout 5s + POST a `/auth/logout`). El
+  `refreshListenable` de GoRouter sólo dispara el `redirect` cuando
+  el estado cambia, así que la navegación a `/welcome` esperaba ese
+  await. Fix: flipar `state` **antes** del await; el wipe de Drift
+  + revocación server-side continúan en background dentro del mismo
+  `try/finally` ya existente en `AuthService.logout`. Dónde:
+  `lib/providers/auth_provider.dart`.
+
 ## [1.10.1] - 2026-05-30 — fix: editar actividad refleja cambios en re-open (#34)
 
 ### Fixed

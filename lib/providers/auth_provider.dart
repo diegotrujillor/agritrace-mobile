@@ -343,8 +343,19 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     // logout (which has just wiped Drift) does not push stale rows or
     // ping the server with an absent session.
     ref.read(connectivitySyncBridgeProvider).stop();
-    await ref.read(authServiceProvider).logout();
+    // v1.10.2 fix — flip the auth state to Unauthenticated BEFORE awaiting
+    // the AuthService.logout flow (which can take seconds: it pushes
+    // pending changes with a 5 s timeout and posts to `/auth/logout`).
+    // Doing this earlier guarantees `_AuthListenable` notifies GoRouter
+    // immediately, the redirect re-evaluates the current location, and
+    // the user lands on `/welcome` without having to tap something to
+    // discover the session is already dead. The remaining Drift wipe +
+    // server revocation continue safely in the background via the same
+    // `try/finally` in `AuthService.logout`. Reported by Ana V. on
+    // v1.10.1 (inactivity timeout fires, but the UI stays on the active
+    // screen until the next tap triggers a 401 banner).
     state = const AsyncData(AuthUnauthenticated());
+    await ref.read(authServiceProvider).logout();
   }
 
   /// Arms ALL session-scoped background services in one place so the
