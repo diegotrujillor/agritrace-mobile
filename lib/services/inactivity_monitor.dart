@@ -25,7 +25,8 @@ import '../utils/constants.dart';
 /// into the widget tree lives in `main.dart`.
 class InactivityMonitor {
   InactivityMonitor({Duration? timeout})
-      : _timeout = timeout ?? const Duration(minutes: kInactivityTimeoutMinutes);
+      : _timeout =
+            timeout ?? const Duration(minutes: kInactivityTimeoutMinutes);
 
   final Duration _timeout;
 
@@ -66,8 +67,19 @@ class InactivityMonitor {
 
   /// Records the moment the app moved to background. Pair with
   /// [resumeFromBackground] to apply the elapsed-while-paused check.
+  ///
+  /// Idempotent within a single background trip: the FIRST mark wins.
+  /// Flutter fires [AppLifecycleState.hidden] on BOTH the background path
+  /// (`inactive → hidden → paused`) and the foreground path
+  /// (`paused → hidden → inactive → resumed`). `main.dart` maps both
+  /// `paused` and `hidden` to this method, so without this guard the
+  /// foreground `hidden` would overwrite the real background timestamp
+  /// with "now" — making the resume elapsed ≈ 0 and letting a 20 min
+  /// background trip slip past the logout. `_backgroundedAt` is cleared by
+  /// [resumeFromBackground], [start] and [stop], re-arming the next trip.
   void markBackgroundedAt(DateTime now) {
     if (_onTimeout == null) return;
+    if (_backgroundedAt != null) return;
     _backgroundedAt = now;
     // Cancel the foreground timer — `Timer` keeps ticking while the app
     // is paused on iOS but Android may freeze it, so we do not rely on

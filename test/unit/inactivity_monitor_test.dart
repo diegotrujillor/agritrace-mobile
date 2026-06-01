@@ -15,8 +15,7 @@ void main() {
   test('fires the callback after the configured timeout elapses', () {
     fakeAsync((async) {
       int fires = 0;
-      final monitor =
-          InactivityMonitor(timeout: const Duration(minutes: 20));
+      final monitor = InactivityMonitor(timeout: const Duration(minutes: 20));
 
       monitor.start(() => fires++);
 
@@ -31,8 +30,7 @@ void main() {
   test('poke() resets the timer indefinitely', () {
     fakeAsync((async) {
       int fires = 0;
-      final monitor =
-          InactivityMonitor(timeout: const Duration(minutes: 20));
+      final monitor = InactivityMonitor(timeout: const Duration(minutes: 20));
 
       monitor.start(() => fires++);
 
@@ -51,8 +49,7 @@ void main() {
   test('stop() cancels the timer and clears the callback', () {
     fakeAsync((async) {
       int fires = 0;
-      final monitor =
-          InactivityMonitor(timeout: const Duration(minutes: 20));
+      final monitor = InactivityMonitor(timeout: const Duration(minutes: 20));
 
       monitor.start(() => fires++);
       async.elapse(const Duration(minutes: 10));
@@ -68,8 +65,7 @@ void main() {
   test('start() after stop() works (re-arms cleanly)', () {
     fakeAsync((async) {
       int fires = 0;
-      final monitor =
-          InactivityMonitor(timeout: const Duration(minutes: 20));
+      final monitor = InactivityMonitor(timeout: const Duration(minutes: 20));
 
       monitor.start(() => fires++);
       monitor.stop();
@@ -84,8 +80,7 @@ void main() {
   });
 
   test('poke() is a no-op when the monitor was never started', () {
-    final monitor =
-        InactivityMonitor(timeout: const Duration(minutes: 20));
+    final monitor = InactivityMonitor(timeout: const Duration(minutes: 20));
     // Must not throw and must not arm a phantom timer.
     monitor.poke();
     expect(monitor.isRunning, isFalse);
@@ -93,8 +88,7 @@ void main() {
 
   test('background → resume after the full timeout fires immediately', () {
     int fires = 0;
-    final monitor =
-        InactivityMonitor(timeout: const Duration(minutes: 20));
+    final monitor = InactivityMonitor(timeout: const Duration(minutes: 20));
 
     final start = DateTime.utc(2026, 5, 25, 9, 0);
     monitor.start(() => fires++);
@@ -110,12 +104,36 @@ void main() {
     expect(fires, 1);
   });
 
+  test('foreground hidden does not clobber the background timestamp', () {
+    // Regression: Flutter fires `hidden` on the foreground path
+    // (paused → hidden → inactive → resumed). main.dart maps `hidden` to
+    // markBackgroundedAt, which used to overwrite the real background
+    // timestamp with ~now → resume elapsed ≈ 0 → a long background trip
+    // never logged out. First mark must win.
+    int fires = 0;
+    final monitor = InactivityMonitor(timeout: const Duration(minutes: 20));
+
+    final start = DateTime.utc(2026, 5, 25, 9, 0);
+    monitor.start(() => fires++);
+
+    // Real backgrounding at 09:00 (hidden then paused on the way out).
+    monitor.markBackgroundedAt(start);
+    monitor.markBackgroundedAt(start.add(const Duration(seconds: 1)));
+
+    // 25 min later the foreground `hidden` fires just before `resumed`.
+    final resumeAt = start.add(const Duration(minutes: 25));
+    monitor.markBackgroundedAt(resumeAt); // must be ignored
+    monitor.resumeFromBackground(resumeAt);
+
+    expect(fires, 1,
+        reason: 'elapsed must be measured from the first (real) mark');
+  });
+
   test('background → resume before the timeout re-arms the remaining budget',
       () {
     fakeAsync((async) {
       int fires = 0;
-      final monitor =
-          InactivityMonitor(timeout: const Duration(minutes: 20));
+      final monitor = InactivityMonitor(timeout: const Duration(minutes: 20));
 
       final start = DateTime.utc(2026, 5, 25, 9, 0);
       monitor.start(() => fires++);
@@ -136,8 +154,7 @@ void main() {
   test('resume without a paired pause re-arms a fresh full timer', () {
     fakeAsync((async) {
       int fires = 0;
-      final monitor =
-          InactivityMonitor(timeout: const Duration(minutes: 20));
+      final monitor = InactivityMonitor(timeout: const Duration(minutes: 20));
 
       monitor.start(() => fires++);
       // Hot restart can deliver `resumed` without a preceding `paused` —
@@ -154,8 +171,7 @@ void main() {
   test('background then resume → stop cleans up everything', () {
     fakeAsync((async) {
       int fires = 0;
-      final monitor =
-          InactivityMonitor(timeout: const Duration(minutes: 20));
+      final monitor = InactivityMonitor(timeout: const Duration(minutes: 20));
 
       final start = DateTime.utc(2026, 5, 25, 9, 0);
       monitor.start(() => fires++);

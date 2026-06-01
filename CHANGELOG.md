@@ -4,6 +4,25 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.10.3] - 2026-05-31 — fix: auto-logout por inactividad tras app en background
+
+### Fixed
+- **fix (user-report):** dejar AgriTrace abierto, cambiar a otra app y
+  volver +20 min después dejaba la sesión activa en la última pantalla
+  (no se cerraba ni navegaba a login). Causa: Flutter dispara
+  `AppLifecycleState.hidden` tanto al irse a background
+  (`inactive → hidden → paused`) como al volver
+  (`paused → hidden → inactive → resumed`). `main.dart` mapea `hidden`
+  (y `paused`) a `InactivityMonitor.markBackgroundedAt(now)`, así que el
+  `hidden` del camino de vuelta **sobrescribía** el timestamp real de
+  background con "ahora" → en `resumeFromBackground` el `elapsed` daba
+  ≈ 0 y nunca disparaba el logout. Fix: `markBackgroundedAt` ahora es
+  idempotente dentro de un mismo viaje a background (gana la primera
+  marca); `resumeFromBackground`/`start`/`stop` la limpian. Dónde:
+  `lib/services/inactivity_monitor.dart`.
+- **tests:** +1 regresión `foreground hidden does not clobber the
+  background timestamp` en `test/unit/inactivity_monitor_test.dart`.
+
 ## [1.10.2] - 2026-05-31 — fix: inactivity logout navega a /welcome inmediato
 
 ### Fixed
