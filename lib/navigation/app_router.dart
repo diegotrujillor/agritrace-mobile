@@ -18,6 +18,8 @@ import '../screens/activities/activity_timeline_screen.dart';
 import '../screens/alerts/alerts_screen.dart';
 import '../screens/alerts/alert_form_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/pilot/pilot_blocked_screen.dart';
+import '../models/user.dart';
 import 'route_names.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -30,15 +32,31 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final authState = ref.read(authProvider);
       if (authState.isLoading) return null;
-      final isAuthenticated = authState.valueOrNull is AuthAuthenticated;
+
+      final authValue = authState.valueOrNull;
+      final authenticatedState = authValue is AuthAuthenticated ? authValue : null;
+      final isAuthenticated = authenticatedState != null;
+      final loc = state.matchedLocation;
+
       final isAuthRoute = {
         Routes.welcome,
         Routes.login,
         Routes.register,
-      }.contains(state.matchedLocation);
+      }.contains(loc);
 
-      if (isAuthenticated && isAuthRoute)  return Routes.dashboard;
       if (!isAuthenticated && !isAuthRoute) return Routes.welcome;
+      if (isAuthenticated && isAuthRoute) return Routes.dashboard;
+
+      // Pilot-window gate. Checked after auth so only authenticated users
+      // reach this branch. Admin role and is_demo users are always exempt.
+      if (isAuthenticated) {
+        final user = authenticatedState.user;
+        final blocked = _isPilotBlocked(user);
+        if (blocked && loc != Routes.pilotBlocked) return Routes.pilotBlocked;
+        // When the operator extends/starts the pilot, let the user back in.
+        if (!blocked && loc == Routes.pilotBlocked) return Routes.dashboard;
+      }
+
       return null;
     },
     routes: [
@@ -47,6 +65,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.register,  builder: (_, __) => const RegisterScreen()),
       GoRoute(path: Routes.dashboard, builder: (_, __) => const DashboardScreen()),
       GoRoute(path: Routes.profile,   builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: Routes.pilotBlocked, builder: (_, __) => const PilotBlockedScreen()),
       // Static `/alerts/new` before `/alerts` for consistency with the
       // `/new`-before-`:id` ordering used elsewhere.
       GoRoute(path: Routes.alertNew, builder: (_, __) => const AlertFormScreen()),
@@ -120,6 +139,17 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(router.dispose);
   return router;
 });
+
+/// Returns true when [user] must be redirected to [Routes.pilotBlocked].
+///
+/// Exempt: admin role, is_demo flag.
+/// Blocked: pilot not started (pilotEndsAt null) or window elapsed.
+bool _isPilotBlocked(User user) {
+  if (user.role == UserRole.admin || user.isDemo) return false;
+  final endsAt = user.pilotEndsAt;
+  if (endsAt == null) return true;
+  return DateTime.now().isAfter(endsAt);
+}
 
 class _AuthListenable extends ChangeNotifier {
   _AuthListenable(Ref ref) {

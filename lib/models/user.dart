@@ -7,6 +7,8 @@ class User {
     required this.fullName,
     required this.phone,
     required this.role,
+    this.isDemo = false,
+    this.pilotEndsAt,
   });
 
   final String id;
@@ -14,6 +16,13 @@ class User {
   final String fullName;
   final String phone;
   final UserRole role;
+
+  /// True when this account is a demo/QA account exempt from the pilot window.
+  final bool isDemo;
+
+  /// UTC timestamp when the 30-day pilot window closes. Null when the
+  /// operator has not yet called `POST /v1/internal/pilots/start`.
+  final DateTime? pilotEndsAt;
 
   factory User.fromJson(Map<String, dynamic> json) => User(
         id: json['id'] as String,
@@ -24,6 +33,10 @@ class User {
           (r) => r.name == json['role'],
           orElse: () => UserRole.producer,
         ),
+        isDemo: (json['isDemo'] as bool?) ?? false,
+        pilotEndsAt: json['pilotEndsAt'] != null
+            ? DateTime.parse(json['pilotEndsAt'] as String).toLocal()
+            : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -32,6 +45,9 @@ class User {
         'fullName': fullName,
         'phone': phone,
         'role': role.name,
+        'isDemo': isDemo,
+        if (pilotEndsAt != null)
+          'pilotEndsAt': pilotEndsAt!.toUtc().toIso8601String(),
       };
 
   User copyWith({
@@ -40,6 +56,8 @@ class User {
     String? fullName,
     String? phone,
     UserRole? role,
+    bool? isDemo,
+    DateTime? pilotEndsAt,
   }) =>
       User(
         id: id ?? this.id,
@@ -47,6 +65,8 @@ class User {
         fullName: fullName ?? this.fullName,
         phone: phone ?? this.phone,
         role: role ?? this.role,
+        isDemo: isDemo ?? this.isDemo,
+        pilotEndsAt: pilotEndsAt ?? this.pilotEndsAt,
       );
 }
 

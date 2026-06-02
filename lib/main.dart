@@ -5,6 +5,7 @@ import 'navigation/app_router.dart';
 import 'providers/auth_provider.dart';
 import 'services/inactivity_monitor.dart';
 import 'utils/theme.dart';
+import 'widgets/common/pilot_countdown_banner.dart';
 
 void main() {
   // Block google_fonts from making outbound HTTP requests to fonts.gstatic.com.
@@ -104,6 +105,15 @@ class _AgriTraceAppState extends ConsumerState<AgriTraceApp>
         scaffoldMessengerKey: _messengerKey,
         routerConfig: router,
         debugShowCheckedModeBanner: false,
+        // Mount PilotCountdownBanner above every screen. The widget
+        // returns SizedBox.shrink() when not applicable (unauthenticated,
+        // demo/admin, > 5 days remaining).
+        builder: (context, child) => Column(
+          children: [
+            const PilotCountdownBanner(),
+            Expanded(child: child ?? const SizedBox.shrink()),
+          ],
+        ),
       ),
     );
   }

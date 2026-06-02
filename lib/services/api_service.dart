@@ -186,6 +186,20 @@ class _AuthInterceptor extends QueuedInterceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
+    // 403 ACCOUNT_DISABLED: operator revoked access mid-session. Trigger
+    // immediate logout so the user lands on /welcome without waiting up to
+    // 15 min for the access token to expire. Other 403 codes (PILOT_EXPIRED,
+    // PILOT_NOT_STARTED, NOT_INVITED) pass through — the router handles them
+    // via its redirect on next navigation.
+    if (err.response?.statusCode == 403) {
+      final data = err.response?.data;
+      if (data is Map && data['code'] == 'ACCOUNT_DISABLED') {
+        _onLogout?.call();
+      }
+      handler.next(err);
+      return;
+    }
+
     final isAuthError = err.response?.statusCode == 401;
     // Three early-outs share the same shape:
     //  - not a 401 → not our concern

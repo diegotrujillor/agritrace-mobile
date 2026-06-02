@@ -22,6 +22,25 @@ String parseApiError(Object? error) {
     }
 
     final status = error.response?.statusCode;
+    if (status == 403) {
+      // Machine-readable code from the backend envelope lets us give a
+      // specific message per failure mode. The interceptor in api_service.dart
+      // also calls _onLogout for ACCOUNT_DISABLED; this message shows during
+      // the brief window before the navigation completes.
+      final data = error.response?.data;
+      final code = data is Map ? data['code'] as String? : null;
+      return switch (code) {
+        'PILOT_EXPIRED' =>
+          'Tu período de piloto ha terminado. Contacta al equipo AgriTrace.',
+        'PILOT_NOT_STARTED' =>
+          'Tu acceso al piloto aún no ha sido activado. Contacta al equipo AgriTrace.',
+        'ACCOUNT_DISABLED' =>
+          'Tu cuenta ha sido desactivada. Contacta al equipo AgriTrace.',
+        'NOT_INVITED' =>
+          'Este correo no está autorizado para el piloto. Contacta al equipo AgriTrace.',
+        _ => 'No tienes permiso para ver esto.',
+      };
+    }
     if (status == 401) {
       // Split the raw-401 message by origin:
       //  - `/auth/login`         → wrong credentials at sign-in

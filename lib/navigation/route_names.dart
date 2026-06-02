@@ -12,6 +12,10 @@ abstract final class Routes {
   static const alertNew  = '/alerts/new';
   static const profile   = '/profile';
 
+  /// Full-screen pilot-window block. Reached via GoRouter redirect when
+  /// [User.pilotEndsAt] is null or in the past and user is not demo/admin.
+  static const pilotBlocked = '/pilot-blocked';
+
   // Parameterised paths registered on the GoRouter. Use the builder helpers
   // below to construct concrete locations rather than string-concatenating
   // at call sites.

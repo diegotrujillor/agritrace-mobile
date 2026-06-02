@@ -4,6 +4,25 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.10.4] - 2026-06-01 — feat: ventana de piloto + bloqueo + cuenta regresiva
+
+### Added
+- `User.pilotEndsAt DateTime?` + `User.isDemo bool` desde respuesta de login/register/refresh.
+  Retrocompatibles (JSON sin estos campos = null/false). `lib/models/user.dart`.
+- `pilotStatusProvider` + `PilotStatus` — estado derivado (exempt/active/notStarted/expired)
+  + `daysRemaining`. `lib/providers/pilot_status_provider.dart`.
+- `PilotCountdownBanner` — banner ámbar global (≤5 días). Montado en `main.dart` vía
+  `MaterialApp.router.builder`. `lib/widgets/common/pilot_countdown_banner.dart`.
+- `PilotBlockedScreen` en `/pilot-blocked` — pantalla de bloqueo total, diferencia
+  `notStarted` vs `expired`, preserva exportar datos + logout (Ley 1581).
+  `lib/screens/pilot/pilot_blocked_screen.dart`.
+- GoRouter redirect detecta pilot blocked → `/pilot-blocked`; admin e `isDemo` exentos.
+  `lib/navigation/app_router.dart`, `lib/navigation/route_names.dart`.
+- `error_parser.dart`: 403 con códigos `PILOT_EXPIRED`, `PILOT_NOT_STARTED`,
+  `ACCOUNT_DISABLED`, `NOT_INVITED` → mensajes en español.
+- `_AuthInterceptor`: 403 `ACCOUNT_DISABLED` → `onLogout` inmediato. `lib/services/api_service.dart`.
+- 8 unit tests para `PilotStatus.fromUser`. Suite: 399 pasan.
+
 ## [1.10.3] - 2026-05-31 — fix: auto-logout por inactividad tras app en background
 
 ### Fixed
