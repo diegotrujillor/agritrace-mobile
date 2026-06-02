@@ -114,8 +114,12 @@ class AuthUnauthenticated extends AuthState {
 }
 
 class AuthAuthenticated extends AuthState {
-  const AuthAuthenticated(this.user);
+  const AuthAuthenticated(this.user, {this.pilotConsentGiven = false});
   final User user;
+  /// True when the producer has accepted the Política de Privacidad
+  /// (Ley 1581) on this device via [AuthNotifier.markPilotConsentGiven].
+  /// The router redirects to [Routes.pilotConsent] when false.
+  final bool pilotConsentGiven;
 }
 
 class AuthNotifier extends AsyncNotifier<AuthState> {
@@ -163,6 +167,8 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     // online and we want the inactivity timer running from the first frame.
     _armSessionBackgroundServices();
 
+    final consentGiven = await storage.getPilotConsent(snapshot.email);
+
     // Schedule the background probe AFTER returning Authenticated so the
     // router routes the user to the dashboard with zero waiting time.
     // `Future.microtask` defers the call until the current async frame
@@ -170,7 +176,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     // the new state. `unawaited` is intentional — we want fire-and-forget.
     unawaited(Future.microtask(() => _backgroundProbe(storage)));
 
-    return AuthAuthenticated(snapshot);
+    return AuthAuthenticated(snapshot, pilotConsentGiven: consentGiven);
   }
 
   /// Legacy strict cold-start probe — the v1.9.10 behaviour. Used as the
@@ -187,9 +193,10 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   Future<AuthState> _probeAndReturn(StorageService storage) async {
     try {
       final auth = await ref.read(authServiceProvider).refresh();
+      final consentGiven = await storage.getPilotConsent(auth.user.email);
       _seedInBackground('initial seed');
       _armSessionBackgroundServices();
-      return AuthAuthenticated(auth.user);
+      return AuthAuthenticated(auth.user, pilotConsentGiven: consentGiven);
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       if (status == 401 || status == 403) {
@@ -301,8 +308,10 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       final auth = await ref
           .read(authServiceProvider)
           .login(email: email, password: password);
+      final consentGiven =
+          await ref.read(storageServiceProvider).getPilotConsent(auth.user.email);
       _armSessionBackgroundServices();
-      return AuthAuthenticated(auth.user);
+      return AuthAuthenticated(auth.user, pilotConsentGiven: consentGiven);
     });
   }
 
@@ -327,8 +336,10 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
             password: password,
             privacyConsent: privacyConsent,
           );
+      final consentGiven =
+          await ref.read(storageServiceProvider).getPilotConsent(auth.user.email);
       _armSessionBackgroundServices();
-      return AuthAuthenticated(auth.user);
+      return AuthAuthenticated(auth.user, pilotConsentGiven: consentGiven);
     });
   }
 
@@ -383,6 +394,17 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   /// logout flow and emits a signal on [inactivityLogoutSignalProvider]
   /// so the root widget in `main.dart` can queue a SnackBar after the
   /// router routes back to `/welcome`.
+  /// Records pilot-privacy consent for the current user and updates the
+  /// auth state so the GoRouter redirect re-evaluates immediately.
+  Future<void> markPilotConsentGiven() async {
+    final current = state.valueOrNull;
+    if (current is! AuthAuthenticated) return;
+    await ref.read(storageServiceProvider).savePilotConsent(current.user.email);
+    state = AsyncData(
+      AuthAuthenticated(current.user, pilotConsentGiven: true),
+    );
+  }
+
   void _handleInactivityTimeout() {
     // Increment the signal counter BEFORE awaiting logout so the UI sees
     // the change in the same microtask as the auth state flip. Using a

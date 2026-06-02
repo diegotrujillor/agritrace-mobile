@@ -30,10 +30,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   bool _consent = false;
 
-  static final Uri _privacyPolicyUrl = Uri.parse(
-    'https://github.com/diegotrujillor/agritrace-docs/blob/main/'
-    '01-preparacion-mvp/08-legal/01-politica-privacidad.md',
-  );
+  static final Uri _privacyPolicyUrl = Uri.parse(kPrivacyPolicyUrl);
 
   Future<void> _openPrivacyPolicy() async {
     await launchUrl(_privacyPolicyUrl, mode: LaunchMode.externalApplication);

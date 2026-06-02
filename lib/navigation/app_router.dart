@@ -19,6 +19,7 @@ import '../screens/alerts/alerts_screen.dart';
 import '../screens/alerts/alert_form_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/pilot/pilot_blocked_screen.dart';
+import '../screens/pilot/pilot_consent_screen.dart';
 import '../models/user.dart';
 import 'route_names.dart';
 
@@ -52,9 +53,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (isAuthenticated) {
         final user = authenticatedState.user;
         final blocked = _isPilotBlocked(user);
+
+        // 1. Pilot gate (window not started or expired).
         if (blocked && loc != Routes.pilotBlocked) return Routes.pilotBlocked;
-        // When the operator extends/starts the pilot, let the user back in.
         if (!blocked && loc == Routes.pilotBlocked) return Routes.dashboard;
+
+        // 2. Privacy-consent gate (Ley 1581). Exempt: admin + demo (internal).
+        // Blocked users see the pilot-blocked screen instead (no consent needed
+        // until the pilot is activated).
+        final needsConsent = !blocked &&
+            !authenticatedState.pilotConsentGiven &&
+            user.role != UserRole.admin &&
+            !user.isDemo;
+        if (needsConsent && loc != Routes.pilotConsent) return Routes.pilotConsent;
+        if (!needsConsent && loc == Routes.pilotConsent) return Routes.dashboard;
       }
 
       return null;
@@ -66,6 +78,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.dashboard, builder: (_, __) => const DashboardScreen()),
       GoRoute(path: Routes.profile,   builder: (_, __) => const ProfileScreen()),
       GoRoute(path: Routes.pilotBlocked, builder: (_, __) => const PilotBlockedScreen()),
+      GoRoute(path: Routes.pilotConsent, builder: (_, __) => const PilotConsentScreen()),
       // Static `/alerts/new` before `/alerts` for consistency with the
       // `/new`-before-`:id` ordering used elsewhere.
       GoRoute(path: Routes.alertNew, builder: (_, __) => const AlertFormScreen()),

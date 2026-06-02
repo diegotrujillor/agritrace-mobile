@@ -137,6 +137,10 @@ void main() {
     // offline-friendly fast path explicitly override this. The legacy
     // active-probe path is the default behavior with this stub.
     when(() => mockStorage.getUserSnapshot()).thenAnswer((_) async => null);
+    // Pilot consent defaults false. Tests verifying post-consent behaviour
+    // override per-test.
+    when(() => mockStorage.getPilotConsent(any())).thenAnswer((_) async => false);
+    when(() => mockStorage.savePilotConsent(any())).thenAnswer((_) async {});
     // Background seed sync — fire-and-forget. Stub to no-op so tests that
     // exercise login/register/cold-start succeed without hitting the real DB.
     when(() => mockOrchestrator.run(since: any(named: 'since')))

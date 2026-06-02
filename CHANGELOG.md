@@ -4,6 +4,18 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.10.5] - 2026-06-02 — feat: consentimiento de privacidad Ley 1581
+
+### Added
+- `PilotConsentScreen` (`/pilot-consent`): pantalla única por dispositivo/cuenta.
+  Resumen de datos + enlace a `agritrace.co/privacidad`. "Acepto" guarda timestamp
+  en `FlutterSecureStorage`; router redirige automáticamente. Exento: admin/isDemo.
+- `StorageService.savePilotConsent` + `getPilotConsent`: clave `pilot_consent_<email>`.
+- `AuthAuthenticated.pilotConsentGiven: bool` + `markPilotConsentGiven()`.
+- `kPrivacyPolicyUrl = 'https://agritrace.co/privacidad'` en constants.
+- `RegisterScreen`: URL de política actualizada al dominio propio.
+- Suite: 399 pasan.
+
 ## [1.10.4] - 2026-06-01 — feat: ventana de piloto + bloqueo + cuenta regresiva
 
 ### Added

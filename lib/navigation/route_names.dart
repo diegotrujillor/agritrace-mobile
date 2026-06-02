@@ -16,6 +16,10 @@ abstract final class Routes {
   /// [User.pilotEndsAt] is null or in the past and user is not demo/admin.
   static const pilotBlocked = '/pilot-blocked';
 
+  /// One-time privacy-consent gate (Ley 1581). Reached via GoRouter redirect
+  /// when [AuthAuthenticated.pilotConsentGiven] is false.
+  static const pilotConsent = '/pilot-consent';
+
   // Parameterised paths registered on the GoRouter. Use the builder helpers
   // below to construct concrete locations rather than string-concatenating
   // at call sites.

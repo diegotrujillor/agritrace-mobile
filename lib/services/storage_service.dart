@@ -96,6 +96,25 @@ class StorageService {
   Future<void> deleteUserSnapshot() =>
       _storage.delete(key: _userSnapshotKey);
 
+  /// Persists pilot-privacy consent acceptance for [email].
+  ///
+  /// Stores the ISO-8601 UTC timestamp so there is an auditable record
+  /// of when the producer consented (Ley 1581). Key is per-email so
+  /// multiple accounts on one device are tracked independently.
+  Future<void> savePilotConsent(String email) => _storage.write(
+        key: 'pilot_consent_${email.toLowerCase()}',
+        value: DateTime.now().toUtc().toIso8601String(),
+      );
+
+  /// Returns true when pilot consent has already been accepted for
+  /// [email] on this device.
+  Future<bool> getPilotConsent(String email) async {
+    final v = await _storage.read(
+      key: 'pilot_consent_${email.toLowerCase()}',
+    );
+    return v != null && v.isNotEmpty;
+  }
+
   /// Clears every key owned by the app (tokens + `last_user_id` +
   /// `user_snapshot`).
   ///

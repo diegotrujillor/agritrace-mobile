@@ -36,6 +36,10 @@ abstract final class AppSpacing {
 /// rural pilots where producers often hand-pass a single phone.
 const int kInactivityTimeoutMinutes = 20;
 
+/// Public URL for the full Política de Privacidad (Ley 1581).
+/// Linked from [RegisterScreen] and [PilotConsentScreen].
+const String kPrivacyPolicyUrl = 'https://agritrace.co/privacidad';
+
 /// Crop types offered in the **plot** form. Constrained to the MVP pilot
 /// region (Valle del Cauca) primary crops plus an `otro` escape hatch. The
 /// value is sent verbatim to the backend `cropType` field.
