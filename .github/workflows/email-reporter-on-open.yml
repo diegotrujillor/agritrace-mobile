@@ -1,0 +1,117 @@
+name: Email original reporter when a user-report issue is opened
+
+# Reception acknowledgment: when a user-report issue (created via
+# `POST /v1/feedback`) is opened, parse the original productor email out
+# of the issue body and send them a short Spanish "gracias, lo estamos
+# revisando" message so they know the report was received.
+#
+# Companion to email-reporter-on-close.yml (which fires on close with the
+# "ya lo arreglamos" message). Same parsing, same GMAIL_* secrets.
+#
+# Trigger: ONLY `opened`. The backend always creates the issue with the
+# `user-report` label attached, so `opened` carries it and the guard below
+# passes. We deliberately do NOT listen on `labeled` — see
+# email-on-user-report.yml for why that caused triple emails.
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to send the reception ack for"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  notify:
+    # Auto-trigger only on user-report issues. workflow_dispatch bypasses
+    # the label check (handled in the parse step).
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.issue.labels.*.name, 'user-report')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Resolve issue + extract reporter email
+        id: parse
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ISSUE_NUMBER="${{ inputs.issue_number }}"
+          else
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+          fi
+          ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --json number,title,body,labels,state,url)
+          # Guard the auto-trigger to only fire on user-report issues.
+          # workflow_dispatch bypasses the label check intentionally.
+          LABELS=$(echo "$ISSUE_JSON" | jq -r '[.labels[].name] | join(",")')
+          if [ "${{ github.event_name }}" = "issues" ] && ! echo ",$LABELS," | grep -q ',user-report,'; then
+            echo "Issue #$ISSUE_NUMBER lacks user-report label — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BODY=$(echo "$ISSUE_JSON" | jq -r '.body')
+          # Backend feedback service writes a line like
+          # "**Usuario:** <email> (id: <uuid>)" in the issue body.
+          REPORTER_EMAIL=$(echo "$BODY" | grep -Eio '\*\*Usuario:\*\*[[:space:]]*[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' \
+            | head -1 \
+            | sed -E 's/.*\*\*Usuario:\*\*[[:space:]]*//I')
+          if [ -z "$REPORTER_EMAIL" ]; then
+            echo "::warning::Could not extract reporter email from issue #$ISSUE_NUMBER body — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          TITLE=$(echo "$ISSUE_JSON" | jq -r '.title' | sed 's/^\[user-report\][[:space:]]*//')
+          URL=$(echo "$ISSUE_JSON" | jq -r '.url')
+          {
+            echo "skip=false"
+            echo "issue_number=$ISSUE_NUMBER"
+            echo "reporter_email=$REPORTER_EMAIL"
+            echo "issue_title=$TITLE"
+            echo "issue_url=$URL"
+          } >> "$GITHUB_OUTPUT"
+          echo "Will acknowledge $REPORTER_EMAIL about issue #$ISSUE_NUMBER"
+
+      - name: Send "gracias, lo estamos revisando" email via Gmail SMTP
+        if: steps.parse.outputs.skip == 'false'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "Recibimos tu reporte en AgriTrace — gracias (#${{ steps.parse.outputs.issue_number }})"
+          to: ${{ steps.parse.outputs.reporter_email }}
+          # bcc so Diego sees the outbound + has the thread for follow-up.
+          bcc: diegotrujillor@gmail.com
+          from: "AgriTrace <${{ secrets.GMAIL_USER }}>"
+          body: |
+            Hola,
+
+            Soy Diego, de AgriTrace. ¡Gracias por reportar el problema desde la app!
+
+            Ya recibimos tu reporte:
+            #${{ steps.parse.outputs.issue_number }} — ${{ steps.parse.outputs.issue_title }}
+
+            Lo vamos a revisar y trabajar en una solución. Cuando esté lista,
+            te avisamos por este mismo correo para que actualices la app.
+
+            No necesitás hacer nada más por ahora. Si te encontrás con algo más,
+            usá de nuevo la opción "Reportar problema" desde la app.
+
+            Tu feedback me ayuda muchísimo a mejorar AgriTrace para todos los
+            productores. Mil gracias por tomarte el tiempo.
+
+            Diego Trujillo
+            AgriTrace (Cali)
+            ${{ steps.parse.outputs.issue_url }}
