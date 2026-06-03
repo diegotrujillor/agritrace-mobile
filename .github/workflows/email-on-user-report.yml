@@ -23,14 +23,18 @@ name: Email Diego when a user-report issue is opened
 
 on:
   issues:
-    # `opened` fires when the issue is created with labels already
-    # attached (the typical backend path: `POST /v1/feedback` sends
-    # title + body + labels atomically). `labeled` is a safety net for
-    # cases where the label is applied in a second call (e.g. gh CLI
-    # smoke tests, manual triage). The `if:` guard prevents double
-    # emails — when both events fire we only act on the one that
-    # already has the label.
-    types: [opened, labeled]
+    # ONLY `opened`. The backend (`POST /v1/feedback` →
+    # `feedback.service.ts`) always creates the issue with BOTH labels
+    # (`['user-report', category]`) attached atomically, so `opened`
+    # already carries the `user-report` label and the `if:` guard below
+    # passes on creation.
+    #
+    # We previously also listened on `labeled`, believing the `if:` guard
+    # would dedupe. It does NOT: `contains(labels, 'user-report')` is true
+    # on EVERY event once the label exists, so a single feedback POST fired
+    # 3 emails — one `opened` + one `labeled` per attached label. Removing
+    # `labeled` makes it exactly one email per issue.
+    types: [opened]
 
 permissions:
   contents: read
