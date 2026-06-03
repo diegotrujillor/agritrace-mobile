@@ -117,5 +117,32 @@ void main() {
       expect(copy.description, 'New');
       expect(copy.photoUrl, 'https://x/y.jpg');
     });
+
+    // Bug #38 root cause: copyWith CANNOT clear a nullable field — passing
+    // null null-coalesces back to the existing value. This is why
+    // ActivityRepository.update() builds a fresh Activity (explicit
+    // construction) instead of copyWith when the form removes the photo.
+    test('copyWith(photoUrl: null) keeps the old photo — must NOT be used to clear', () {
+      final withPhoto = base.copyWith(photoUrl: 'https://x/y.jpg');
+      expect(withPhoto.photoUrl, 'https://x/y.jpg');
+
+      final attemptedClear = withPhoto.copyWith(photoUrl: null);
+      expect(attemptedClear.photoUrl, 'https://x/y.jpg');
+    });
+
+    test('explicit construction with null photoUrl DOES clear (repo update path)', () {
+      final withPhoto = base.copyWith(photoUrl: 'https://x/y.jpg');
+      // Mirrors ActivityRepository.update(): rebuild the entity so null clears.
+      final cleared = Activity(
+        id: withPhoto.id,
+        plotId: withPhoto.plotId,
+        type: withPhoto.type,
+        occurredAt: withPhoto.occurredAt,
+        createdAt: withPhoto.createdAt,
+        description: withPhoto.description,
+        photoUrl: null,
+      );
+      expect(cleared.photoUrl, isNull);
+    });
   });
 }

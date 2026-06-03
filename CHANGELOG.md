@@ -4,6 +4,28 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.10.6] - 2026-06-03 — fix: eliminar foto en actividad ahora persiste (#38)
+
+### Fixed
+- **fix #38 (user-report anavospina):** al editar una actividad y quitar la
+  foto ("Quitar foto"), al guardar + reabrir la foto seguía ahí — se podía
+  reemplazar pero no eliminar. Causa: `ActivityRepository.update` usaba
+  `Activity.copyWith(photoUrl: photoUrl)`; cuando el form enviaba `null`
+  (foto removida), el null-coalescing de `copyWith` (`photoUrl ?? this.photoUrl`)
+  restauraba la foto vieja. Fix: `update()` ahora construye un `Activity`
+  nuevo explícitamente, así un `null` SÍ limpia el campo. Además
+  `SyncOrchestrator` envía `photoUrl`/`description` siempre (incluso null)
+  para que el clear se propague al backend (el upsert de sync usa
+  `EXCLUDED.photo_url`, reemplazo completo — ya estaba correcto). Dónde:
+  `lib/repositories/activity_repository.dart`,
+  `lib/services/sync_orchestrator.dart`.
+- **tests:** +2 regresión en `activity_model_test.dart`. Suite: 401 pasan.
+
+### Nota
+- **#39 (feature, "letrero de reconfirmación al eliminar cuenta"):** ya estaba
+  implementado — el botón "Eliminar mi cuenta" muestra un `AlertDialog` de
+  confirmación ("No se puede deshacer") antes de borrar. Sin cambios de código.
+
 ## [1.10.5] - 2026-06-02 — feat: consentimiento de privacidad Ley 1581
 
 ### Added

@@ -131,8 +131,13 @@ class SyncOrchestrator {
           'plotId': row.plotId,
           'type': row.type,
           'occurredAt': row.occurredAt.toUtc().toIso8601String(),
-          if (row.description != null) 'description': row.description,
-          if (row.photoUrl != null) 'photoUrl': row.photoUrl,
+          // Always send description + photoUrl (even when null) so an
+          // explicit clear ("Quitar foto" / cleared description) propagates
+          // to the backend. Omitting null let the server keep the old value
+          // on upsert, so a removed photo reappeared after the next pull
+          // (bug #38).
+          'description': row.description,
+          'photoUrl': row.photoUrl,
           'updatedAt': row.updatedAt.toUtc().toIso8601String(),
         },
       ));

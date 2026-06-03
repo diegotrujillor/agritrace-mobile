@@ -63,6 +63,13 @@ class ActivityRepository {
   }
 
   /// Updates an existing [Activity] locally and marks it [pendingUpdate].
+  ///
+  /// The edit form always submits the COMPLETE desired state, so
+  /// [description] and [photoUrl] are set EXPLICITLY — a `null` CLEARS the
+  /// field (e.g. "Quitar foto"). Using `copyWith` here would null-coalesce
+  /// and silently keep the old photo (bug #38: removed photo reappeared on
+  /// reopen). [type] and [occurredAt] are required by the form and never
+  /// null, but still fall back to the existing value for non-form callers.
   Future<Activity> update(
     Activity existing, {
     ActivityType? type,
@@ -71,9 +78,12 @@ class ActivityRepository {
     String? photoUrl,
   }) async {
     final now = DateTime.now().toUtc();
-    final updated = existing.copyWith(
-      type: type,
-      occurredAt: occurredAt,
+    final updated = Activity(
+      id: existing.id,
+      plotId: existing.plotId,
+      type: type ?? existing.type,
+      occurredAt: occurredAt ?? existing.occurredAt,
+      createdAt: existing.createdAt,
       description: description,
       photoUrl: photoUrl,
     );
