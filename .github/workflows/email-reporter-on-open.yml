@@ -98,7 +98,7 @@ jobs:
           body: |
             Hola,
 
-            Soy Diego, de AgriTrace. ¡Gracias por reportar el problema desde la app!
+            Soy Diego Trujillo, de AgriTrace. ¡Gracias por reportar el problema desde la app!
 
             Ya recibimos tu reporte:
             #${{ steps.parse.outputs.issue_number }} — ${{ steps.parse.outputs.issue_title }}
@@ -106,8 +106,8 @@ jobs:
             Lo vamos a revisar y trabajar en una solución. Cuando esté lista,
             te avisamos por este mismo correo para que actualices la app.
 
-            No necesitás hacer nada más por ahora. Si te encontrás con algo más,
-            usá de nuevo la opción "Reportar problema" desde la app.
+            No necesitas hacer nada más por ahora. Si te encuentras con algo más,
+            usa de nuevo la opción "Reportar problema" desde la app.
 
             Tu feedback me ayuda muchísimo a mejorar AgriTrace para todos los
             productores. Mil gracias por tomarte el tiempo.
