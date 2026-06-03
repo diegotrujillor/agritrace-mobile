@@ -1,0 +1,122 @@
+name: Email reporter when a fix is ready to verify
+
+# Intermediate state in the feedback loop: GitHub issues only have
+# open/closed, so we use the `pending-verification` label to mean "the fix
+# is committed and ships in the next APK — please re-download and test".
+# Adding that label fires this workflow, which emails the original reporter
+# asking them to verify on their device. When they confirm, we close the
+# issue and email-reporter-on-close.yml sends the final "ya quedó" message.
+#
+# Trigger: `labeled` guarded to the SPECIFIC label just added
+# (github.event.label.name == 'pending-verification'). This fires exactly
+# once — only when THIS label is applied — so it does not suffer the
+# multi-label triple-email problem of email-on-user-report.yml.
+#
+# Reuses GMAIL_USER / GMAIL_APP_PASSWORD already configured for the other
+# feedback workflows.
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to ask the reporter to verify"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  notify:
+    # Auto-trigger ONLY when the pending-verification label is the one just
+    # added. workflow_dispatch bypasses this for manual replays.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.label.name == 'pending-verification'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Resolve issue + extract reporter email
+        id: parse
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ISSUE_NUMBER="${{ inputs.issue_number }}"
+          else
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+          fi
+          ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --json number,title,body,labels,state,url)
+          # Only notify on user-report issues — internal/QA issues never
+          # have a real reporter email in the body.
+          LABELS=$(echo "$ISSUE_JSON" | jq -r '[.labels[].name] | join(",")')
+          if [ "${{ github.event_name }}" = "issues" ] && ! echo ",$LABELS," | grep -q ',user-report,'; then
+            echo "Issue #$ISSUE_NUMBER lacks user-report label — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BODY=$(echo "$ISSUE_JSON" | jq -r '.body')
+          # Backend feedback service writes "**Usuario:** <email> (id: <uuid>)".
+          REPORTER_EMAIL=$(echo "$BODY" | grep -Eio '\*\*Usuario:\*\*[[:space:]]*[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' \
+            | head -1 \
+            | sed -E 's/.*\*\*Usuario:\*\*[[:space:]]*//I')
+          if [ -z "$REPORTER_EMAIL" ]; then
+            echo "::warning::Could not extract reporter email from issue #$ISSUE_NUMBER body — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          TITLE=$(echo "$ISSUE_JSON" | jq -r '.title' | sed 's/^\[user-report\][[:space:]]*//')
+          URL=$(echo "$ISSUE_JSON" | jq -r '.url')
+          {
+            echo "skip=false"
+            echo "issue_number=$ISSUE_NUMBER"
+            echo "reporter_email=$REPORTER_EMAIL"
+            echo "issue_title=$TITLE"
+            echo "issue_url=$URL"
+          } >> "$GITHUB_OUTPUT"
+          echo "Will ask $REPORTER_EMAIL to verify issue #$ISSUE_NUMBER"
+
+      - name: Send "lo arreglamos, por favor verifica" email via Gmail SMTP
+        if: steps.parse.outputs.skip == 'false'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "Tu reporte en AgriTrace ya tiene solución — ¿nos ayudas a verificar? (#${{ steps.parse.outputs.issue_number }})"
+          to: ${{ steps.parse.outputs.reporter_email }}
+          bcc: diegotrujillor@gmail.com
+          from: "AgriTrace <${{ secrets.GMAIL_USER }}>"
+          body: |
+            Hola,
+
+            Soy Diego Trujillo, de AgriTrace. ¡Buenas noticias!
+
+            Ya trabajamos en una solución para el problema que reportaste:
+            #${{ steps.parse.outputs.issue_number }} — ${{ steps.parse.outputs.issue_title }}
+
+            La corrección está incluida en la nueva versión de la app. Para
+            probarla:
+
+            1. Descarga e instala la última versión del APK (te pasamos el
+               enlace por WhatsApp, o búscala en el grupo del piloto).
+            2. Abre la app y repite los pasos donde viste el problema.
+            3. Cuéntanos si quedó resuelto — respóndenos a este correo o usa
+               de nuevo la opción "Reportar problema" desde la app.
+
+            Si todo funciona bien, cerramos el reporte. Si sigues viendo algo
+            raro, avísanos y lo seguimos revisando.
+
+            Mil gracias por tu paciencia y por ayudarnos a mejorar AgriTrace.
+
+            Diego Trujillo
+            AgriTrace (Cali)
+            ${{ steps.parse.outputs.issue_url }}
