@@ -64,6 +64,9 @@ class ActivitiesTable extends Table {
   DateTimeColumn get occurredAt => dateTime().named('occurred_at')();
   TextColumn get description => text().nullable()();
   TextColumn get photoUrl => text().named('photo_url').nullable()();
+  // v2 (schema bump): structured labor record — amount + unit of the input.
+  RealColumn get quantity => real().nullable()();
+  TextColumn get unit => text().nullable()();
   DateTimeColumn get createdAt => dateTime().named('created_at')();
   DateTimeColumn get updatedAt => dateTime().named('updated_at')();
   TextColumn get syncStatus =>

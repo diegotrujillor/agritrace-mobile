@@ -1067,6 +1067,17 @@ class $ActivitiesTableTable extends ActivitiesTable
   late final GeneratedColumn<String> photoUrl = GeneratedColumn<String>(
       'photo_url', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _quantityMeta =
+      const VerificationMeta('quantity');
+  @override
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
+      'quantity', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+      'unit', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -1095,6 +1106,8 @@ class $ActivitiesTableTable extends ActivitiesTable
         occurredAt,
         description,
         photoUrl,
+        quantity,
+        unit,
         createdAt,
         updatedAt,
         syncStatus
@@ -1145,6 +1158,14 @@ class $ActivitiesTableTable extends ActivitiesTable
       context.handle(_photoUrlMeta,
           photoUrl.isAcceptableOrUnknown(data['photo_url']!, _photoUrlMeta));
     }
+    if (data.containsKey('quantity')) {
+      context.handle(_quantityMeta,
+          quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta));
+    }
+    if (data.containsKey('unit')) {
+      context.handle(
+          _unitMeta, unit.isAcceptableOrUnknown(data['unit']!, _unitMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -1184,6 +1205,10 @@ class $ActivitiesTableTable extends ActivitiesTable
           .read(DriftSqlType.string, data['${effectivePrefix}description']),
       photoUrl: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}photo_url']),
+      quantity: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}quantity']),
+      unit: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}unit']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
@@ -1207,6 +1232,8 @@ class ActivitiesTableData extends DataClass
   final DateTime occurredAt;
   final String? description;
   final String? photoUrl;
+  final double? quantity;
+  final String? unit;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String syncStatus;
@@ -1217,6 +1244,8 @@ class ActivitiesTableData extends DataClass
       required this.occurredAt,
       this.description,
       this.photoUrl,
+      this.quantity,
+      this.unit,
       required this.createdAt,
       required this.updatedAt,
       required this.syncStatus});
@@ -1232,6 +1261,12 @@ class ActivitiesTableData extends DataClass
     }
     if (!nullToAbsent || photoUrl != null) {
       map['photo_url'] = Variable<String>(photoUrl);
+    }
+    if (!nullToAbsent || quantity != null) {
+      map['quantity'] = Variable<double>(quantity);
+    }
+    if (!nullToAbsent || unit != null) {
+      map['unit'] = Variable<String>(unit);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -1251,6 +1286,10 @@ class ActivitiesTableData extends DataClass
       photoUrl: photoUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(photoUrl),
+      quantity: quantity == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quantity),
+      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       syncStatus: Value(syncStatus),
@@ -1267,6 +1306,8 @@ class ActivitiesTableData extends DataClass
       occurredAt: serializer.fromJson<DateTime>(json['occurredAt']),
       description: serializer.fromJson<String?>(json['description']),
       photoUrl: serializer.fromJson<String?>(json['photoUrl']),
+      quantity: serializer.fromJson<double?>(json['quantity']),
+      unit: serializer.fromJson<String?>(json['unit']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
@@ -1282,6 +1323,8 @@ class ActivitiesTableData extends DataClass
       'occurredAt': serializer.toJson<DateTime>(occurredAt),
       'description': serializer.toJson<String?>(description),
       'photoUrl': serializer.toJson<String?>(photoUrl),
+      'quantity': serializer.toJson<double?>(quantity),
+      'unit': serializer.toJson<String?>(unit),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'syncStatus': serializer.toJson<String>(syncStatus),
@@ -1295,6 +1338,8 @@ class ActivitiesTableData extends DataClass
           DateTime? occurredAt,
           Value<String?> description = const Value.absent(),
           Value<String?> photoUrl = const Value.absent(),
+          Value<double?> quantity = const Value.absent(),
+          Value<String?> unit = const Value.absent(),
           DateTime? createdAt,
           DateTime? updatedAt,
           String? syncStatus}) =>
@@ -1305,6 +1350,8 @@ class ActivitiesTableData extends DataClass
         occurredAt: occurredAt ?? this.occurredAt,
         description: description.present ? description.value : this.description,
         photoUrl: photoUrl.present ? photoUrl.value : this.photoUrl,
+        quantity: quantity.present ? quantity.value : this.quantity,
+        unit: unit.present ? unit.value : this.unit,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
         syncStatus: syncStatus ?? this.syncStatus,
@@ -1319,6 +1366,8 @@ class ActivitiesTableData extends DataClass
       description:
           data.description.present ? data.description.value : this.description,
       photoUrl: data.photoUrl.present ? data.photoUrl.value : this.photoUrl,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      unit: data.unit.present ? data.unit.value : this.unit,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       syncStatus:
@@ -1335,6 +1384,8 @@ class ActivitiesTableData extends DataClass
           ..write('occurredAt: $occurredAt, ')
           ..write('description: $description, ')
           ..write('photoUrl: $photoUrl, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('syncStatus: $syncStatus')
@@ -1344,7 +1395,7 @@ class ActivitiesTableData extends DataClass
 
   @override
   int get hashCode => Object.hash(id, plotId, type, occurredAt, description,
-      photoUrl, createdAt, updatedAt, syncStatus);
+      photoUrl, quantity, unit, createdAt, updatedAt, syncStatus);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1355,6 +1406,8 @@ class ActivitiesTableData extends DataClass
           other.occurredAt == this.occurredAt &&
           other.description == this.description &&
           other.photoUrl == this.photoUrl &&
+          other.quantity == this.quantity &&
+          other.unit == this.unit &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.syncStatus == this.syncStatus);
@@ -1367,6 +1420,8 @@ class ActivitiesTableCompanion extends UpdateCompanion<ActivitiesTableData> {
   final Value<DateTime> occurredAt;
   final Value<String?> description;
   final Value<String?> photoUrl;
+  final Value<double?> quantity;
+  final Value<String?> unit;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<String> syncStatus;
@@ -1378,6 +1433,8 @@ class ActivitiesTableCompanion extends UpdateCompanion<ActivitiesTableData> {
     this.occurredAt = const Value.absent(),
     this.description = const Value.absent(),
     this.photoUrl = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -1390,6 +1447,8 @@ class ActivitiesTableCompanion extends UpdateCompanion<ActivitiesTableData> {
     required DateTime occurredAt,
     this.description = const Value.absent(),
     this.photoUrl = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.syncStatus = const Value.absent(),
@@ -1407,6 +1466,8 @@ class ActivitiesTableCompanion extends UpdateCompanion<ActivitiesTableData> {
     Expression<DateTime>? occurredAt,
     Expression<String>? description,
     Expression<String>? photoUrl,
+    Expression<double>? quantity,
+    Expression<String>? unit,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<String>? syncStatus,
@@ -1419,6 +1480,8 @@ class ActivitiesTableCompanion extends UpdateCompanion<ActivitiesTableData> {
       if (occurredAt != null) 'occurred_at': occurredAt,
       if (description != null) 'description': description,
       if (photoUrl != null) 'photo_url': photoUrl,
+      if (quantity != null) 'quantity': quantity,
+      if (unit != null) 'unit': unit,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (syncStatus != null) 'sync_status': syncStatus,
@@ -1433,6 +1496,8 @@ class ActivitiesTableCompanion extends UpdateCompanion<ActivitiesTableData> {
       Value<DateTime>? occurredAt,
       Value<String?>? description,
       Value<String?>? photoUrl,
+      Value<double?>? quantity,
+      Value<String?>? unit,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt,
       Value<String>? syncStatus,
@@ -1444,6 +1509,8 @@ class ActivitiesTableCompanion extends UpdateCompanion<ActivitiesTableData> {
       occurredAt: occurredAt ?? this.occurredAt,
       description: description ?? this.description,
       photoUrl: photoUrl ?? this.photoUrl,
+      quantity: quantity ?? this.quantity,
+      unit: unit ?? this.unit,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       syncStatus: syncStatus ?? this.syncStatus,
@@ -1472,6 +1539,12 @@ class ActivitiesTableCompanion extends UpdateCompanion<ActivitiesTableData> {
     if (photoUrl.present) {
       map['photo_url'] = Variable<String>(photoUrl.value);
     }
+    if (quantity.present) {
+      map['quantity'] = Variable<double>(quantity.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1496,6 +1569,8 @@ class ActivitiesTableCompanion extends UpdateCompanion<ActivitiesTableData> {
           ..write('occurredAt: $occurredAt, ')
           ..write('description: $description, ')
           ..write('photoUrl: $photoUrl, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('syncStatus: $syncStatus, ')
@@ -2567,6 +2642,8 @@ typedef $$ActivitiesTableTableCreateCompanionBuilder = ActivitiesTableCompanion
   required DateTime occurredAt,
   Value<String?> description,
   Value<String?> photoUrl,
+  Value<double?> quantity,
+  Value<String?> unit,
   required DateTime createdAt,
   required DateTime updatedAt,
   Value<String> syncStatus,
@@ -2580,6 +2657,8 @@ typedef $$ActivitiesTableTableUpdateCompanionBuilder = ActivitiesTableCompanion
   Value<DateTime> occurredAt,
   Value<String?> description,
   Value<String?> photoUrl,
+  Value<double?> quantity,
+  Value<String?> unit,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<String> syncStatus,
@@ -2612,6 +2691,12 @@ class $$ActivitiesTableTableFilterComposer
 
   ColumnFilters<String> get photoUrl => $composableBuilder(
       column: $table.photoUrl, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get quantity => $composableBuilder(
+      column: $table.quantity, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get unit => $composableBuilder(
+      column: $table.unit, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -2650,6 +2735,12 @@ class $$ActivitiesTableTableOrderingComposer
   ColumnOrderings<String> get photoUrl => $composableBuilder(
       column: $table.photoUrl, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get quantity => $composableBuilder(
+      column: $table.quantity, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+      column: $table.unit, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -2686,6 +2777,12 @@ class $$ActivitiesTableTableAnnotationComposer
 
   GeneratedColumn<String> get photoUrl =>
       $composableBuilder(column: $table.photoUrl, builder: (column) => column);
+
+  GeneratedColumn<double> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2730,6 +2827,8 @@ class $$ActivitiesTableTableTableManager extends RootTableManager<
             Value<DateTime> occurredAt = const Value.absent(),
             Value<String?> description = const Value.absent(),
             Value<String?> photoUrl = const Value.absent(),
+            Value<double?> quantity = const Value.absent(),
+            Value<String?> unit = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<String> syncStatus = const Value.absent(),
@@ -2742,6 +2841,8 @@ class $$ActivitiesTableTableTableManager extends RootTableManager<
             occurredAt: occurredAt,
             description: description,
             photoUrl: photoUrl,
+            quantity: quantity,
+            unit: unit,
             createdAt: createdAt,
             updatedAt: updatedAt,
             syncStatus: syncStatus,
@@ -2754,6 +2855,8 @@ class $$ActivitiesTableTableTableManager extends RootTableManager<
             required DateTime occurredAt,
             Value<String?> description = const Value.absent(),
             Value<String?> photoUrl = const Value.absent(),
+            Value<double?> quantity = const Value.absent(),
+            Value<String?> unit = const Value.absent(),
             required DateTime createdAt,
             required DateTime updatedAt,
             Value<String> syncStatus = const Value.absent(),
@@ -2766,6 +2869,8 @@ class $$ActivitiesTableTableTableManager extends RootTableManager<
             occurredAt: occurredAt,
             description: description,
             photoUrl: photoUrl,
+            quantity: quantity,
+            unit: unit,
             createdAt: createdAt,
             updatedAt: updatedAt,
             syncStatus: syncStatus,

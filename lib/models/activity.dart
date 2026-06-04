@@ -52,6 +52,8 @@ class Activity {
     required this.createdAt,
     this.description,
     this.photoUrl,
+    this.quantity,
+    this.unit,
   });
 
   final String id;
@@ -61,6 +63,13 @@ class Activity {
   final DateTime createdAt;
   final String? description;
   final String? photoUrl;
+
+  /// Optional amount of the input applied (e.g. 50 for "50 kg de abono").
+  final double? quantity;
+
+  /// Optional unit of measure for [quantity]: 'kg' | 'g' | 'L' | 'ml' |
+  /// 'unidades'. See [kActivityUnits].
+  final String? unit;
 
   factory Activity.fromJson(Map<String, dynamic> json) => Activity(
         id: json['id'] as String,
@@ -74,7 +83,16 @@ class Activity {
         ),
         description: json['description'] as String?,
         photoUrl: (json['photoUrl'] ?? json['photo_url']) as String?,
+        // Backend returns NUMERIC as a JSON number; tolerate string too.
+        quantity: _parseQuantity(json['quantity']),
+        unit: json['unit'] as String?,
       );
+
+  static double? _parseQuantity(Object? v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString());
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -84,6 +102,8 @@ class Activity {
         'createdAt': createdAt.toIso8601String(),
         'description': description,
         'photoUrl': photoUrl,
+        'quantity': quantity,
+        'unit': unit,
       };
 
   Activity copyWith({
@@ -94,6 +114,8 @@ class Activity {
     DateTime? createdAt,
     String? description,
     String? photoUrl,
+    double? quantity,
+    String? unit,
   }) =>
       Activity(
         id: id ?? this.id,
@@ -103,5 +125,7 @@ class Activity {
         createdAt: createdAt ?? this.createdAt,
         description: description ?? this.description,
         photoUrl: photoUrl ?? this.photoUrl,
+        quantity: quantity ?? this.quantity,
+        unit: unit ?? this.unit,
       );
 }

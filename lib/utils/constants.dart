@@ -40,6 +40,12 @@ const int kInactivityTimeoutMinutes = 20;
 /// Linked from [RegisterScreen] and [PilotConsentScreen].
 const String kPrivacyPolicyUrl = 'https://agritrace.co/privacidad';
 
+/// Units of measure offered in the activity form's `cantidad` dropdown.
+/// Kept in sync with the backend Zod enum (`ACTIVITY_UNITS` in
+/// agritrace-backend/src/api/activities/activity.validations.ts). A fixed
+/// list (not free text) keeps the data aggregatable for future labor reports.
+const List<String> kActivityUnits = <String>['kg', 'g', 'L', 'ml', 'unidades'];
+
 /// Crop types offered in the **plot** form. Constrained to the MVP pilot
 /// region (Valle del Cauca) primary crops plus an `otro` escape hatch. The
 /// value is sent verbatim to the backend `cropType` field.

@@ -80,11 +80,15 @@ class _EditBody extends ConsumerWidget {
             initialOccurredAt: activity.occurredAt,
             initialDescription: activity.description,
             initialPhotoUrl: activity.photoUrl,
+            initialQuantity: activity.quantity,
+            initialUnit: activity.unit,
             onSubmit: ({
               required ActivityType type,
               required DateTime occurredAt,
               String? description,
               String? photoUrl,
+              double? quantity,
+              String? unit,
             }) async {
               // Capture before await to avoid use_build_context_synchronously.
               final messenger = ScaffoldMessenger.of(context);
@@ -98,6 +102,8 @@ class _EditBody extends ConsumerWidget {
                     occurredAt: occurredAt,
                     description: description,
                     photoUrl: photoUrl,
+                    quantity: quantity,
+                    unit: unit,
                   );
               // Invalidate the single-activity lookup so a future open of the
               // edit screen reflects the freshly persisted values.

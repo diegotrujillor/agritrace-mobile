@@ -138,6 +138,8 @@ class SyncOrchestrator {
           // (bug #38).
           'description': row.description,
           'photoUrl': row.photoUrl,
+          'quantity': row.quantity,
+          'unit': row.unit,
           'updatedAt': row.updatedAt.toUtc().toIso8601String(),
         },
       ));

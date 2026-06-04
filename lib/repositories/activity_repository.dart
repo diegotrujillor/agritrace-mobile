@@ -37,6 +37,8 @@ class ActivityRepository {
     required DateTime occurredAt,
     String? description,
     String? photoUrl,
+    double? quantity,
+    String? unit,
   }) async {
     final now = DateTime.now().toUtc();
     final id = _uuid.v4();
@@ -47,6 +49,8 @@ class ActivityRepository {
       occurredAt: Value(occurredAt.toUtc()),
       description: Value(description),
       photoUrl: Value(photoUrl),
+      quantity: Value(quantity),
+      unit: Value(unit),
       createdAt: Value(now),
       updatedAt: Value(now),
       syncStatus: const Value('pendingCreate'),
@@ -59,6 +63,8 @@ class ActivityRepository {
       createdAt: now,
       description: description,
       photoUrl: photoUrl,
+      quantity: quantity,
+      unit: unit,
     );
   }
 
@@ -76,6 +82,8 @@ class ActivityRepository {
     DateTime? occurredAt,
     String? description,
     String? photoUrl,
+    double? quantity,
+    String? unit,
   }) async {
     final now = DateTime.now().toUtc();
     final updated = Activity(
@@ -86,6 +94,8 @@ class ActivityRepository {
       createdAt: existing.createdAt,
       description: description,
       photoUrl: photoUrl,
+      quantity: quantity,
+      unit: unit,
     );
     await _db.upsertActivity(ActivitiesTableCompanion(
       id: Value(existing.id),
@@ -94,6 +104,8 @@ class ActivityRepository {
       occurredAt: Value(updated.occurredAt.toUtc()),
       description: Value(updated.description),
       photoUrl: Value(updated.photoUrl),
+      quantity: Value(updated.quantity),
+      unit: Value(updated.unit),
       createdAt: Value(existing.createdAt),
       updatedAt: Value(now),
       syncStatus: const Value('pendingUpdate'),
@@ -135,6 +147,8 @@ class ActivityRepository {
       occurredAt: Value(row.occurredAt),
       description: Value(row.description),
       photoUrl: Value(row.photoUrl),
+      quantity: Value(row.quantity),
+      unit: Value(row.unit),
       createdAt: Value(row.createdAt),
       updatedAt: Value(updatedAt),
       syncStatus: const Value('synced'),
@@ -151,5 +165,7 @@ class ActivityRepository {
         createdAt: r.createdAt,
         description: r.description,
         photoUrl: r.photoUrl,
+        quantity: r.quantity,
+        unit: r.unit,
       );
 }

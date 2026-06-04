@@ -145,4 +145,50 @@ void main() {
       expect(cleared.photoUrl, isNull);
     });
   });
+
+  group('Activity quantity + unit', () {
+    test('fromJson parses numeric quantity + unit', () {
+      final a = Activity.fromJson({
+        ...activityJson(),
+        'quantity': 50.5,
+        'unit': 'kg',
+      });
+      expect(a.quantity, 50.5);
+      expect(a.unit, 'kg');
+    });
+
+    test('fromJson tolerates quantity sent as a string (pg NUMERIC)', () {
+      final a = Activity.fromJson({
+        ...activityJson(),
+        'quantity': '12.000',
+        'unit': 'L',
+      });
+      expect(a.quantity, 12.0);
+      expect(a.unit, 'L');
+    });
+
+    test('fromJson leaves quantity + unit null when absent', () {
+      final a = Activity.fromJson(activityJson());
+      expect(a.quantity, isNull);
+      expect(a.unit, isNull);
+    });
+
+    test('toJson includes quantity + unit', () {
+      final a = Activity.fromJson({
+        ...activityJson(),
+        'quantity': 3,
+        'unit': 'unidades',
+      });
+      final json = a.toJson();
+      expect(json['quantity'], 3.0);
+      expect(json['unit'], 'unidades');
+    });
+
+    test('copyWith overrides quantity + unit', () {
+      final a = Activity.fromJson(activityJson());
+      final b = a.copyWith(quantity: 7.5, unit: 'g');
+      expect(b.quantity, 7.5);
+      expect(b.unit, 'g');
+    });
+  });
 }

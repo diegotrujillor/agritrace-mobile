@@ -39,6 +39,8 @@ class ActivityService {
     required DateTime occurredAt,
     String? description,
     String? photoUrl,
+    double? quantity,
+    String? unit,
   }) async {
     final response = await _api.client.post('/activities', data: {
       'plotId': plotId,
@@ -49,6 +51,8 @@ class ActivityService {
       if (description != null && description.isNotEmpty)
         'description': description,
       if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
+      if (quantity != null) 'quantity': quantity,
+      if (unit != null) 'unit': unit,
     });
     return unwrapOne(response.data, Activity.fromJson);
   }
@@ -61,6 +65,8 @@ class ActivityService {
     required DateTime occurredAt,
     String? description,
     String? photoUrl,
+    double? quantity,
+    String? unit,
   }) async {
     final response = await _api.client.put('/activities/$id', data: {
       'plotId': plotId,
@@ -71,6 +77,8 @@ class ActivityService {
       if (description != null && description.isNotEmpty)
         'description': description,
       if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
+      if (quantity != null) 'quantity': quantity,
+      if (unit != null) 'unit': unit,
     });
     return unwrapOne(response.data, Activity.fromJson);
   }

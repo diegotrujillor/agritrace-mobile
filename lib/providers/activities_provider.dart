@@ -78,6 +78,8 @@ class ActivitiesNotifier
     required DateTime occurredAt,
     String? description,
     String? photoUrl,
+    double? quantity,
+    String? unit,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
@@ -87,6 +89,8 @@ class ActivitiesNotifier
         occurredAt: occurredAt,
         description: description,
         photoUrl: photoUrl,
+        quantity: quantity,
+        unit: unit,
       );
       return _repo.listByPlot(_plotId);
     });
@@ -100,6 +104,8 @@ class ActivitiesNotifier
     required DateTime occurredAt,
     String? description,
     String? photoUrl,
+    double? quantity,
+    String? unit,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
@@ -111,6 +117,8 @@ class ActivitiesNotifier
         occurredAt: occurredAt,
         description: description,
         photoUrl: photoUrl,
+        quantity: quantity,
+        unit: unit,
       );
       return _repo.listByPlot(_plotId);
     });

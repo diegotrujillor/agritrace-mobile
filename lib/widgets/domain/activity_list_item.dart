@@ -24,6 +24,11 @@ class ActivityListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final description = activity.description;
+    final quantity = activity.quantity;
+    final unit = activity.unit;
+    final quantityLabel = (quantity != null && unit != null)
+        ? '${quantity == quantity.truncateToDouble() ? quantity.toInt() : quantity} $unit'
+        : null;
     return AppCard(
       onTap: onTap,
       onLongPress: onLongPress,
@@ -63,6 +68,24 @@ class ActivityListItem extends StatelessWidget {
                     fontSize: 14,
                   ),
                 ),
+                if (quantityLabel != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Row(
+                    children: [
+                      const Icon(Icons.straighten,
+                          size: 14, color: AppColors.earthBrown),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        quantityLabel,
+                        style: const TextStyle(
+                          color: AppColors.earthBrown,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (description != null && description.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Text(

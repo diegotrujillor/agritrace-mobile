@@ -312,10 +312,11 @@ class PdfTraceabilityService {
   ) {
     return pw.Table(
       columnWidths: const {
-        0: pw.FixedColumnWidth(65),
-        1: pw.FixedColumnWidth(100),
-        2: pw.FlexColumnWidth(),
-        3: pw.FixedColumnWidth(88),
+        0: pw.FixedColumnWidth(60),
+        1: pw.FixedColumnWidth(85),
+        2: pw.FixedColumnWidth(55),
+        3: pw.FlexColumnWidth(),
+        4: pw.FixedColumnWidth(80),
       },
       border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
       children: [
@@ -335,7 +336,13 @@ class PdfTraceabilityService {
           ),
         );
     return pw.TableRow(
-      children: [cell('Fecha'), cell('Tipo'), cell('Nota'), cell('Foto')],
+      children: [
+        cell('Fecha'),
+        cell('Tipo'),
+        cell('Cantidad'),
+        cell('Nota'),
+        cell('Foto'),
+      ],
     );
   }
 
@@ -376,10 +383,16 @@ class PdfTraceabilityService {
             ? '—'
             : activity.description!;
 
+    final q = activity.quantity;
+    final quantityText = (q != null && activity.unit != null)
+        ? '${q == q.truncateToDouble() ? q.toInt() : q} ${activity.unit}'
+        : '—';
+
     return pw.TableRow(
       children: [
         textCell(formatLocalDate(activity.occurredAt)),
         textCell(activity.type.label),
+        textCell(quantityText),
         textCell(note),
         photoCell,
       ],

@@ -4,6 +4,31 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.11.0] - 2026-06-03 — feat: cantidad + unidad en actividades (registro de labores)
+
+### Added
+- **Campos `cantidad` + `unidad` en la actividad.** Tras demo Observatorio
+  2026-06-03 (Sandra Durán): el registro de labores necesita cantidad + unidad
+  estructuradas (p.ej. "50 kg de abono"), no sólo notas libres. Form con campo
+  numérico + dropdown (`kg | g | L | ml | unidades`); ambos opcionales, pero una
+  cantidad exige unidad (y viceversa) — validado en el form. Se muestra en el
+  timeline (línea con ícono) y en el PDF de trazabilidad (nueva columna
+  "Cantidad"). Dónde: `lib/models/activity.dart`, `lib/database/tables.dart`,
+  `lib/repositories/activity_repository.dart`,
+  `lib/screens/activities/widgets/activity_form.dart` (+ create/edit screens),
+  `lib/providers/activities_provider.dart`, `lib/services/activity_service.dart`,
+  `lib/services/sync_orchestrator.dart`, `lib/services/pdf_traceability_service.dart`,
+  `lib/widgets/domain/activity_list_item.dart`, `lib/utils/constants.dart`
+  (`kActivityUnits`).
+
+### Changed
+- **Drift schema v1 → v2** con migración `onUpgrade` (ADD COLUMN quantity, unit).
+  Los dispositivos de los pilotos actualizan en sitio — sus datos offline
+  (fincas, lotes, actividades) se preservan. Dónde: `lib/database/app_database.dart`.
+
+### Tests
+- +5 casos en `activity_model_test.dart`. Suite: 406 pasan.
+
 ## [1.10.6] - 2026-06-03 — fix: eliminar foto en actividad ahora persiste (#38)
 
 ### Fixed

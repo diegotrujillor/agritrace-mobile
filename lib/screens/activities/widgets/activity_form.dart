@@ -39,6 +39,8 @@ class ActivityForm extends ConsumerStatefulWidget {
     this.initialOccurredAt,
     this.initialDescription,
     this.initialPhotoUrl,
+    this.initialQuantity,
+    this.initialUnit,
     this.imagePicker,
   });
 
@@ -53,11 +55,17 @@ class ActivityForm extends ConsumerStatefulWidget {
     required DateTime occurredAt,
     String? description,
     String? photoUrl,
+    double? quantity,
+    String? unit,
   }) onSubmit;
 
   final ActivityType initialType;
   final DateTime? initialOccurredAt;
   final String? initialDescription;
+
+  /// Pre-filled quantity + unit (edit mode).
+  final double? initialQuantity;
+  final String? initialUnit;
 
   /// Pre-filled photo URL (edit mode). Displayed as the initial preview
   /// when present; the user can replace it with a fresh camera/gallery
@@ -76,10 +84,13 @@ class ActivityForm extends ConsumerStatefulWidget {
 class _ActivityFormState extends ConsumerState<ActivityForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _descriptionController;
+  late final TextEditingController _quantityController;
   late ImagePicker _picker;
 
   late ActivityType _type;
   late DateTime _occurredAt;
+  /// Selected unit, or null when the producer hasn't chosen one.
+  String? _unit;
   bool _submitting = false;
   String? _errorMessage;
 
@@ -100,6 +111,12 @@ class _ActivityFormState extends ConsumerState<ActivityForm> {
     _occurredAt = widget.initialOccurredAt ?? DateTime.now();
     _descriptionController =
         TextEditingController(text: widget.initialDescription ?? '');
+    // Show the quantity without a trailing ".0" for whole numbers.
+    final q = widget.initialQuantity;
+    _quantityController = TextEditingController(
+      text: q == null ? '' : (q == q.truncateToDouble() ? q.toInt().toString() : q.toString()),
+    );
+    _unit = widget.initialUnit;
     _uploadedUrl = widget.initialPhotoUrl;
     _picker = widget.imagePicker ?? ImagePicker();
   }
@@ -107,6 +124,7 @@ class _ActivityFormState extends ConsumerState<ActivityForm> {
   @override
   void dispose() {
     _descriptionController.dispose();
+    _quantityController.dispose();
     super.dispose();
   }
 
@@ -229,11 +247,21 @@ class _ActivityFormState extends ConsumerState<ActivityForm> {
         }
       }
 
+      // Quantity is optional; only send it when both a positive number AND
+      // a unit are present, so the data stays consistent (a number without a
+      // unit, or vice versa, is meaningless for the labor record).
+      final rawQty = _quantityController.text.trim().replaceAll(',', '.');
+      final parsedQty = rawQty.isEmpty ? null : double.tryParse(rawQty);
+      final bothPresent =
+          parsedQty != null && parsedQty > 0 && _unit != null;
+
       await widget.onSubmit(
         type: _type,
         occurredAt: _occurredAt,
         description: description.isEmpty ? null : description,
         photoUrl: photoUrl,
+        quantity: bothPresent ? parsedQty : null,
+        unit: bothPresent ? _unit : null,
       );
       // On success the parent typically pops this route; clearing the
       // submitting flag here would race with a possibly-unmounted state.
@@ -244,6 +272,78 @@ class _ActivityFormState extends ConsumerState<ActivityForm> {
         _errorMessage = parseApiError(error);
       });
     }
+  }
+
+  /// Optional cantidad + unidad row. A number field (left) + a unit dropdown
+  /// (right). Both optional, but a quantity requires a unit (and vice versa)
+  /// — enforced by the field validators so the labor record stays consistent.
+  Widget _buildQuantitySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Cantidad (opcional)',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: AppColors.darkGreen,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3,
+              child: TextFormField(
+                controller: _quantityController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  hintText: 'Ej. 50',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                onChanged: (_) => setState(() {}),
+                validator: (value) {
+                  final raw = (value ?? '').trim().replaceAll(',', '.');
+                  if (raw.isEmpty) {
+                    // Empty quantity is fine UNLESS a unit was chosen.
+                    return _unit == null ? null : 'Ingresa la cantidad';
+                  }
+                  final n = double.tryParse(raw);
+                  if (n == null || n <= 0) return 'Cantidad inválida';
+                  if (_unit == null) return 'Elige una unidad';
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              flex: 2,
+              child: DropdownButtonFormField<String?>(
+                value: _unit,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                hint: const Text('Unidad'),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('—'),
+                  ),
+                  for (final u in kActivityUnits)
+                    DropdownMenuItem<String?>(value: u, child: Text(u)),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (v) => setState(() => _unit = v),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   Widget _buildPhotoSection() {
@@ -358,6 +458,8 @@ class _ActivityFormState extends ConsumerState<ActivityForm> {
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.sentences,
           ),
+          const SizedBox(height: AppSpacing.md),
+          _buildQuantitySection(),
           const SizedBox(height: AppSpacing.md),
           _buildPhotoSection(),
           if (_errorMessage != null) ...[

@@ -50,6 +50,8 @@ class ActivityFormScreen extends ConsumerWidget {
                   required DateTime occurredAt,
                   String? description,
                   String? photoUrl,
+                  double? quantity,
+                  String? unit,
                 }) async {
                   // Capture router before await to avoid
                   // use_build_context_synchronously across the network call.
@@ -103,6 +105,8 @@ class ActivityFormScreen extends ConsumerWidget {
                         occurredAt: occurredAt,
                         description: description,
                         photoUrl: photoUrl,
+                        quantity: quantity,
+                        unit: unit,
                       );
                   router.pop();
                 },

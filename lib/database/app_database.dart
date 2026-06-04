@@ -4,17 +4,37 @@ import 'tables.dart';
 
 part 'app_database.g.dart';
 
-/// Drift SQLite database. Schema version 1 — offline-first persistence.
+/// Drift SQLite database.
 ///
 /// All four domain tables include `sync_status` + `updated_at` columns so the
 /// [SyncOrchestrator] can drain pending changes to the backend and apply
 /// server-pulled rows with Last-Write-Wins semantics.
+///
+/// Schema history:
+///   v1 — initial (farms, plots, activities, alerts).
+///   v2 — activities.quantity (REAL) + activities.unit (TEXT) for the
+///        structured labor record (registro de labores). Existing pilot
+///        devices upgrade in place via [migration] — their data is preserved.
 @DriftDatabase(tables: [FarmsTable, PlotsTable, ActivitiesTable, AlertsTable])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  /// In-place schema upgrades. Critical for pilot devices that already hold
+  /// offline data — we ADD COLUMN rather than recreate, so finca/lote/
+  /// actividad rows survive the update.
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(activitiesTable, activitiesTable.quantity);
+            await m.addColumn(activitiesTable, activitiesTable.unit);
+          }
+        },
+      );
 
   static QueryExecutor _openConnection() {
     return driftDatabase(name: 'agritrace');
