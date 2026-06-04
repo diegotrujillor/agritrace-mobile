@@ -60,11 +60,14 @@ jobs:
           fi
           # Normalise: ensure a leading 'v'.
           case "$VERSION" in v*) ;; *) VERSION="v$VERSION" ;; esac
-          REPO="${{ github.repository }}"
+          # Public download lives on the landing-page install section. The
+          # GitHub release URL is NOT usable — the repo is private, so a
+          # producer's link would 404. agritrace.co/#instalar has the
+          # step-by-step download + install guide.
           {
             echo "version=$VERSION"
             echo "whats_new=$WHATS_NEW"
-            echo "release_url=https://github.com/$REPO/releases/tag/$VERSION"
+            echo "download_url=https://agritrace.co/#instalar"
           } >> "$GITHUB_OUTPUT"
           echo "Announcing $VERSION"
 
@@ -135,7 +138,7 @@ jobs:
             3. Abre la app y listo.
 
             Enlace de descarga:
-            ${{ steps.meta.outputs.release_url }}
+            ${{ steps.meta.outputs.download_url }}
 
             Si tienes cualquier problema al actualizar, respóndenos a este
             correo o escríbenos por WhatsApp. Y recuerda que puedes reportar
