@@ -79,8 +79,10 @@ jobs:
             echo "::error::API_BASE_URL or INTERNAL_API_TOKEN secret is missing"
             exit 1
           fi
+          # includeDemo=true: external QA testers run as demo accounts and
+          # are exactly the people who need a "new APK to test" email.
           RESP=$(curl -s -w '\n%{http_code}' \
-            "$API_BASE_URL/internal/users/emails" \
+            "$API_BASE_URL/internal/users/emails?includeDemo=true" \
             -H "x-internal-token: $INTERNAL_API_TOKEN")
           BODY=$(echo "$RESP" | head -n -1)
           CODE=$(echo "$RESP" | tail -n 1)
