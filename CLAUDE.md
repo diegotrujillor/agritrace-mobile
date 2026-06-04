@@ -129,6 +129,9 @@ All backend responses: `{ success: bool, data: T }` or `{ success: false, error:
 ### Activity types (Sprint 3)
 `sowing` | `fertilization` | `irrigation` | `pest_control` | `harvest` | `other`
 
+### Activity units (v1.11.0 — `kActivityUnits` in `lib/utils/constants.dart`)
+`kg` | `g` | `L` | `ml` | `unidades` — optional `quantity` (double) + `unit` on each activity (registro de labores). A quantity requires a unit (form-validated). Kept in sync with backend Zod `ACTIVITY_UNITS`.
+
 ### Plot statuses (Sprint 2)
 `planning` | `growing` | `ready` | `harvested`
 
@@ -156,6 +159,11 @@ Drift sync fields on every model: `syncStatus TEXT` (`'synced'`|`'pendingCreate'
 - **Sprint 4 (done):** Alerts (`/alerts`, weather + reminders), `SyncStatusBadge`, alerts entry on dashboard; consumes `/v1/alerts` + `/v1/alerts/weather/check`.
 - **Sprint 5 (done — v1.6.0 → v1.8.0):** Profile screen (ARCO compliance — Ley 1581), export data, delete account, in-app issue reporting (CU-28) via `POST /v1/feedback` → GitHub Issues; PDF traceability now includes phone, email, GPS, photos (CU-25).
 - **Sprint 6 (done — v1.9.0 → v1.9.4):** Photo capture (`image_picker`) + GPS (`geolocator`) on activities + multipart `POST /v1/uploads/photos`. `AppLogoMark` reusable widget across 13 screens with per-screen size policy. P0 security fix: `AppDatabase.wipeAllUserData()` on logout + cross-account login. UX hotfixes (logo alignment, auth banner leak across screens, back arrows, autofill trim).
+- **Inactivity auto-logout (v1.9.8 → v1.10.3):** `InactivityMonitor` (20 min, `kInactivityTimeoutMinutes`) — gesture-poked, lifecycle-aware (background-trip elapsed check). Note: CU-26 doc still says "not implemented" — stale.
+- **Private photo read path (v1.10.0):** activity photos read via authenticated `GET /v1/uploads/photos/{id}` (bucket private, Ley 1581).
+- **Pilot window (v1.10.4 → v1.10.5):** `User.pilotEndsAt` + `isDemo`; `pilotStatusProvider`; `PilotCountdownBanner` (≤5 days, app-wide); `PilotBlockedScreen` (`/pilot-blocked`); GoRouter pilot+consent redirects; 403 codes (`PILOT_EXPIRED`/`PILOT_NOT_STARTED`/`ACCOUNT_DISABLED`/`NOT_INVITED`) in `error_parser`. **PilotConsentScreen** (`/pilot-consent`) — one-time post-login privacy consent (CU-30). See CU-29/CU-30.
+- **Bug #38 fix (v1.10.6):** removing an activity photo now persists (explicit rebuild in repo `update`, sync sends null to clear).
+- **Activity quantity+unit (v1.11.0 — CU-14):** `Activity.quantity` (double?) + `unit` (String?); form number field + unit dropdown (`kActivityUnits`); shown in timeline + PDF. **Drift schema v1→v2** with `onUpgrade` ADD COLUMN migration in `app_database.dart` — existing devices keep their offline data; ANY future column add needs a schemaVersion bump + onUpgrade step.
 
 New feature screens go in `lib/screens/<domain>/`, providers in `lib/providers/<domain>_provider.dart`, services in `lib/services/<domain>_service.dart`, Drift repos in `lib/repositories/<domain>_repository.dart`.
 
