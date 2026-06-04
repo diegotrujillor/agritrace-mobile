@@ -1,0 +1,145 @@
+name: Announce new APK to registered users
+
+# Sends a "nueva versión disponible" email to every REGISTERED, active,
+# non-demo producer, telling them a new APK is available to download + install.
+#
+# Audience source: GET /v1/internal/users/emails on the backend (reads the
+# `users` table, NOT `pilot_invites` — i.e. people who actually created an
+# account). Excludes admin + demo/QA accounts automatically.
+#
+# Two ways to fire:
+#   - Automatically: after the "Build Release APK" workflow completes
+#     successfully on a v*.*.* tag (workflow_run trigger below).
+#   - Manually: workflow_dispatch — paste the version + (optional) a one-line
+#     "what's new" summary.
+#
+# Required repo secrets:
+#   INTERNAL_API_TOKEN  shared secret for /v1/internal/* (same value as the
+#                       OCI VM .env).
+#   API_BASE_URL        e.g. https://api.agritrace.co/v1
+#   GMAIL_USER / GMAIL_APP_PASSWORD  the existing feedback-email sender.
+
+on:
+  workflow_run:
+    workflows: ["Build Release APK"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión del APK (p.ej. v1.11.0)"
+        required: true
+        type: string
+      whats_new:
+        description: "Resumen de novedades (1-2 líneas, opcional)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    # On the auto path, only proceed when the APK build actually succeeded.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolve version + release URL
+        id: meta
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+            WHATS_NEW="${{ inputs.whats_new }}"
+          else
+            # workflow_run carries the tag that triggered the APK build.
+            VERSION="${{ github.event.workflow_run.head_branch }}"
+            WHATS_NEW=""
+          fi
+          # Normalise: ensure a leading 'v'.
+          case "$VERSION" in v*) ;; *) VERSION="v$VERSION" ;; esac
+          REPO="${{ github.repository }}"
+          {
+            echo "version=$VERSION"
+            echo "whats_new=$WHATS_NEW"
+            echo "release_url=https://github.com/$REPO/releases/tag/$VERSION"
+          } >> "$GITHUB_OUTPUT"
+          echo "Announcing $VERSION"
+
+      - name: Fetch registered producer emails
+        id: recipients
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE_URL:-}" ] || [ -z "${INTERNAL_API_TOKEN:-}" ]; then
+            echo "::error::API_BASE_URL or INTERNAL_API_TOKEN secret is missing"
+            exit 1
+          fi
+          RESP=$(curl -s -w '\n%{http_code}' \
+            "$API_BASE_URL/internal/users/emails" \
+            -H "x-internal-token: $INTERNAL_API_TOKEN")
+          BODY=$(echo "$RESP" | head -n -1)
+          CODE=$(echo "$RESP" | tail -n 1)
+          if [ "$CODE" != "200" ]; then
+            echo "::error::users/emails returned HTTP $CODE: $BODY"
+            exit 1
+          fi
+          # Comma-separated list for the BCC field. `to` is the sender itself.
+          EMAILS=$(echo "$BODY" | jq -r '.data.users[].email' | paste -sd, -)
+          COUNT=$(echo "$BODY" | jq -r '.data.count')
+          if [ -z "$EMAILS" ] || [ "$COUNT" = "0" ]; then
+            echo "::warning::No registered producers to notify — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "bcc=$EMAILS" >> "$GITHUB_OUTPUT"
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Will notify $COUNT producer(s)"
+
+      - name: Send "nueva versión disponible" email via Gmail SMTP
+        if: steps.recipients.outputs.skip == 'false'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "AgriTrace ${{ steps.meta.outputs.version }} ya está disponible — actualiza tu app"
+          # Single send: `to` = sender, all producers in BCC (privacy: nadie ve
+          # los correos de los demás).
+          to: ${{ secrets.GMAIL_USER }}
+          bcc: ${{ steps.recipients.outputs.bcc }}
+          from: "AgriTrace <${{ secrets.GMAIL_USER }}>"
+          body: |
+            Hola,
+
+            Soy Diego Trujillo, de AgriTrace. Hay una nueva versión de la app
+            disponible: ${{ steps.meta.outputs.version }}.
+
+            ${{ steps.meta.outputs.whats_new }}
+
+            Para actualizar:
+
+            1. Descarga la última versión del APK desde el enlace de abajo (o
+               desde el grupo del piloto en WhatsApp).
+            2. Instálala sobre la app actual — no perderás tus datos; tus
+               fincas, lotes y actividades se conservan.
+            3. Abre la app y listo.
+
+            Enlace de descarga:
+            ${{ steps.meta.outputs.release_url }}
+
+            Si tienes cualquier problema al actualizar, respóndenos a este
+            correo o escríbenos por WhatsApp. Y recuerda que puedes reportar
+            cualquier cosa desde la opción "Reportar problema" dentro de la app.
+
+            Gracias por ser parte del piloto.
+
+            Diego Trujillo
+            AgriTrace (Cali)
