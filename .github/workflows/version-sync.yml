@@ -69,13 +69,13 @@ jobs:
           if [ -n "${MOBILE_OVERRIDE:-}" ]; then
             MOBILE="$MOBILE_OVERRIDE"
           else
-            MOBILE=$(resolve_tag "diegotrujillor/agritrace-mobile")
+            MOBILE=$(resolve_tag "diegotrujillor/agritrace-mobile") || MOBILE=""
           fi
 
           if [ -n "${BACKEND_OVERRIDE:-}" ]; then
             BACKEND="$BACKEND_OVERRIDE"
           else
-            BACKEND=$(resolve_tag "diegotrujillor/agritrace-backend")
+            BACKEND=$(resolve_tag "diegotrujillor/agritrace-backend") || BACKEND=""
           fi
 
           if [ -z "${MOBILE:-}" ] || [ -z "${BACKEND:-}" ]; then
