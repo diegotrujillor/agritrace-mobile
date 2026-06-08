@@ -43,27 +43,26 @@ jobs:
       - name: Resolve latest versions
         id: versions
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Cross-repo private tag reads need a PAT; the default
+          # GITHUB_TOKEN is scoped to THIS repo only (404 on other repos).
+          GH_TOKEN: ${{ secrets.MIRROR_PAT || secrets.GITHUB_TOKEN }}
           MOBILE_OVERRIDE: ${{ inputs.mobile_override }}
           BACKEND_OVERRIDE: ${{ inputs.backend_override }}
         run: |
           set -euo pipefail
 
+          is_semver() { printf '%s' "${1:-}" | grep -qE '^v[0-9]+\\.[0-9]+\\.[0-9]+$'; }
+
           resolve_tag() {
-            local repo="$1"
+            local repo="$1" tag
             # 1) Try the published GitHub Release.
-            local tag
             tag=$(gh release view --repo "$repo" --json tagName --jq '.tagName' 2>/dev/null || true)
-            if [ -n "${tag:-}" ]; then
-              echo "$tag"
-              return 0
-            fi
-            # 2) Fall back to the highest semver git tag from the API.
+            if is_semver "$tag"; then echo "$tag"; return 0; fi
+            # 2) Fall back to the highest semver git tag from the API. A 404 /
+            #    error body must NEVER be returned as a tag (that produced the
+            #    "backend tag malformed: {...404...}" failure), so validate shape.
             tag=$(gh api "repos/${repo}/tags" --jq '[.[].name | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | .[0]' 2>/dev/null || true)
-            if [ -n "${tag:-}" ] && [ "$tag" != "null" ]; then
-              echo "$tag"
-              return 0
-            fi
+            if is_semver "$tag"; then echo "$tag"; return 0; fi
             return 1
           }
 
