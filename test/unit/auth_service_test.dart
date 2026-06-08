@@ -471,6 +471,81 @@ void main() {
     });
   });
 
+  // v1.11.x stale-state login bug: a recreated account (purge + re-register
+  // → new user.id) hit the cross-user branch over stale local state and
+  // threw, surfacing as the opaque "Ocurrió un error" with "Clear app data"
+  // the only workaround. Local-setup failures must NOT abort an already-
+  // authenticated session.
+  group('self-healing local setup (v1.11.x stale-state bug)', () {
+    test('login still completes + saves tokens when the cross-user wipe throws',
+        () async {
+      Future<void> wiper() async => throw StateError('drift wipe boom');
+      final svc = AuthService(api, storage, wipeLocalData: wiper);
+
+      // Different cached id → the cross-user wipe branch fires (and throws).
+      when(() => storage.getLastUserId()).thenAnswer((_) async => 'OLD-ID');
+      when(() => dio.post('/auth/login', data: any(named: 'data')))
+          .thenAnswer((_) async => okResponse(_authEnvelope()));
+
+      final auth = await svc.login(email: 'a@b.com', password: 'pwd-12345');
+
+      expect(auth.user.id, 'u-1', reason: 'auth succeeded; wipe failure swallowed');
+      verify(() => storage.saveTokens(accessToken: 'acc', refreshToken: 'ref'))
+          .called(1);
+      verify(() => storage.saveLastUserId('u-1')).called(1);
+    });
+
+    test('login still completes when saveUserSnapshot throws', () async {
+      when(() => storage.getLastUserId()).thenAnswer((_) async => null);
+      when(() => storage.saveUserSnapshot(any()))
+          .thenThrow(StateError('snapshot boom'));
+      when(() => dio.post('/auth/login', data: any(named: 'data')))
+          .thenAnswer((_) async => okResponse(_authEnvelope()));
+
+      final auth = await service.login(email: 'a@b.com', password: 'pwd-12345');
+
+      expect(auth.user.id, 'u-1');
+      verify(() => storage.saveTokens(accessToken: 'acc', refreshToken: 'ref'))
+          .called(1);
+    });
+
+    test('register still completes when the cross-user wipe throws', () async {
+      Future<void> wiper() async => throw StateError('drift wipe boom');
+      final svc = AuthService(api, storage, wipeLocalData: wiper);
+
+      when(() => storage.getLastUserId()).thenAnswer((_) async => 'OLD-ID');
+      when(() => dio.post('/auth/register', data: any(named: 'data')))
+          .thenAnswer((_) async => okResponse(_authEnvelope()));
+
+      final auth = await svc.register(
+        fullName: 'Ana',
+        phone: '+57 300',
+        email: 'a@b.com',
+        password: 'pwd-12345',
+        privacyConsent: true,
+      );
+
+      expect(auth.user.id, 'u-1');
+    });
+
+    test('a genuine token-storage failure still propagates (not swallowed)',
+        () async {
+      when(() => storage.getLastUserId()).thenAnswer((_) async => null);
+      when(() => storage.saveTokens(
+            accessToken: any(named: 'accessToken'),
+            refreshToken: any(named: 'refreshToken'),
+          )).thenThrow(StateError('keystore unavailable'));
+      when(() => dio.post('/auth/login', data: any(named: 'data')))
+          .thenAnswer((_) async => okResponse(_authEnvelope()));
+
+      expect(
+        () => service.login(email: 'a@b.com', password: 'pwd-12345'),
+        throwsA(isA<StateError>()),
+        reason: 'token persistence is essential — must not be swallowed',
+      );
+    });
+  });
+
   // v1.9.9 — P0 fix (continuation of v1.9.8). Logout must push any
   // local pending changes BEFORE wiping the Drift DB, otherwise a row
   // created in the session that has not yet been auto-synced is destroyed

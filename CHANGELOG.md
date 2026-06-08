@@ -4,6 +4,29 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.11.1] - 2026-06-07 — fix: login self-healing ante estado local viejo
+
+### Fixed
+- **Login "Ocurrió un error" para una cuenta recreada.** Cuando una cuenta se
+  purga + re-registra obtiene un `user.id` nuevo; el login entraba a la rama
+  cross-user (`_wipeIfCrossUser` → `wipeAllUserData`) sobre estado local viejo
+  y lanzaba — la excepción real quedaba oculta tras el catch-all de
+  `parseApiError`, y el único arreglo era "Borrar datos de la app" (inviable
+  para un productor del piloto). Ahora los pasos de setup LOCAL post-auth
+  (wipe cross-user, snapshot, hydrate) son best-effort: la sesión ya está
+  autenticada (tokens guardados), así que un fallo de Drift/storage **ya no
+  aborta el login** — se registra la causa real (visible en `adb logcat`,
+  tag `auth`) y la sesión completa. Sólo el guardado de tokens sigue siendo
+  obligatorio (un fallo ahí sí propaga). Dónde:
+  `lib/services/auth_service.dart` (nuevo `_persistSession` + `_runLocalStep`).
+  +4 tests.
+
+### Changed
+- **`parseApiError` ahora loguea el error sin mapear** (tag `error_parser`)
+  antes del catch-all genérico — típicamente excepciones locales (Drift,
+  secure storage, parse) que antes eran invisibles. Dónde:
+  `lib/utils/error_parser.dart`.
+
 ## [1.11.0] - 2026-06-03 — feat: cantidad + unidad en actividades (registro de labores)
 
 ### Added

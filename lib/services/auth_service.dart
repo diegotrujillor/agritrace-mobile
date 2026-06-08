@@ -99,24 +99,7 @@ class AuthService {
       'privacyConsentVersion': privacyConsentVersion,
     });
     final auth = AuthResponse.fromJson(response.data as Map<String, dynamic>);
-    // v1.9.3 — P0 fix (defense in depth). A brand-new account on a device
-    // that previously hosted another account must not inherit its rows.
-    await _wipeIfCrossUser(auth.user.id);
-    await _storage.saveTokens(
-      accessToken: auth.accessToken,
-      refreshToken: auth.refreshToken,
-    );
-    await _storage.saveLastUserId(auth.user.id);
-    // v1.9.11 — Persist a snapshot of the authenticated user alongside the
-    // tokens so the next cold start can short-circuit the active refresh
-    // probe and route the user straight to the dashboard while offline.
-    await _storage.saveUserSnapshot(auth.user);
-    // v1.9.8 — P0 fix. Hydrate the local Drift DB from the server before
-    // returning. A fresh account starts empty server-side so this is a
-    // no-op for the happy path, but keeping the call here mirrors the
-    // login flow (and protects the rare case where a producer registers
-    // again to recover a session against an existing account).
-    await _hydrateFromRemote();
+    await _persistSession(auth, 'register');
     return auth;
   }
 
@@ -129,29 +112,71 @@ class AuthService {
       'password': password,
     });
     final auth = AuthResponse.fromJson(response.data as Map<String, dynamic>);
-    // v1.9.3 — P0 fix (defense in depth). The user may close the app
-    // without ever calling `logout()`; if someone else then logs in on
-    // the same device they would otherwise see the previous account's
-    // farms, plots, activities and alerts. Wipe whenever the freshly
-    // authenticated id differs from the one cached at the last login.
-    await _wipeIfCrossUser(auth.user.id);
+    await _persistSession(auth, 'login');
+    return auth;
+  }
+
+  /// Persists the authenticated session and runs best-effort local setup.
+  ///
+  /// By the time this runs the network auth has already succeeded, so the
+  /// user IS authenticated. Only the token write is essential; everything
+  /// after it is LOCAL bookkeeping (cross-user Drift wipe, user snapshot,
+  /// remote hydration) and is wrapped so a local/storage/Drift failure can
+  /// NEVER strand an authenticated user on the catch-all "Ocurrió un error".
+  ///
+  /// That was the v1.11.x stale-state login bug: when an account is
+  /// recreated (purge + re-register → new `user.id`), login hit the
+  /// cross-user branch over stale local state and threw; the opaque
+  /// `parseApiError` fallthrough hid the real cause and the only workaround
+  /// was "Clear app data" — unusable for a pilot farmer. Now the wipe /
+  /// snapshot steps self-heal: the real exception is logged (visible in
+  /// `adb logcat`, tag `auth`) and the session still completes.
+  Future<void> _persistSession(AuthResponse auth, String flow) async {
+    // Essential: without tokens the session is useless. A failure here is a
+    // genuine storage fault and is allowed to propagate.
     await _storage.saveTokens(
       accessToken: auth.accessToken,
       refreshToken: auth.refreshToken,
     );
+    // v1.9.3 — P0 cross-user wipe. MUST run BEFORE the marker is updated
+    // below (it compares the PREVIOUS `last_user_id`). Best-effort: a
+    // Drift failure must not abort an already-authenticated session.
+    await _runLocalStep(
+      () => _wipeIfCrossUser(auth.user.id),
+      'cross-user wipe',
+      flow,
+    );
     await _storage.saveLastUserId(auth.user.id);
-    // v1.9.11 — Persist a snapshot of the authenticated user alongside the
-    // tokens (see [StorageService.saveUserSnapshot]). Powers the offline-
-    // friendly cold-start path in [AuthNotifier.build].
-    await _storage.saveUserSnapshot(auth.user);
-    // v1.9.8 — P0 fix. Pull the authenticated user's farms/plots/activities/
-    // alerts from the server INTO the local Drift DB before returning so the
-    // dashboard (which reads local-first) sees a populated state on the
-    // very first frame after login. Required because logout wipes Drift —
-    // without this hydration step a same-user re-login renders "No tienes
-    // fincas aún" indefinitely until the user manually triggers a sync.
+    // v1.9.11 — snapshot powers the offline cold-start path. Best-effort.
+    await _runLocalStep(
+      () => _storage.saveUserSnapshot(auth.user),
+      'user snapshot',
+      flow,
+    );
+    // v1.9.8 — hydrate Drift from the server (already swallows its errors).
     await _hydrateFromRemote();
-    return auth;
+  }
+
+  /// Runs a non-critical local-setup [step], swallowing and LOGGING any
+  /// failure. The session is already authenticated, so a local hiccup must
+  /// not surface as an auth error. The log carries the real exception +
+  /// stack so the (otherwise invisible) root cause is recoverable from
+  /// `adb logcat`.
+  Future<void> _runLocalStep(
+    Future<void> Function() step,
+    String label,
+    String flow,
+  ) async {
+    try {
+      await step();
+    } catch (e, st) {
+      dev.log(
+        'AuthService: $label failed on $flow (session preserved): $e',
+        name: 'auth',
+        error: e,
+        stackTrace: st,
+      );
+    }
   }
 
   /// Awaits the injected [RemotePuller] when present and swallows any

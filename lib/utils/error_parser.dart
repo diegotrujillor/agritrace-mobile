@@ -1,3 +1,5 @@
+import 'dart:developer' as dev;
+
 import 'package:dio/dio.dart';
 
 import '../services/api_service.dart';
@@ -67,5 +69,15 @@ String parseApiError(Object? error) {
       return 'Sin conexión, verifica tu internet';
     }
   }
+  // Anything reaching here is unmapped — typically a NON-Dio local/client
+  // exception (Drift, secure storage, JSON parse) rather than a network
+  // failure. The user only sees the catch-all below, so log the real
+  // error + type to `adb logcat` (tag `error_parser`) to make the
+  // otherwise-invisible root cause recoverable.
+  dev.log(
+    'parseApiError: unmapped error (${error.runtimeType}): $error',
+    name: 'error_parser',
+    error: error,
+  );
   return 'Ocurrió un error, intenta de nuevo';
 }
