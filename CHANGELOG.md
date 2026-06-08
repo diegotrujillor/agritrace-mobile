@@ -4,6 +4,17 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.11.2] - 2026-06-07 — feat: banner de cuenta regresiva del piloto más visible
+
+### Changed
+- **`PilotCountdownBanner` más visible.** Antes: franja amber delgada, texto
+  12px sin ícono — fácil de ignorar. Ahora: ícono ⚠ + texto 14px bold + más
+  padding, y el fondo **escala de amber a ROJO cuando quedan ≤1 día**
+  (`mañana` / `hoy`) para que las últimas 48 h sean inconfundibles; 2–5 días
+  sigue amber. Umbral de aparición sin cambios (≤5 días). Dónde:
+  `lib/widgets/common/pilot_countdown_banner.dart`. +5 widget tests (primer
+  test del banner).
+
 ## [1.11.1] - 2026-06-07 — fix: login self-healing ante estado local viejo
 
 ### Fixed

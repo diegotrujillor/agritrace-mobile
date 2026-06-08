@@ -29,23 +29,46 @@ class PilotCountdownBanner extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final label = days == 0
-        ? 'Tu piloto vence hoy — exporta tus datos desde Perfil'
-        : 'Tu piloto vence en $days ${days == 1 ? "día" : "días"}'
-            ' — contacta al equipo AgriTrace';
+    final label = switch (days) {
+      0 => 'Tu piloto vence hoy — exporta tus datos desde Perfil',
+      1 => 'Tu piloto vence mañana — contacta al equipo AgriTrace',
+      _ => 'Tu piloto vence en $days días — contacta al equipo AgriTrace',
+    };
+
+    // ≤1 day (mañana / hoy) escalates the strip from amber to red so the
+    // final 48 h are unmissable; 2–5 days stays amber.
+    final isUrgent = days <= 1;
+    final background =
+        isUrgent ? AppColors.error : AppColors.harvestYellow;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-      color: AppColors.harvestYellow,
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: AppColors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.sm,
+        horizontal: AppSpacing.md,
+      ),
+      color: background,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: AppColors.white,
+            size: 20,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Flexible(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
