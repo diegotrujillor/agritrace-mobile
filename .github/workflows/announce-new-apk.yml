@@ -39,10 +39,16 @@ permissions:
 
 jobs:
   announce:
-    # On the auto path, only proceed when the APK build actually succeeded.
+    # Manual dispatch always proceeds. On the AUTO (workflow_run) path, only
+    # proceed when the APK build (a) succeeded AND (b) was triggered by a
+    # v*.*.* TAG push — never by a `workflow_dispatch` build-only run. Without
+    # the event/tag check, every build-only APK fired this email and set the
+    # version to the branch name ("main") instead of a tag.
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
