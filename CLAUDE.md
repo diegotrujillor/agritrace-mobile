@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Engineering Principles
+
+Project constitution lives in [`agritrace-docs/00-referencia/02-principios-de-ingenieria.md`](https://github.com/diegotrujillor/agritrace-docs/blob/main/00-referencia/02-principios-de-ingenieria.md).
+Short version: minimal cost, no vendor lock-in (no proprietary cloud/LLM SDKs in app code; external providers behind abstractions), open standards (REST+JSON via Dio only — GraphQL/gRPC prohibited on the client path), migratable infra, dependencies must earn their place. Deviations require a short ADR.
+
 ## Commands
 
 ```bash
