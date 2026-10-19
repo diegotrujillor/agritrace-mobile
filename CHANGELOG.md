@@ -4,6 +4,15 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [Unreleased] - 2026-10-19 — docs: nuevo modelo de pricing en contexto comercial
+
+### Changed
+- README y CLAUDE.md pasan del modelo escalonado (Mes 1 gratis → $14.900 →
+  $29.900) a **tarifa única $29.900 COP/mes pagada por adelantado desde el Mes
+  1, con garantía de devolución de 30 días**. Solo documentación; sin cambios de
+  código. Fuente: `agritrace-docs/01-preparacion-mvp/10-comercial-gtm/06-modelo-pricing-validacion.md`.
+  Dónde: `README.md`, `CLAUDE.md`.
+
 ## [1.11.2] - 2026-06-07 — feat: banner de cuenta regresiva del piloto más visible
 
 ### Changed

@@ -181,7 +181,7 @@ New feature screens go in `lib/screens/<domain>/`, providers in `lib/providers/<
 
 ## Business context
 
-Pilot region: **Valle del Cauca, Colombia** (MVP exclusive). Target users: small/medium farmers (5–50 ha). Primary crops: cacao, caña panelera, hortalizas/frutas. Pricing model under validation (tiered): Mes 1 free with commitment contract → Mes 2-3 = $14.900 COP/mes (introductory) → Mes 4+ = $29.900 COP/mes (full tariff). Willingness-to-pay is always validated against the full $29.900 tariff. App must work offline for ≥14 days; buyers verify traceability via QR codes (later release). Ley 1581 (Colombian data-protection law) requires minimizing personal data and logging access. Commercial validation track: see `agritrace-docs/01-preparacion-mvp/10-comercial-gtm/`.
+Pilot region: **Valle del Cauca, Colombia** (MVP exclusive). Target users: small/medium farmers (5–50 ha). Primary crops: cacao, caña panelera, hortalizas/frutas. Pricing model under validation: flat $29.900 COP/mes, paid upfront from Mes 1, with a 30-day full-refund guarantee (no free month, no introductory tier). Willingness-to-pay = paid upfront + renewed Mes 2. App must work offline for ≥14 days; buyers verify traceability via QR codes (later release). Ley 1581 (Colombian data-protection law) requires minimizing personal data and logging access. Commercial validation track: see `agritrace-docs/01-preparacion-mvp/10-comercial-gtm/`.
 
 ## Development guidelines (MANDATORY)
 

@@ -6,7 +6,7 @@ App móvil del MVP de **AgriTrace** — plataforma de trazabilidad agrícola par
 
 > Estrategia MVP: **Farmer-First · Mobile-Only · Offline-First**. El agricultor registra actividades sin conexión durante 14+ días. Marketplace con compradores internacionales es later release.
 >
-> **Validación comercial MVP**: Valle del Cauca, modelo híbrido escalonado: Mes 1 gratis con commitment contract → Mes 2-3 = $14.900 COP/mes (introductorio) → Mes 4+ = $29.900 COP/mes (tarifa full). Demo navegable: [`agritrace-demo`](https://github.com/diegotrujillor/agritrace-demo). Estrategia: [`agritrace-docs/01-preparacion-mvp/10-comercial-gtm/`](https://github.com/diegotrujillor/agritrace-docs/tree/main/01-preparacion-mvp/10-comercial-gtm).
+> **Validación comercial MVP**: Valle del Cauca, tarifa única $29.900 COP/mes pagada por adelantado desde el Mes 1, con garantía de devolución de 30 días. Demo navegable: [`agritrace-demo`](https://github.com/diegotrujillor/agritrace-demo). Estrategia: [`agritrace-docs/01-preparacion-mvp/10-comercial-gtm/`](https://github.com/diegotrujillor/agritrace-docs/tree/main/01-preparacion-mvp/10-comercial-gtm).
 
 ## Highlights v1.9.0 → v1.9.4
 
