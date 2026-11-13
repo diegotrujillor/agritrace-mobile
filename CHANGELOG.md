@@ -4,7 +4,22 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
-## [Unreleased] - 2026-10-19 — docs: nuevo modelo de pricing en contexto comercial
+## [Unreleased] - 2026-11-13 — fix: subida de foto falla con token expirado
+
+### Fixed
+- **Subir foto tras >15 min de sesión mostraba "No se pudo subir la foto: No
+  tienes permiso para ver esto."** El access JWT (15 min) expiraba, el backend
+  respondía 401 `jwt expired`, el interceptor refrescaba el token y reintentaba
+  la petición original — pero un `FormData` de Dio solo se puede enviar una
+  vez: el reintento lanzaba "FormData has already been finalized", nunca salía
+  del dispositivo, y el usuario veía el 401 original mapeado al mensaje de
+  permisos. No dependía de cámara vs. galería: solo de la edad del token.
+  `_withAuth` ahora clona el `FormData` (`FormData.clone()`, Dio 5.9) al
+  reintentar. Detectado en prod 2026-11-13 (cuenta demo comercial@, log Caddy
+  401 + API `jwt expired`). Dónde: `lib/services/api_service.dart`. +1 test de
+  regresión en `test/unit/auth_interceptor_test.dart`. Commit `2d2607c`.
+
+## 2026-10-19 — docs: nuevo modelo de pricing en contexto comercial
 
 ### Changed
 - README y CLAUDE.md pasan del modelo escalonado (Mes 1 gratis → $14.900 →
