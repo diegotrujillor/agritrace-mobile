@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import 'api_service.dart';
 
 /// A single local change to push to the backend. Sprint 3 has no local DB
@@ -62,6 +64,33 @@ class SyncService {
   const SyncService(this._api);
 
   final ApiService _api;
+
+  /// REST collection per sync entity, for server DELETEs (v1.11.5).
+  static const Map<String, String> _restPaths = {
+    'farm': '/farms',
+    'plot': '/plots',
+    'activity': '/activities',
+    'alert': '/alerts',
+  };
+
+  static const int _httpNotFound = 404;
+
+  /// Deletes [id] on the server via `DELETE /<collection>/<id>` (soft
+  /// delete; it then comes back on pulls with `deleted_at` set). A 404
+  /// means it is already gone and counts as success; any other failure is
+  /// rethrown so the local tombstone stays and is retried on the next sync.
+  Future<void> deleteRemote(String entity, String id) async {
+    final path = _restPaths[entity];
+    if (path == null) {
+      throw ArgumentError.value(entity, 'entity', 'unknown sync entity');
+    }
+    try {
+      await _api.client.delete('$path/$id');
+    } on DioException catch (e) {
+      if (e.response?.statusCode == _httpNotFound) return;
+      rethrow;
+    }
+  }
 
   /// Pushes [changes] then pulls everything changed since [since].
   ///

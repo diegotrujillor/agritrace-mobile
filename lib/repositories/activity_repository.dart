@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
+import 'sync_deletable.dart';
 import '../models/activity.dart';
 
 /// Local-first repository for [Activity] entities.
@@ -9,7 +10,7 @@ import '../models/activity.dart';
 /// stored using its snake_case wire value (e.g. `'pest_control'`) so the DB
 /// column stays in sync with the backend enum — mapped back via
 /// [ActivityType.fromWire] when reading.
-class ActivityRepository {
+class ActivityRepository implements SyncDeletable {
   ActivityRepository(this._db);
 
   final AppDatabase _db;
@@ -19,10 +20,9 @@ class ActivityRepository {
   // ── Reads ──────────────────────────────────────────────────────────────────
 
   /// Reactive stream of activities for a given plot, newest first.
-  Stream<List<Activity>> watchByPlot(String plotId) =>
-      _db
-          .watchActivitiesByPlot(plotId)
-          .map((rows) => rows.map(_fromRow).toList());
+  Stream<List<Activity>> watchByPlot(String plotId) => _db
+      .watchActivitiesByPlot(plotId)
+      .map((rows) => rows.map(_fromRow).toList());
 
   /// One-shot fetch of activities for a given plot.
   Future<List<Activity>> listByPlot(String plotId) async =>
@@ -114,7 +114,20 @@ class ActivityRepository {
   }
 
   /// Deletes an activity from the local DB immediately.
-  Future<void> delete(String id) => _db.deleteActivity(id);
+  /// Local delete (v1.11.5): hides the row immediately and queues the
+  /// server DELETE for the next sync (see [SyncDeletable]).
+  Future<void> delete(String id) => _db.queueDelete('activity', id);
+
+  @override
+  Future<List<String>> getPendingDeleteIds() =>
+      _db.getPendingDeleteIds('activity');
+
+  @override
+  Future<bool> isPendingDelete(String id) =>
+      _db.isPendingDelete('activity', id);
+
+  @override
+  Future<void> purge(String id) => _db.purgeRow('activity', id);
 
   /// One-shot read from local Drift by primary key. Returns `null` when
   /// the activity is unknown locally (e.g. deep-link to an id that was
@@ -128,8 +141,7 @@ class ActivityRepository {
   // ── Sync helpers ──────────────────────────────────────────────────────────
 
   /// Returns all rows whose [syncStatus] is not `'synced'`.
-  Future<List<ActivitiesTableData>> getPending() =>
-      _db.getPendingActivities();
+  Future<List<ActivitiesTableData>> getPending() => _db.getPendingActivities();
 
   /// Marks a row as `'synced'` after the backend accepted the change.
   Future<void> markSynced(String id) => _db.markActivitySynced(id);

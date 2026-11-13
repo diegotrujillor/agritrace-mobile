@@ -260,6 +260,113 @@ void main() {
       expect(refreshCalls, 1,
           reason: 'refresh must be coalesced across concurrent 401s');
     });
+
+    test(
+        'session refresh (cold-start probe) and a concurrent 401 share ONE '
+        'refresh', () async {
+      // Regression (prod 2026-11-13): the cold-start probe refreshed through
+      // AuthService outside the interceptor's single-flight lock. A request
+      // that 401'd before the rotated tokens were persisted fired a SECOND
+      // refresh with the already-rotated refresh token → 401 → forced
+      // logout + local wipe.
+      // Arrange
+      var storedAccess = 'OLD';
+      var storedRefresh = 'R1';
+      when(() => storage.getAccessToken())
+          .thenAnswer((_) async => storedAccess);
+      when(() => storage.getRefreshToken())
+          .thenAnswer((_) async => storedRefresh);
+      when(() => storage.saveTokens(
+            accessToken: any(named: 'accessToken'),
+            refreshToken: any(named: 'refreshToken'),
+          )).thenAnswer((inv) async {
+        storedAccess = inv.namedArguments[#accessToken] as String;
+        storedRefresh = inv.namedArguments[#refreshToken] as String;
+      });
+
+      final adapter = _ScriptedAdapter((opts) async {
+        if (opts.headers['Authorization'] == 'Bearer NEW') {
+          return _jsonBody(200, {'ok': true});
+        }
+        return _jsonBody(401, {'error': 'jwt expired'});
+      });
+
+      final refreshGate = Completer<void>();
+      final usedRefreshTokens = <String>[];
+      final refreshAdapter = _ScriptedAdapter((opts) async {
+        final token = (opts.data as Map)['refreshToken'] as String;
+        usedRefreshTokens.add(token);
+        await refreshGate.future;
+        // Server rotates: R1 is valid once, anything else is revoked.
+        if (token != 'R1') return _jsonBody(401, {'error': 'revoked'});
+        return _jsonBody(200, _refreshOk('NEW', 'R2'));
+      });
+
+      final dio = Dio(BaseOptions(baseUrl: 'https://x'))
+        ..httpClientAdapter = adapter;
+      final refreshDio = Dio(BaseOptions(baseUrl: 'https://x'))
+        ..httpClientAdapter = refreshAdapter;
+      var loggedOut = false;
+      final interceptor = buildAuthInterceptorForTest(
+        dio: dio,
+        refreshClient: refreshDio,
+        storage: storage,
+        onLogout: () => loggedOut = true,
+      );
+
+      // Act — probe refresh in flight, then a request 401s.
+      final probe = refreshSessionForTest(interceptor);
+      final request = dio.post<Map<String, dynamic>>('/sync');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      refreshGate.complete();
+      final auth = await probe;
+      final response = await request;
+
+      // Assert
+      expect(auth.accessToken, 'NEW');
+      expect(response.statusCode, 200);
+      expect(usedRefreshTokens, ['R1'],
+          reason: 'exactly one refresh, never replaying a rotated token');
+      expect(loggedOut, isFalse);
+    });
+  });
+
+  group('session refresh errors', () {
+    test('rejected refresh token surfaces the original 401 DioException',
+        () async {
+      // Arrange
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R1');
+      final refreshDio = Dio(BaseOptions(baseUrl: 'https://x'))
+        ..httpClientAdapter =
+            _ScriptedAdapter((opts) async => _jsonBody(401, {'e': 'revoked'}));
+      final interceptor = buildAuthInterceptorForTest(
+        dio: Dio(BaseOptions(baseUrl: 'https://x')),
+        refreshClient: refreshDio,
+        storage: storage,
+      );
+
+      // Act / Assert
+      await expectLater(
+        refreshSessionForTest(interceptor),
+        throwsA(isA<DioException>()
+            .having((e) => e.response?.statusCode, 'status', 401)),
+      );
+      verify(() => storage.deleteTokens()).called(1);
+    });
+
+    test('missing refresh token throws StateError', () async {
+      // Arrange
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
+      final interceptor = buildAuthInterceptorForTest(
+        dio: Dio(BaseOptions(baseUrl: 'https://x')),
+        refreshClient: Dio(BaseOptions(baseUrl: 'https://x')),
+        storage: storage,
+      );
+
+      // Act / Assert
+      await expectLater(
+          refreshSessionForTest(interceptor), throwsA(isA<StateError>()));
+    });
   });
 
   group('refresh failure', () {

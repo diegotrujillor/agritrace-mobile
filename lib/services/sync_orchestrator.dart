@@ -4,6 +4,7 @@ import '../repositories/activity_repository.dart';
 import '../repositories/alert_repository.dart';
 import '../repositories/farm_repository.dart';
 import '../repositories/plot_repository.dart';
+import '../repositories/sync_deletable.dart';
 import 'sync_service.dart';
 
 /// Ties the local repositories to the [SyncService] push/pull cycle.
@@ -33,6 +34,7 @@ class SyncOrchestrator {
   /// Pass [since] to request only changes after a known cursor (incremental
   /// pull); omit for a full pull (first sync after login).
   Future<SyncResult> run({DateTime? since}) async {
+    await _pushDeletes();
     final changes = await _collectPending();
     final result = await syncService.syncNow(
       changes: changes,
@@ -79,12 +81,46 @@ class SyncOrchestrator {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
+  /// Children before parents, so a lote's activities are deleted on the
+  /// server before the lote itself (and lotes before their finca).
+  static const List<String> _deleteOrder = [
+    'activity',
+    'alert',
+    'plot',
+    'farm'
+  ];
+
+  SyncDeletable? _deletable(String? entity) => switch (entity) {
+        'farm' => farmRepo,
+        'plot' => plotRepo,
+        'activity' => activityRepo,
+        'alert' => alertRepo,
+        _ => null,
+      };
+
+  /// v1.11.5 — sends the server DELETE for every local tombstone, purging
+  /// each row only after the server confirmed. A failure (offline, 5xx)
+  /// propagates and aborts the run like a failed push: the tombstones stay
+  /// and are retried on the next sync.
+  Future<void> _pushDeletes() async {
+    for (final entity in _deleteOrder) {
+      final repo = _deletable(entity)!;
+      for (final id in await repo.getPendingDeleteIds()) {
+        await syncService.deleteRemote(entity, id);
+        await repo.purge(id);
+      }
+    }
+  }
+
+  /// A pulled row deleted server-side carries `deleted_at` (raw DB row).
+  static bool _isServerDeleted(Map<String, dynamic> change) =>
+      (change['deleted_at'] ?? change['deletedAt']) != null;
+
   Future<List<SyncChange>> _collectPending() async {
     final changes = <SyncChange>[];
 
     for (final row in await farmRepo.getPending()) {
-      final action =
-          row.syncStatus == 'pendingCreate' ? 'create' : 'update';
+      final action = row.syncStatus == 'pendingCreate' ? 'create' : 'update';
       changes.add(SyncChange(
         entity: 'farm',
         id: row.id,
@@ -102,8 +138,7 @@ class SyncOrchestrator {
     }
 
     for (final row in await plotRepo.getPending()) {
-      final action =
-          row.syncStatus == 'pendingCreate' ? 'create' : 'update';
+      final action = row.syncStatus == 'pendingCreate' ? 'create' : 'update';
       changes.add(SyncChange(
         entity: 'plot',
         id: row.id,
@@ -121,8 +156,7 @@ class SyncOrchestrator {
     }
 
     for (final row in await activityRepo.getPending()) {
-      final action =
-          row.syncStatus == 'pendingCreate' ? 'create' : 'update';
+      final action = row.syncStatus == 'pendingCreate' ? 'create' : 'update';
       changes.add(SyncChange(
         entity: 'activity',
         id: row.id,
@@ -146,8 +180,7 @@ class SyncOrchestrator {
     }
 
     for (final row in await alertRepo.getPending()) {
-      final action =
-          row.syncStatus == 'pendingCreate' ? 'create' : 'update';
+      final action = row.syncStatus == 'pendingCreate' ? 'create' : 'update';
       changes.add(SyncChange(
         entity: 'alert',
         id: row.id,
@@ -186,6 +219,17 @@ class SyncOrchestrator {
 
   Future<void> _applyPulledChange(Map<String, dynamic> change) async {
     try {
+      final repo = _deletable(change['entity'] as String?);
+      final id = change['id'] as String?;
+      if (repo != null && id != null) {
+        // v1.11.5 — never resurrect deleted rows: purge server-side deletes
+        // and skip rows whose local delete has not reached the server yet.
+        if (_isServerDeleted(change)) {
+          await repo.purge(id);
+          return;
+        }
+        if (await repo.isPendingDelete(id)) return;
+      }
       switch (change['entity'] as String?) {
         case 'farm':
           await farmRepo.upsertFromServer(change);
@@ -197,7 +241,8 @@ class SyncOrchestrator {
           await alertRepo.upsertFromServer(change);
       }
     } catch (e) {
-      dev.log('SyncOrchestrator: failed to apply pulled change: $e', name: 'sync');
+      dev.log('SyncOrchestrator: failed to apply pulled change: $e',
+          name: 'sync');
     }
   }
 }

@@ -4,6 +4,41 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.11.5] - 2026-11-13 — fix: borrar sincroniza con el servidor, logout forzado por carrera de refresh, aviso de duplicado en todos los tipos
+
+### Fixed
+- **Lo borrado reaparecía tras sincronizar o re-iniciar sesión.** Borrar una
+  finca/lote/actividad/alerta solo eliminaba la fila de Drift: el protocolo de
+  sync solo empuja `create|update` y nunca se llamaba `DELETE /v1/<recurso>/:id`
+  (prod: cero DELETE en logs). Además el pull devolvía filas con `deleted_at` y
+  la app las re-insertaba. Ahora borrar marca la fila `pendingDelete` (oculta
+  en todas las listas; una fila nunca sincronizada se borra directo); el
+  `SyncOrchestrator` envía el DELETE REST por cada tombstone (hijos antes que
+  padres; 404 = ya borrado) y solo entonces la purga; si falla (offline/5xx)
+  el tombstone queda y se reintenta. Un pull con `deleted_at` purga la fila
+  local y nunca resucita una fila pendiente de borrar. Sin cambio de esquema
+  Drift ni de backend. Dónde: `lib/database/app_database.dart`,
+  `lib/repositories/*_repository.dart`, `lib/repositories/sync_deletable.dart`
+  (nuevo), `lib/services/sync_service.dart`, `lib/services/sync_orchestrator.dart`.
+- **"La app se cierra sola" = logout forzado por carrera de refresh.** El
+  refresh del arranque (`AuthService.refresh`) iba por fuera del single-flight
+  del interceptor. Con refresh tokens rotativos, un 401 concurrente disparaba
+  un segundo refresh con el token ya rotado → 401 → sesión colapsada → logout +
+  borrado local (prod 17:01 UTC: refresh 200, sync 401, refresh 401).
+  `AuthService.refresh` ahora usa `ApiService.refreshSession()`, que comparte
+  el single-flight del interceptor; mismo contrato de errores. Dónde:
+  `lib/services/api_service.dart`, `lib/services/auth_service.dart`.
+
+### Changed
+- **Aviso de actividad duplicada (mismo lote, tipo y día) para todos los
+  tipos**, no solo Siembra. Sigue siendo suave ("Sí, continuar" guarda).
+  Dónde: `lib/utils/constants.dart`.
+
+### Tests
+- +4 BD (Drift en memoria, `AppDatabase.forTesting`), +4 orquestador, +4
+  `deleteRemote`, +3 interceptor/refresh, +2 `AuthService.refresh`, widget de
+  duplicado actualizado. Total 433 pasando.
+
 ## [1.11.4] - 2026-11-13 — ci: build de APK roto por paquete SDK `tools` retirado
 
 ### Fixed

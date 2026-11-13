@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
+import 'sync_deletable.dart';
 import '../models/farm.dart';
 
 /// Local-first repository for [Farm] entities.
@@ -9,7 +10,7 @@ import '../models/farm.dart';
 /// [SyncOrchestrator] drains pending rows to the backend and calls
 /// [markSynced] on success.  Reads are immutable [Farm] value objects
 /// produced from the Drift-generated [FarmsTableData] rows.
-class FarmRepository {
+class FarmRepository implements SyncDeletable {
   FarmRepository(this._db);
 
   final AppDatabase _db;
@@ -114,7 +115,18 @@ class FarmRepository {
   /// Tombstone push (pendingDelete) is a later enhancement; for MVP the
   /// delete is also queued as an implicit server DELETE via sync if the row
   /// was previously synced.
-  Future<void> delete(String id) => _db.deleteFarm(id);
+  /// Local delete (v1.11.5): hides the row immediately and queues the
+  /// server DELETE for the next sync (see [SyncDeletable]).
+  Future<void> delete(String id) => _db.queueDelete('farm', id);
+
+  @override
+  Future<List<String>> getPendingDeleteIds() => _db.getPendingDeleteIds('farm');
+
+  @override
+  Future<bool> isPendingDelete(String id) => _db.isPendingDelete('farm', id);
+
+  @override
+  Future<void> purge(String id) => _db.purgeRow('farm', id);
 
   // ── Sync helpers ──────────────────────────────────────────────────────────
 

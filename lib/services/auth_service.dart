@@ -229,15 +229,12 @@ class AuthService {
     if (refreshToken == null || refreshToken.isEmpty) {
       throw StateError('no refresh token in storage');
     }
-    final response = await _api.client.post(
-      '/auth/refresh',
-      data: {'refreshToken': refreshToken},
-    );
-    final auth = AuthResponse.fromJson(response.data as Map<String, dynamic>);
-    await _storage.saveTokens(
-      accessToken: auth.accessToken,
-      refreshToken: auth.refreshToken,
-    );
+    // v1.11.5 — go through the interceptor's single-flight refresh (which
+    // also persists the rotated tokens). A raw POST here raced the 401
+    // retry path: both sent the same rotating refresh token, the loser got
+    // 401 and the session collapsed into a forced logout + local wipe
+    // (prod 2026-11-13).
+    final auth = await _api.refreshSession();
     // v1.9.3 — keep the cached `last_user_id` in sync on cold-start
     // refresh too. The probe is the first place the freshly-bound app
     // learns who the active session belongs to; without this, a device

@@ -4,6 +4,7 @@ import 'package:agritrace_mobile/repositories/activity_repository.dart';
 import 'package:agritrace_mobile/repositories/alert_repository.dart';
 import 'package:agritrace_mobile/repositories/farm_repository.dart';
 import 'package:agritrace_mobile/repositories/plot_repository.dart';
+import 'package:agritrace_mobile/repositories/sync_deletable.dart';
 import 'package:agritrace_mobile/services/sync_orchestrator.dart';
 import 'package:agritrace_mobile/services/sync_service.dart';
 
@@ -57,6 +58,107 @@ void main() {
     when(() => plotRepo.upsertFromServer(any())).thenAnswer((_) async {});
     when(() => activityRepo.upsertFromServer(any())).thenAnswer((_) async {});
     when(() => alertRepo.upsertFromServer(any())).thenAnswer((_) async {});
+    // v1.11.5 — delete tombstones. Default: nothing pending, nothing
+    // tombstoned locally.
+    for (final repo in <SyncDeletable>[
+      farmRepo,
+      plotRepo,
+      activityRepo,
+      alertRepo,
+    ]) {
+      when(repo.getPendingDeleteIds).thenAnswer((_) async => const []);
+      when(() => repo.isPendingDelete(any())).thenAnswer((_) async => false);
+      when(() => repo.purge(any())).thenAnswer((_) async {});
+    }
+  });
+
+  group('delete propagation (v1.11.5)', () {
+    void stubEmptySync() {
+      when(() => syncService.syncNow(
+            changes: any(named: 'changes'),
+            since: any(named: 'since'),
+          )).thenAnswer((_) async => _pullResult(const []));
+      when(farmRepo.getPending).thenAnswer((_) async => []);
+      when(plotRepo.getPending).thenAnswer((_) async => []);
+      when(activityRepo.getPending).thenAnswer((_) async => []);
+      when(alertRepo.getPending).thenAnswer((_) async => []);
+    }
+
+    test(
+        'run() sends a server DELETE per tombstone, children first, then '
+        'purges locally', () async {
+      // Arrange
+      stubEmptySync();
+      when(farmRepo.getPendingDeleteIds).thenAnswer((_) async => ['f1']);
+      when(activityRepo.getPendingDeleteIds).thenAnswer((_) async => ['a1']);
+      when(() => syncService.deleteRemote(any(), any()))
+          .thenAnswer((_) async {});
+
+      // Act
+      await orchestrator.run();
+
+      // Assert
+      verifyInOrder([
+        () => syncService.deleteRemote('activity', 'a1'),
+        () => activityRepo.purge('a1'),
+        () => syncService.deleteRemote('farm', 'f1'),
+        () => farmRepo.purge('f1'),
+      ]);
+    });
+
+    test('run() keeps the tombstone and aborts when the DELETE fails',
+        () async {
+      // Arrange
+      stubEmptySync();
+      when(activityRepo.getPendingDeleteIds).thenAnswer((_) async => ['a1']);
+      when(() => syncService.deleteRemote(any(), any()))
+          .thenThrow(Exception('offline'));
+
+      // Act / Assert
+      await expectLater(orchestrator.run(), throwsA(isA<Exception>()));
+      verifyNever(() => activityRepo.purge(any()));
+    });
+
+    test('a pulled row with deleted_at is purged locally, never upserted',
+        () async {
+      // Arrange
+      when(() => syncService.syncNow(
+            changes: any(named: 'changes'),
+            since: any(named: 'since'),
+          )).thenAnswer((_) async => _pullResult([
+            {
+              'entity': 'activity',
+              'id': 'a1',
+              'deleted_at': '2026-11-13T17:00:00.000Z',
+            },
+          ]));
+
+      // Act
+      await orchestrator.pullAllFromServer();
+
+      // Assert
+      verify(() => activityRepo.purge('a1')).called(1);
+      verifyNever(() => activityRepo.upsertFromServer(any()));
+    });
+
+    test('a pulled row that is locally pending delete is not resurrected',
+        () async {
+      // Arrange
+      when(() => syncService.syncNow(
+            changes: any(named: 'changes'),
+            since: any(named: 'since'),
+          )).thenAnswer((_) async => _pullResult([
+            {'entity': 'activity', 'id': 'a1', 'deleted_at': null},
+          ]));
+      when(() => activityRepo.isPendingDelete('a1'))
+          .thenAnswer((_) async => true);
+
+      // Act
+      await orchestrator.pullAllFromServer();
+
+      // Assert
+      verifyNever(() => activityRepo.upsertFromServer(any()));
+    });
   });
 
   // v1.9.8 — P0 fix. `pullAllFromServer()` is invoked by `AuthService`

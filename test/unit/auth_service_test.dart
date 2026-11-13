@@ -102,9 +102,8 @@ void main() {
     });
 
     test('propagates DioException', () async {
-      when(() => dio.post('/auth/login', data: any(named: 'data')))
-          .thenThrow(DioException(
-              requestOptions: RequestOptions(path: '/auth/login')));
+      when(() => dio.post('/auth/login', data: any(named: 'data'))).thenThrow(
+          DioException(requestOptions: RequestOptions(path: '/auth/login')));
 
       expect(
         service.login(email: 'a@b.com', password: 'x'),
@@ -191,6 +190,40 @@ void main() {
     });
   });
 
+  group('refresh', () {
+    test(
+        'rotates via ApiService.refreshSession (single-flight) and never '
+        'POSTs /auth/refresh directly', () async {
+      // Arrange
+      final auth = AuthResponse.fromJson(_authEnvelope(
+        accessToken: 'NEW-A',
+        refreshToken: 'NEW-R',
+      ));
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R1');
+      when(() => api.refreshSession()).thenAnswer((_) async => auth);
+
+      // Act
+      final result = await service.refresh();
+
+      // Assert
+      expect(result.accessToken, 'NEW-A');
+      verify(() => api.refreshSession()).called(1);
+      verifyNever(() => dio.post('/auth/refresh', data: any(named: 'data')));
+      verify(() => storage.saveLastUserId(auth.user.id)).called(1);
+      verify(() => storage.saveUserSnapshot(auth.user)).called(1);
+    });
+
+    test('throws StateError without calling the API when no refresh token',
+        () async {
+      // Arrange
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
+
+      // Act / Assert
+      await expectLater(service.refresh(), throwsA(isA<StateError>()));
+      verifyNever(() => api.refreshSession());
+    });
+  });
+
   group('logout', () {
     test('skips network call when no refresh token is stored', () async {
       when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
@@ -228,9 +261,8 @@ void main() {
 
     test('still deletes local tokens when server logout fails', () async {
       when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R-token');
-      when(() => dio.post('/auth/logout', data: any(named: 'data')))
-          .thenThrow(DioException(
-              requestOptions: RequestOptions(path: '/auth/logout')));
+      when(() => dio.post('/auth/logout', data: any(named: 'data'))).thenThrow(
+          DioException(requestOptions: RequestOptions(path: '/auth/logout')));
 
       await service.logout();
 
@@ -244,16 +276,14 @@ void main() {
   // counter to assert the wipe ran (or didn't) without dragging Drift
   // into the unit-test build.
   group('cross-user data wipe (P0)', () {
-    test('logout always invokes the wiper, even on server failure',
-        () async {
+    test('logout always invokes the wiper, even on server failure', () async {
       int wipeCalls = 0;
       Future<void> wiper() async => wipeCalls++;
       final svc = AuthService(api, storage, wipeLocalData: wiper);
 
       when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R-X');
-      when(() => dio.post('/auth/logout', data: any(named: 'data')))
-          .thenThrow(DioException(
-              requestOptions: RequestOptions(path: '/auth/logout')));
+      when(() => dio.post('/auth/logout', data: any(named: 'data'))).thenThrow(
+          DioException(requestOptions: RequestOptions(path: '/auth/logout')));
 
       await svc.logout();
 
@@ -272,8 +302,7 @@ void main() {
 
       // Different user id was last on this device — the new login must
       // tear down the previous user's Drift rows before mounting.
-      when(() => storage.getLastUserId())
-          .thenAnswer((_) async => 'OTHER-USER');
+      when(() => storage.getLastUserId()).thenAnswer((_) async => 'OTHER-USER');
       when(() => dio.post('/auth/login', data: any(named: 'data')))
           .thenAnswer((_) async => okResponse(_authEnvelope()));
 
@@ -324,8 +353,7 @@ void main() {
       Future<void> wiper() async => wipeCalls++;
       final svc = AuthService(api, storage, wipeLocalData: wiper);
 
-      when(() => storage.getLastUserId())
-          .thenAnswer((_) async => 'OTHER-USER');
+      when(() => storage.getLastUserId()).thenAnswer((_) async => 'OTHER-USER');
       when(() => dio.post('/auth/register', data: any(named: 'data')))
           .thenAnswer((_) async => okResponse(_authEnvelope()));
 
@@ -408,8 +436,7 @@ void main() {
         privacyConsent: true,
       );
 
-      expect(pullCalls, 1,
-          reason: 'puller must run exactly once per register');
+      expect(pullCalls, 1, reason: 'puller must run exactly once per register');
     });
 
     test('login completes even when the puller throws (offline-tolerant)',
@@ -452,8 +479,7 @@ void main() {
       Future<void> wiper() async => order.add('wipe');
       Future<void> puller() async => order.add('pull');
 
-      when(() => storage.getLastUserId())
-          .thenAnswer((_) async => 'OTHER-USER');
+      when(() => storage.getLastUserId()).thenAnswer((_) async => 'OTHER-USER');
       when(() => dio.post('/auth/login', data: any(named: 'data')))
           .thenAnswer((_) async => okResponse(_authEnvelope()));
 
@@ -489,7 +515,8 @@ void main() {
 
       final auth = await svc.login(email: 'a@b.com', password: 'pwd-12345');
 
-      expect(auth.user.id, 'u-1', reason: 'auth succeeded; wipe failure swallowed');
+      expect(auth.user.id, 'u-1',
+          reason: 'auth succeeded; wipe failure swallowed');
       verify(() => storage.saveTokens(accessToken: 'acc', refreshToken: 'ref'))
           .called(1);
       verify(() => storage.saveLastUserId('u-1')).called(1);

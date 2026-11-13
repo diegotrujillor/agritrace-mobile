@@ -4,6 +4,16 @@ import 'tables.dart';
 
 part 'app_database.g.dart';
 
+/// `sync_status` of a row deleted locally whose server DELETE has not been
+/// confirmed yet (v1.11.5). Such rows are hidden from every list and are
+/// never pushed as create/update; [SyncOrchestrator] sends the DELETE and
+/// then purges them.
+const String kSyncPendingDelete = 'pendingDelete';
+
+/// Statuses excluded from the create/update push: already synced, or a
+/// delete tombstone handled separately.
+const List<String> _kNotPushedAsUpsert = ['synced', kSyncPendingDelete];
+
 /// Drift SQLite database.
 ///
 /// All four domain tables include `sync_status` + `updated_at` columns so the
@@ -18,6 +28,9 @@ part 'app_database.g.dart';
 @DriftDatabase(tables: [FarmsTable, PlotsTable, ActivitiesTable, AlertsTable])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
+
+  /// Test-only constructor over an arbitrary executor (e.g. in-memory).
+  AppDatabase.forTesting(super.executor);
 
   @override
   int get schemaVersion => 2;
@@ -42,11 +55,13 @@ class AppDatabase extends _$AppDatabase {
 
   // ── Farms ─────────────────────────────────────────────────────────────────
 
-  Future<List<FarmsTableData>> getAllFarms() =>
-      select(farmsTable).get();
+  Future<List<FarmsTableData>> getAllFarms() => (select(farmsTable)
+        ..where((t) => t.syncStatus.isNotValue(kSyncPendingDelete)))
+      .get();
 
-  Stream<List<FarmsTableData>> watchAllFarms() =>
-      select(farmsTable).watch();
+  Stream<List<FarmsTableData>> watchAllFarms() => (select(farmsTable)
+        ..where((t) => t.syncStatus.isNotValue(kSyncPendingDelete)))
+      .watch();
 
   Future<void> upsertFarm(FarmsTableCompanion farm) =>
       into(farmsTable).insertOnConflictUpdate(farm);
@@ -54,10 +69,9 @@ class AppDatabase extends _$AppDatabase {
   Future<void> deleteFarm(String id) =>
       (delete(farmsTable)..where((t) => t.id.equals(id))).go();
 
-  Future<List<FarmsTableData>> getPendingFarms() =>
-      (select(farmsTable)
-            ..where((t) => t.syncStatus.isNotValue('synced')))
-          .get();
+  Future<List<FarmsTableData>> getPendingFarms() => (select(farmsTable)
+        ..where((t) => t.syncStatus.isNotIn(_kNotPushedAsUpsert)))
+      .get();
 
   Future<void> markFarmSynced(String id) =>
       (update(farmsTable)..where((t) => t.id.equals(id)))
@@ -66,10 +80,18 @@ class AppDatabase extends _$AppDatabase {
   // ── Plots ─────────────────────────────────────────────────────────────────
 
   Stream<List<PlotsTableData>> watchPlotsByFarm(String farmId) =>
-      (select(plotsTable)..where((t) => t.farmId.equals(farmId))).watch();
+      (select(plotsTable)
+            ..where((t) =>
+                t.farmId.equals(farmId) &
+                t.syncStatus.isNotValue(kSyncPendingDelete)))
+          .watch();
 
   Future<List<PlotsTableData>> getPlotsByFarm(String farmId) =>
-      (select(plotsTable)..where((t) => t.farmId.equals(farmId))).get();
+      (select(plotsTable)
+            ..where((t) =>
+                t.farmId.equals(farmId) &
+                t.syncStatus.isNotValue(kSyncPendingDelete)))
+          .get();
 
   /// One-shot single-plot lookup by id. Used by [PlotRepository.getById]
   /// to power the offline-first plot detail screen (bug #20 fix).
@@ -82,10 +104,9 @@ class AppDatabase extends _$AppDatabase {
   Future<void> deletePlot(String id) =>
       (delete(plotsTable)..where((t) => t.id.equals(id))).go();
 
-  Future<List<PlotsTableData>> getPendingPlots() =>
-      (select(plotsTable)
-            ..where((t) => t.syncStatus.isNotValue('synced')))
-          .get();
+  Future<List<PlotsTableData>> getPendingPlots() => (select(plotsTable)
+        ..where((t) => t.syncStatus.isNotIn(_kNotPushedAsUpsert)))
+      .get();
 
   Future<void> markPlotSynced(String id) =>
       (update(plotsTable)..where((t) => t.id.equals(id)))
@@ -95,40 +116,44 @@ class AppDatabase extends _$AppDatabase {
 
   Stream<List<ActivitiesTableData>> watchActivitiesByPlot(String plotId) =>
       (select(activitiesTable)
-            ..where((t) => t.plotId.equals(plotId))
+            ..where((t) =>
+                t.plotId.equals(plotId) &
+                t.syncStatus.isNotValue(kSyncPendingDelete))
             ..orderBy([(t) => OrderingTerm.desc(t.occurredAt)]))
           .watch();
 
   Future<List<ActivitiesTableData>> getActivitiesByPlot(String plotId) =>
       (select(activitiesTable)
-            ..where((t) => t.plotId.equals(plotId)))
+            ..where((t) =>
+                t.plotId.equals(plotId) &
+                t.syncStatus.isNotValue(kSyncPendingDelete)))
           .get();
 
   Future<void> upsertActivity(ActivitiesTableCompanion activity) =>
       into(activitiesTable).insertOnConflictUpdate(activity);
 
   Future<ActivitiesTableData?> getActivity(String id) =>
-      (select(activitiesTable)..where((t) => t.id.equals(id))).getSingleOrNull();
+      (select(activitiesTable)..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
 
   Future<void> deleteActivity(String id) =>
       (delete(activitiesTable)..where((t) => t.id.equals(id))).go();
 
   Future<List<ActivitiesTableData>> getPendingActivities() =>
       (select(activitiesTable)
-            ..where((t) => t.syncStatus.isNotValue('synced')))
+            ..where((t) => t.syncStatus.isNotIn(_kNotPushedAsUpsert)))
           .get();
 
   Future<void> markActivitySynced(String id) =>
       (update(activitiesTable)..where((t) => t.id.equals(id)))
-          .write(
-              const ActivitiesTableCompanion(syncStatus: Value('synced')));
+          .write(const ActivitiesTableCompanion(syncStatus: Value('synced')));
 
   // ── Alerts ────────────────────────────────────────────────────────────────
 
-  Stream<List<AlertsTableData>> watchAlerts() =>
-      (select(alertsTable)
-            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-          .watch();
+  Stream<List<AlertsTableData>> watchAlerts() => (select(alertsTable)
+        ..where((t) => t.syncStatus.isNotValue(kSyncPendingDelete))
+        ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+      .watch();
 
   Future<void> upsertAlert(AlertsTableCompanion alert) =>
       into(alertsTable).insertOnConflictUpdate(alert);
@@ -136,14 +161,97 @@ class AppDatabase extends _$AppDatabase {
   Future<void> deleteAlertById(String id) =>
       (delete(alertsTable)..where((t) => t.id.equals(id))).go();
 
-  Future<List<AlertsTableData>> getPendingAlerts() =>
-      (select(alertsTable)
-            ..where((t) => t.syncStatus.isNotValue('synced')))
-          .get();
+  Future<List<AlertsTableData>> getPendingAlerts() => (select(alertsTable)
+        ..where((t) => t.syncStatus.isNotIn(_kNotPushedAsUpsert)))
+      .get();
 
   Future<void> markAlertSynced(String id) =>
       (update(alertsTable)..where((t) => t.id.equals(id)))
           .write(const AlertsTableCompanion(syncStatus: Value('synced')));
+
+  // ── Delete tombstones (v1.11.5) ───────────────────────────────────────────
+
+  /// Maps a sync entity name to its table. Entity names are a closed set
+  /// from code (never user input), so interpolating the table name into the
+  /// SQL below is safe; ids always go through bound variables.
+  TableInfo<Table, Object?> _syncTable(String entity) {
+    switch (entity) {
+      case 'farm':
+        return farmsTable;
+      case 'plot':
+        return plotsTable;
+      case 'activity':
+        return activitiesTable;
+      case 'alert':
+        return alertsTable;
+    }
+    throw ArgumentError.value(entity, 'entity', 'unknown entity');
+  }
+
+  /// Local delete. A row that never reached the server (`pendingCreate`) is
+  /// removed outright; any other row becomes a hidden [kSyncPendingDelete]
+  /// tombstone until [SyncOrchestrator] confirms the server DELETE.
+  Future<void> queueDelete(String entity, String id) {
+    final table = _syncTable(entity);
+    final name = table.actualTableName;
+    return transaction(() async {
+      await customUpdate(
+        'DELETE FROM $name WHERE id = ? AND sync_status = ?',
+        variables: [
+          Variable.withString(id),
+          Variable.withString('pendingCreate')
+        ],
+        updates: {table},
+        updateKind: UpdateKind.delete,
+      );
+      await customUpdate(
+        'UPDATE $name SET sync_status = ? WHERE id = ?',
+        variables: [
+          Variable.withString(kSyncPendingDelete),
+          Variable.withString(id),
+        ],
+        updates: {table},
+        updateKind: UpdateKind.update,
+      );
+    });
+  }
+
+  /// Ids of [entity] rows awaiting their server DELETE.
+  Future<List<String>> getPendingDeleteIds(String entity) async {
+    final table = _syncTable(entity);
+    final rows = await customSelect(
+      'SELECT id FROM ${table.actualTableName} WHERE sync_status = ?',
+      variables: [Variable.withString(kSyncPendingDelete)],
+      readsFrom: {table},
+    ).get();
+    return [for (final r in rows) r.read<String>('id')];
+  }
+
+  /// Whether [id] is a local delete tombstone.
+  Future<bool> isPendingDelete(String entity, String id) async {
+    final table = _syncTable(entity);
+    final row = await customSelect(
+      'SELECT 1 FROM ${table.actualTableName} '
+      'WHERE id = ? AND sync_status = ? LIMIT 1',
+      variables: [
+        Variable.withString(id),
+        Variable.withString(kSyncPendingDelete),
+      ],
+      readsFrom: {table},
+    ).getSingleOrNull();
+    return row != null;
+  }
+
+  /// Hard-deletes [id] (server DELETE confirmed, or row deleted server-side).
+  Future<void> purgeRow(String entity, String id) {
+    final table = _syncTable(entity);
+    return customUpdate(
+      'DELETE FROM ${table.actualTableName} WHERE id = ?',
+      variables: [Variable.withString(id)],
+      updates: {table},
+      updateKind: UpdateKind.delete,
+    );
+  }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 

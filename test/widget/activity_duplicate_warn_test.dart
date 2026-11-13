@@ -8,8 +8,8 @@
 //      activity saved.
 //   3. Siembra different day same plot → NO dialog, activity saved.
 //   4. Siembra same day different plot → NO dialog, activity saved.
-//   5. Fertilización duplicate same day same plot → NO dialog
-//      (only the types in `kDuplicateWarnActivityTypes` warn).
+//   5. Fertilización duplicate same day same plot → dialog
+//      (v1.11.5: `kDuplicateWarnActivityTypes` covers every type).
 //   6. Editing an existing Siembra (separate edit screen path) → NO
 //      dialog (edit screen never instantiates `ActivityFormScreen`).
 //
@@ -106,8 +106,7 @@ void main() {
   Widget wrap({required String startRoute, required List<Activity> seeded}) {
     when(() => mockRepo.watchByPlot(any()))
         .thenAnswer((_) => Stream.value(seeded));
-    when(() => mockRepo.listByPlot(any()))
-        .thenAnswer((_) async => seeded);
+    when(() => mockRepo.listByPlot(any())).thenAnswer((_) async => seeded);
     when(() => mockRepo.create(
           plotId: any(named: 'plotId'),
           type: any(named: 'type'),
@@ -116,8 +115,7 @@ void main() {
           photoUrl: any(named: 'photoUrl'),
         )).thenAnswer((inv) async {
       final t = inv.namedArguments[const Symbol('type')] as ActivityType;
-      final o =
-          inv.namedArguments[const Symbol('occurredAt')] as DateTime;
+      final o = inv.namedArguments[const Symbol('occurredAt')] as DateTime;
       final p = inv.namedArguments[const Symbol('plotId')] as String;
       return _activity(
         id: 'act-new',
@@ -188,7 +186,8 @@ void main() {
 
       // Assert — dialog visible with the expected copy.
       expect(find.text('Ya registraste Siembra'), findsOneWidget);
-      expect(find.textContaining('¿Continuar de todas formas?'), findsOneWidget);
+      expect(
+          find.textContaining('¿Continuar de todas formas?'), findsOneWidget);
 
       // Tap Cancelar. Use bounded pumps instead of pumpAndSettle: the
       // form keeps `_submitting=true` after onSubmit returns normally
@@ -298,7 +297,8 @@ void main() {
   );
 
   testWidgets(
-    'Fertilización duplicate same day same plot → NO dialog',
+    'Fertilización duplicate same day same plot → dialog (v1.11.5: every '
+    'type warns)',
     (tester) async {
       // Arrange — existing Fertilización today on this plot.
       await tester.pumpWidget(wrap(
@@ -318,16 +318,17 @@ void main() {
 
       await tapRegister(tester);
 
-      // Assert — no dialog (Fertilización is not in
-      // `kDuplicateWarnActivityTypes`); create was called.
-      expect(find.text('Ya registraste Fertilización'), findsNothing);
-      verify(() => mockRepo.create(
-            plotId: _plotId,
-            type: ActivityType.fertilization,
+      // Assert — the soft warning now fires for every activity type
+      // (pilot feedback 2026-11-13: same-day Fertilización duplicates were
+      // saved silently). Nothing saved until the user confirms.
+      expect(find.text('Ya registraste Fertilización'), findsOneWidget);
+      verifyNever(() => mockRepo.create(
+            plotId: any(named: 'plotId'),
+            type: any(named: 'type'),
             occurredAt: any(named: 'occurredAt'),
-            description: null,
-            photoUrl: null,
-          )).called(1);
+            description: any(named: 'description'),
+            photoUrl: any(named: 'photoUrl'),
+          ));
     },
   );
 
@@ -361,8 +362,7 @@ void main() {
       await tester.ensureVisible(
         find.widgetWithText(ElevatedButton, 'Guardar cambios'),
       );
-      await tester
-          .tap(find.widgetWithText(ElevatedButton, 'Guardar cambios'));
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Guardar cambios'));
       await tester.pumpAndSettle();
 
       // Assert — duplicate dialog never appeared; update was called once.

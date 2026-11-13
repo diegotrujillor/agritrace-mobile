@@ -84,14 +84,21 @@ class ApiService {
     );
     interceptor._dioForRetry = _dio;
     _dio.interceptors.add(interceptor);
+    _interceptor = interceptor;
   }
 
   final StorageService _storage;
   final void Function()? _onLogout;
   late final Dio _dio;
   late final Dio _refreshDio;
+  late final _AuthInterceptor _interceptor;
 
   Dio get client => _dio;
+
+  /// Rotates the session tokens via the interceptor's single-flight
+  /// refresh. Every proactive refresh MUST go through here (never a raw
+  /// `client.post('/auth/refresh')`) — see [_AuthInterceptor.refreshSession].
+  Future<AuthResponse> refreshSession() => _interceptor.refreshSession();
 }
 
 /// Marker exception used internally to signal that the refresh flow has
@@ -100,8 +107,12 @@ class ApiService {
 /// network, timeout) are rethrown instead so the original 401 can pass
 /// through unchanged.
 class _RefreshFailure implements Exception {
-  const _RefreshFailure(this.reason);
+  const _RefreshFailure(this.reason, {this.cause});
   final String reason;
+
+  /// The server's 401/403 when the refresh token was rejected; null for
+  /// local failures (missing token, malformed envelope, storage error).
+  final DioException? cause;
   @override
   String toString() => '_RefreshFailure($reason)';
 }
@@ -128,6 +139,11 @@ QueuedInterceptor buildAuthInterceptorForTest({
   return interceptor;
 }
 
+/// Test-only access to [_AuthInterceptor.refreshSession] for an interceptor
+/// built by [buildAuthInterceptorForTest].
+Future<AuthResponse> refreshSessionForTest(QueuedInterceptor interceptor) =>
+    (interceptor as _AuthInterceptor).refreshSession();
+
 class _AuthInterceptor extends QueuedInterceptor {
   _AuthInterceptor({
     required StorageService storage,
@@ -149,7 +165,7 @@ class _AuthInterceptor extends QueuedInterceptor {
   /// Single-flight cache for the in-flight refresh. Concurrent 401s share
   /// the same future and all retry against the new token, so only ONE
   /// `/auth/refresh` ever hits the network at a time.
-  Future<String>? _refreshFuture;
+  Future<AuthResponse>? _refreshFuture;
 
   /// Per-request stash of the access token used on the originating attempt.
   /// Read on the retry to short-circuit the refresh when another request
@@ -245,7 +261,7 @@ class _AuthInterceptor extends QueuedInterceptor {
 
     final String newToken;
     try {
-      newToken = await _coordinatedRefresh();
+      newToken = (await _coordinatedRefresh()).accessToken;
     } on _RefreshFailure {
       _onLogout?.call();
       handler.reject(_collapsedException(err.requestOptions));
@@ -291,10 +307,30 @@ class _AuthInterceptor extends QueuedInterceptor {
     }
   }
 
+  /// Refreshes the session through the SAME single-flight slot the 401 path
+  /// uses, so a proactive refresh (cold-start probe) and a concurrent 401
+  /// never send two `/auth/refresh` calls. The backend rotates refresh
+  /// tokens, so a second call would replay a revoked token and force a
+  /// logout. Rotated tokens are persisted before this completes.
+  ///
+  /// Error contract (unchanged from the former `AuthService.refresh`):
+  /// rejected refresh token → the 401/403 [DioException] (tokens already
+  /// deleted); missing/malformed/unpersistable → [StateError]; transient
+  /// (network/5xx) → the original [DioException].
+  Future<AuthResponse> refreshSession() async {
+    try {
+      return await _coordinatedRefresh();
+    } on _RefreshFailure catch (failure) {
+      final cause = failure.cause;
+      if (cause != null) throw cause;
+      throw StateError(failure.reason);
+    }
+  }
+
   /// Returns the in-flight refresh future, creating one if none is active.
   /// All concurrent 401s share this future — guaranteeing AT MOST ONE
   /// network call to `/auth/refresh`.
-  Future<String> _coordinatedRefresh() {
+  Future<AuthResponse> _coordinatedRefresh() {
     final existing = _refreshFuture;
     if (existing != null) return existing;
     final future = _doRefresh();
@@ -307,7 +343,7 @@ class _AuthInterceptor extends QueuedInterceptor {
   /// persistence failure) throws [_RefreshFailure]. On transient failure
   /// (5xx, network) rethrows the [DioException] so the caller can decide
   /// to pass through the original 401 instead of collapsing the session.
-  Future<String> _doRefresh() async {
+  Future<AuthResponse> _doRefresh() async {
     try {
       final refreshToken = await _storage.getRefreshToken();
       if (refreshToken == null || refreshToken.isEmpty) {
@@ -324,7 +360,7 @@ class _AuthInterceptor extends QueuedInterceptor {
         final status = e.response?.statusCode;
         if (status == 401 || status == 403) {
           await _storage.deleteTokens();
-          throw const _RefreshFailure('refresh token rejected');
+          throw _RefreshFailure('refresh token rejected', cause: e);
         }
         rethrow; // transient — caller passes original 401 through
       }
@@ -346,7 +382,7 @@ class _AuthInterceptor extends QueuedInterceptor {
       } catch (_) {
         throw const _RefreshFailure('failed to persist refreshed tokens');
       }
-      return auth.accessToken;
+      return auth;
     } finally {
       // ALWAYS clear the single-flight slot — even on failure — so the next
       // 401 can spawn a fresh refresh attempt instead of awaiting a dead future.

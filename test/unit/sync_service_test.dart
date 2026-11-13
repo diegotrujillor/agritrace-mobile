@@ -28,6 +28,50 @@ void main() {
         .thenAnswer((_) async => okResponse(envelope(body)));
   }
 
+  group('deleteRemote (v1.11.5)', () {
+    test('sends DELETE to the entity REST path', () async {
+      // Arrange
+      when(() => dio.delete('/activities/a1'))
+          .thenAnswer((_) async => okResponse(null));
+
+      // Act
+      await service.deleteRemote('activity', 'a1');
+
+      // Assert
+      verify(() => dio.delete('/activities/a1')).called(1);
+    });
+
+    test('treats 404 as already deleted', () async {
+      // Arrange
+      final options = RequestOptions(path: '/farms/f1');
+      when(() => dio.delete('/farms/f1')).thenThrow(DioException(
+        requestOptions: options,
+        response: Response(requestOptions: options, statusCode: 404),
+      ));
+
+      // Act / Assert — completes normally
+      await service.deleteRemote('farm', 'f1');
+    });
+
+    test('rethrows other failures so the tombstone is retried', () async {
+      // Arrange
+      final options = RequestOptions(path: '/plots/p1');
+      when(() => dio.delete('/plots/p1')).thenThrow(DioException(
+        requestOptions: options,
+        response: Response(requestOptions: options, statusCode: 500),
+      ));
+
+      // Act / Assert
+      await expectLater(
+          service.deleteRemote('plot', 'p1'), throwsA(isA<DioException>()));
+    });
+
+    test('rejects an unknown entity', () async {
+      await expectLater(
+          service.deleteRemote('user', 'u1'), throwsArgumentError);
+    });
+  });
+
   void stubPull(Map<String, dynamic> body) {
     when(() => dio.get('/sync/changes',
             queryParameters: any(named: 'queryParameters')))
@@ -62,7 +106,8 @@ void main() {
 
   test('syncNow() serialises changes and sends since cursor', () async {
     stubPush({'synced': 1, 'conflicts': 0});
-    stubPull(envelope({'changes': [], 'timestamp': '2026-05-01T00:00:00.000Z'}));
+    stubPull(
+        envelope({'changes': [], 'timestamp': '2026-05-01T00:00:00.000Z'}));
 
     await service.syncNow(
       changes: const [
@@ -80,7 +125,12 @@ void main() {
       () => dio.post('/sync', data: captureAny(named: 'data')),
     ).captured.single as Map<String, dynamic>;
     expect(pushData['changes'], [
-      {'entity': 'plot', 'id': 'p1', 'action': 'update', 'data': {'name': 'Lote'}},
+      {
+        'entity': 'plot',
+        'id': 'p1',
+        'action': 'update',
+        'data': {'name': 'Lote'}
+      },
     ]);
 
     final pullQuery = verify(
@@ -92,7 +142,8 @@ void main() {
 
   test('syncNow() omits since on first run (null cursor)', () async {
     stubPush({'synced': 0, 'conflicts': 0});
-    stubPull(envelope({'changes': [], 'timestamp': '2026-05-01T00:00:00.000Z'}));
+    stubPull(
+        envelope({'changes': [], 'timestamp': '2026-05-01T00:00:00.000Z'}));
 
     await service.syncNow();
 
@@ -107,7 +158,8 @@ void main() {
     // Bypass stubPush to inject a deliberately malformed envelope.
     when(() => dio.post('/sync', data: any(named: 'data')))
         .thenAnswer((_) async => okResponse({'success': false}));
-    stubPull(envelope({'changes': [], 'timestamp': '2026-05-01T00:00:00.000Z'}));
+    stubPull(
+        envelope({'changes': [], 'timestamp': '2026-05-01T00:00:00.000Z'}));
 
     expect(service.syncNow(), throwsA(isA<FormatException>()));
   });

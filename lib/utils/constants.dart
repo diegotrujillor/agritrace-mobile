@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 import '../models/activity.dart';
 
 abstract final class AppColors {
-  static const primaryGreen  = Color(0xFF2D7A3E);
-  static const darkGreen     = Color(0xFF1B5028);
-  static const lightGreen    = Color(0xFFE8F5E9);
-  static const earthBrown    = Color(0xFF6D4C3D);
+  static const primaryGreen = Color(0xFF2D7A3E);
+  static const darkGreen = Color(0xFF1B5028);
+  static const lightGreen = Color(0xFFE8F5E9);
+  static const earthBrown = Color(0xFF6D4C3D);
   static const harvestYellow = Color(0xFFF9A825);
-  static const certBlue      = Color(0xFF1976D2);
-  static const white         = Color(0xFFFFFFFF);
-  static const error         = Color(0xFFD32F2F);
-  static const grey          = Color(0xFF757575);
-  static const lightGrey     = Color(0xFFF5F5F5);
+  static const certBlue = Color(0xFF1976D2);
+  static const white = Color(0xFFFFFFFF);
+  static const error = Color(0xFFD32F2F);
+  static const grey = Color(0xFF757575);
+  static const lightGrey = Color(0xFFF5F5F5);
   static const offlineOrange = Color(0xFFF57C00);
 }
 
@@ -88,13 +88,12 @@ String cropTypeLabel(String wireValue) => switch (wireValue) {
 /// (user error: thought the first save failed). Siembra is expected once per
 /// growing cycle, so a same-day duplicate is almost certainly noise.
 ///
-/// Other activity types (Fertilización, Riego, Control de plagas, Cosecha,
-/// Otra) are legitimately repeated within a day on large lotes and stay
-/// unrestricted. Add to this set if post-pilot data shows another type with
-/// the same pattern (e.g. a future `cosecha_total` once-per-cycle event).
-const Set<ActivityType> kDuplicateWarnActivityTypes = <ActivityType>{
-  ActivityType.sowing,
-};
+/// **v1.11.5 — every type warns.** Pilot demo feedback (2026-11-13): a
+/// same-day duplicate Fertilización was saved silently and read as a bug.
+/// The warning stays **soft** ("Sí, continuar" always saves), so producers
+/// who legitimately repeat a labor on a large lote are not blocked.
+final Set<ActivityType> kDuplicateWarnActivityTypes =
+    Set.unmodifiable(ActivityType.values);
 
 /// Maps a free-text farm `cropType` suggestion to a plot enum value when
 /// the strings line up (case-insensitive, accent-folded). Returns `null`

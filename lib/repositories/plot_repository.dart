@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import '../database/app_database.dart';
+import 'sync_deletable.dart';
 import '../models/plot.dart';
 
 /// Local-first repository for [Plot] entities.
@@ -8,7 +9,7 @@ import '../models/plot.dart';
 /// Writes go to SQLite first with sync metadata; [SyncOrchestrator] pushes
 /// pending rows to the backend.  [PlotStatus] is stored as its [.name] string
 /// (e.g. `'planning'`, `'growing'`) which matches the backend wire value.
-class PlotRepository {
+class PlotRepository implements SyncDeletable {
   PlotRepository(this._db);
 
   final AppDatabase _db;
@@ -103,7 +104,18 @@ class PlotRepository {
   }
 
   /// Deletes a plot from the local DB immediately.
-  Future<void> delete(String id) => _db.deletePlot(id);
+  /// Local delete (v1.11.5): hides the row immediately and queues the
+  /// server DELETE for the next sync (see [SyncDeletable]).
+  Future<void> delete(String id) => _db.queueDelete('plot', id);
+
+  @override
+  Future<List<String>> getPendingDeleteIds() => _db.getPendingDeleteIds('plot');
+
+  @override
+  Future<bool> isPendingDelete(String id) => _db.isPendingDelete('plot', id);
+
+  @override
+  Future<void> purge(String id) => _db.purgeRow('plot', id);
 
   // ── Sync helpers ──────────────────────────────────────────────────────────
 
