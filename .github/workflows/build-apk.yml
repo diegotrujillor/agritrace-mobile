@@ -33,6 +33,11 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Default "tools platform-tools" fails: the legacy `tools` package no
+          # longer exists in cmdline-tools 16 (runner 2026-11). Gradle installs
+          # the platforms/build-tools it needs on its own.
+          packages: platform-tools
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2

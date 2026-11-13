@@ -4,7 +4,17 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
-## [1.11.3] - 2026-11-13 — fix: subida de foto falla con token expirado
+## [1.11.4] - 2026-11-13 — ci: build de APK roto por paquete SDK `tools` retirado
+
+### Fixed
+- **CI: `Build Release APK` fallaba en "Set up Android SDK".** `android-actions/setup-android@v3`
+  instala por defecto `tools platform-tools`; el runner trae cmdline-tools 16.0, que ya no
+  incluye el paquete legado `tools` → `sdkmanager` exit 1. Ahora se pide solo
+  `packages: platform-tools` (Gradle instala platforms/build-tools por su cuenta). El tag
+  `v1.11.3` quedó sin APK por este fallo; v1.11.4 es el primer APK con el fix de subida de
+  foto de 1.11.3. Dónde: `.github/workflows/build-apk.yml`, `.github/workflows/release-play.yml`.
+
+## [1.11.3] - 2026-11-13 — fix: subida de foto falla con token expirado (sin APK — ver 1.11.4)
 
 ### Fixed
 - **Subir foto tras >15 min de sesión mostraba "No se pudo subir la foto: No
