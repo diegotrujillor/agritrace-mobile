@@ -39,6 +39,34 @@ class _ScriptedAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// Wraps a [_ScriptedAdapter] and records the byte length of every
+/// request body actually streamed to the network layer.
+class _BodyCountingAdapter implements HttpClientAdapter {
+  _BodyCountingAdapter(this._inner, this._bodyLengths);
+
+  final _ScriptedAdapter _inner;
+  final List<int> _bodyLengths;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    var length = 0;
+    if (requestStream != null) {
+      await for (final chunk in requestStream) {
+        length += chunk.length;
+      }
+    }
+    _bodyLengths.add(length);
+    return _inner.fetch(options, null, cancelFuture);
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 ResponseBody _jsonBody(int status, Object body) {
   final bytes = utf8.encode(jsonEncode(body));
   return ResponseBody.fromBytes(
@@ -82,8 +110,7 @@ void main() {
       var storedAccess = 'OLD';
       when(() => storage.getAccessToken())
           .thenAnswer((_) async => storedAccess);
-      when(() => storage.getRefreshToken())
-          .thenAnswer((_) async => 'R1');
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R1');
       when(() => storage.saveTokens(
             accessToken: any(named: 'accessToken'),
             refreshToken: any(named: 'refreshToken'),
@@ -120,6 +147,66 @@ void main() {
       expect(adapter.hits['/me'], 2); // initial 401 + retry 200
       expect(storedAccess, 'NEW');
     });
+
+    test('multipart upload is replayed with a fresh FormData after refresh',
+        () async {
+      // Regression: a Dio FormData can only be finalized once. Replaying the
+      // original RequestOptions after a refresh threw "FormData has already
+      // been finalized", the interceptor surfaced the ORIGINAL 401, and photo
+      // uploads failed whenever the access token had expired (prod
+      // 2026-11-13, comercial@ demo).
+      // Arrange
+      var storedAccess = 'OLD';
+      when(() => storage.getAccessToken())
+          .thenAnswer((_) async => storedAccess);
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R1');
+      when(() => storage.saveTokens(
+            accessToken: any(named: 'accessToken'),
+            refreshToken: any(named: 'refreshToken'),
+          )).thenAnswer((inv) async {
+        storedAccess = inv.namedArguments[#accessToken] as String;
+      });
+
+      final receivedBodies = <int>[];
+      final adapter = _ScriptedAdapter((opts) async {
+        if (opts.headers['Authorization'] == 'Bearer NEW') {
+          return _jsonBody(201, {'ok': true});
+        }
+        return _jsonBody(401, {'error': 'jwt expired'});
+      });
+      final countingAdapter = _BodyCountingAdapter(adapter, receivedBodies);
+      final refreshAdapter = _ScriptedAdapter(
+        (opts) async => _jsonBody(200, _refreshOk('NEW', 'R2')),
+      );
+
+      final dio = Dio(BaseOptions(baseUrl: 'https://x'))
+        ..httpClientAdapter = countingAdapter;
+      final refreshDio = Dio(BaseOptions(baseUrl: 'https://x'))
+        ..httpClientAdapter = refreshAdapter;
+      buildAuthInterceptorForTest(
+        dio: dio,
+        refreshClient: refreshDio,
+        storage: storage,
+      );
+
+      final form = FormData.fromMap({
+        'photo': MultipartFile.fromBytes(
+          List<int>.filled(1024, 7),
+          filename: 'gallery.jpg',
+        ),
+      });
+
+      // Act
+      final response =
+          await dio.post<Map<String, dynamic>>('/uploads/photos', data: form);
+
+      // Assert
+      expect(response.statusCode, 201);
+      expect(refreshAdapter.hits['/auth/refresh'], 1);
+      expect(adapter.hits['/uploads/photos'], 2); // 401 + replayed 201
+      expect(receivedBodies, hasLength(2));
+      expect(receivedBodies.last, receivedBodies.first); // full body resent
+    });
   });
 
   group('concurrent 401s', () {
@@ -127,8 +214,7 @@ void main() {
       var storedAccess = 'OLD';
       when(() => storage.getAccessToken())
           .thenAnswer((_) async => storedAccess);
-      when(() => storage.getRefreshToken())
-          .thenAnswer((_) async => 'R1');
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R1');
       when(() => storage.saveTokens(
             accessToken: any(named: 'accessToken'),
             refreshToken: any(named: 'refreshToken'),
@@ -177,7 +263,8 @@ void main() {
   });
 
   group('refresh failure', () {
-    test('refresh 401 → AuthSessionCollapsed sentinel + storage cleared + onLogout',
+    test(
+        'refresh 401 → AuthSessionCollapsed sentinel + storage cleared + onLogout',
         () async {
       when(() => storage.getAccessToken()).thenAnswer((_) async => 'OLD');
       when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R1');
@@ -289,8 +376,7 @@ void main() {
       var storedAccess = 'OLD';
       when(() => storage.getAccessToken())
           .thenAnswer((_) async => storedAccess);
-      when(() => storage.getRefreshToken())
-          .thenAnswer((_) async => 'R1');
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R1');
       when(() => storage.saveTokens(
             accessToken: any(named: 'accessToken'),
             refreshToken: any(named: 'refreshToken'),

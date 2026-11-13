@@ -52,7 +52,8 @@ final class AuthSessionCollapsed {
 const String kAuthFlowCollapsedExtra = 'authFlowCollapsed';
 
 class ApiService {
-  ApiService(this._storage, {void Function()? onLogout}) : _onLogout = onLogout {
+  ApiService(this._storage, {void Function()? onLogout})
+      : _onLogout = onLogout {
     // Runtime checks (not asserts): asserts are stripped from release builds.
     // A misconfigured release would otherwise silently ship with an empty
     // baseUrl or an insecure scheme and fail only at the first network call.
@@ -369,7 +370,16 @@ class _AuthInterceptor extends QueuedInterceptor {
       _kReqToken: accessToken,
       _kAttempts: attempts,
     };
-    return original.copyWith(headers: headers, extra: extra);
+    // A Dio [FormData] can only be finalized (streamed) once; replaying the
+    // original instance throws "FormData has already been finalized" and the
+    // retry never leaves the device. Clone it so multipart uploads survive a
+    // token refresh.
+    final data = original.data;
+    return original.copyWith(
+      headers: headers,
+      extra: extra,
+      data: data is FormData ? data.clone() : data,
+    );
   }
 
   /// Builds the sentinel [DioException] returned to callers when the auth
