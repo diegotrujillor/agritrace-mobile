@@ -4,7 +4,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
-## [Unreleased] - 2026-11-13 — fix: subida de foto falla con token expirado
+## [1.11.3] - 2026-11-13 — fix: subida de foto falla con token expirado
 
 ### Fixed
 - **Subir foto tras >15 min de sesión mostraba "No se pudo subir la foto: No
