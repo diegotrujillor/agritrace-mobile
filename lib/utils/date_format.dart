@@ -10,3 +10,13 @@ String formatLocalDate(DateTime date) {
   final m = local.month.toString().padLeft(2, '0');
   return '$d/$m/${local.year}';
 }
+
+/// `h:mm a. m.` / `h:mm p. m.` in the local time zone — 12-hour clock as
+/// used in Colombia (v1.12.1, reminder times).
+String formatLocalTime(DateTime date) {
+  final local = date.toLocal();
+  final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final period = local.hour < 12 ? 'a. m.' : 'p. m.';
+  return '$hour12:$minute $period';
+}

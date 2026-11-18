@@ -4,6 +4,30 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.12.1] - 2026-11-18 — fix: el recordatorio tiene hora (antes sonaba a medianoche)
+
+### Fixed
+- **El formulario de recordatorio solo tenía fecha.** `showDatePicker`
+  devuelve la medianoche del día elegido, así que elegir "mañana" programaba
+  la notificación para las 00:00; sin tocar la fecha, sonaba a la misma hora
+  en que se creó. CU-18 especifica fecha **y hora**. Ahora hay un campo
+  "Hora del recordatorio" (selector de hora, por defecto **7:00 a. m. de
+  mañana**); cambiar la fecha conserva la hora elegida y viceversa. Guardar
+  una hora que ya pasó muestra "Elige una hora que aún no haya pasado" (no
+  sonaría nunca). Dónde: `lib/screens/alerts/alert_form_screen.dart`,
+  `lib/utils/reminder_schedule.dart` (nuevo — reglas puras),
+  `lib/widgets/common/app_date_field.dart` (icono configurable).
+
+### Changed
+- La lista de Alertas muestra la hora de los recordatorios
+  (`Recordatorio · 19/11/2026 · 7:00 a. m.`). Nuevo `formatLocalTime` (12 h,
+  formato colombiano) en `lib/utils/date_format.dart`. Dónde:
+  `lib/widgets/domain/alert_list_item.dart`.
+
+### Tests
+- 13 tests nuevos (`test/unit/reminder_schedule_test.dart`,
+  `test/widget/alert_form_time_test.dart`). Suite completa 461/461.
+
 ## [1.12.0] - 2026-11-18 — feat: los recordatorios ahora notifican en el teléfono
 
 ### Added

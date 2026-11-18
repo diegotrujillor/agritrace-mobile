@@ -10,11 +10,16 @@ class AppDateField extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onTap,
+    this.icon = Icons.calendar_today_outlined,
   });
 
   final String label;
   final String value;
   final VoidCallback onTap;
+
+  /// Trailing icon; defaults to a calendar. The reminder time field passes
+  /// a clock (v1.12.1).
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -34,9 +39,7 @@ class AppDateField extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: InputDecorator(
-            decoration: const InputDecoration(
-              suffixIcon: Icon(Icons.calendar_today_outlined),
-            ),
+            decoration: InputDecoration(suffixIcon: Icon(icon)),
             child: Text(
               value,
               style: const TextStyle(fontSize: 16, color: AppColors.darkGreen),

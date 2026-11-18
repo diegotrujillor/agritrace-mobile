@@ -57,7 +57,10 @@ class AlertListItem extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  '${alert.type.label} · ${formatLocalDate(when)}',
+                  alert.scheduledFor != null
+                      ? '${alert.type.label} · ${formatLocalDate(when)} · '
+                          '${formatLocalTime(when)}'
+                      : '${alert.type.label} · ${formatLocalDate(when)}',
                   style: const TextStyle(
                     color: AppColors.grey,
                     fontSize: 13,
