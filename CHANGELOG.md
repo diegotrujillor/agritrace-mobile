@@ -4,6 +4,47 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.12.0] - 2026-11-18 — feat: los recordatorios ahora notifican en el teléfono
+
+### Added
+- **Notificaciones locales para recordatorios (CU-18 / RF-09).** Antes un
+  recordatorio solo aparecía en la lista de Alertas: no existía ningún
+  plugin de notificaciones ni permiso en el manifest, así que nada sonaba a
+  la hora programada (abierta o cerrada la app). Ahora cada recordatorio
+  `pending` con `scheduledFor` futuro se programa como notificación del
+  sistema (canal "Recordatorios") vía `flutter_local_notifications` —
+  100 % en el dispositivo, sin servidor push ni FCM. Un único punto de
+  reconciliación escucha el stream de la tabla `alerts` y re-programa todo
+  (cancelar + programar), así que crear, descartar, borrar, el pull de sync,
+  el login y el logout (wipe → lista vacía → cancela todo) quedan cubiertos
+  sin lógica por caso. Sobrevive reinicio del teléfono y actualización de la
+  app (`ScheduledNotificationBootReceiver`). Alarmas *inexactas*
+  (`inexactAllowWhileIdle`): Android puede retrasarlas unos minutos en
+  reposo, a cambio de no pedir `SCHEDULE_EXACT_ALARM`. Recordatorios ya
+  vencidos no se disparan retroactivamente. Dónde:
+  `lib/services/reminder_notifications.dart` (nuevo — planner puro +
+  reconciliador serializado), `lib/services/local_notification_gateway.dart`
+  (nuevo — adaptador del plugin), `lib/providers/reminder_notifications_provider.dart`
+  (nuevo), `lib/main.dart`.
+- **Permiso de notificaciones (Android 13+)** pedido en contexto, justo
+  después de guardar el primer recordatorio — nunca al abrir la app. Si
+  falla o se niega, el recordatorio igual se guarda. Dónde:
+  `lib/providers/alerts_provider.dart`.
+
+### Changed
+- `AndroidManifest.xml`: `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED` y
+  receivers del plugin. `build.gradle.kts`: core library desugaring
+  (requisito del plugin).
+- Dependencias: `flutter_local_notifications ^22.3.3` (la 23.x exige
+  Flutter ≥3.44; CI está fijado en 3.41.9) y `timezone ^0.11.2`.
+
+### Tests
+- 15 tests nuevos (`test/unit/reminder_notifications_test.dart`,
+  `test/unit/alerts_provider_test.dart`): planner, ids estables de 31 bits,
+  cancelar al descartar/wipe, reprogramar al cambiar la hora, serialización
+  de emisiones concurrentes, fallo del plugin sin romper, permiso. Suite
+  completa 448/448.
+
 ## [1.11.5] - 2026-11-13 — fix: borrar sincroniza con el servidor, logout forzado por carrera de refresh, aviso de duplicado en todos los tipos
 
 ### Fixed

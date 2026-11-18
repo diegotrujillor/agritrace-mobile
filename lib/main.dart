@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'navigation/app_router.dart';
 import 'providers/auth_provider.dart';
+import 'providers/reminder_notifications_provider.dart';
 import 'services/inactivity_monitor.dart';
 import 'utils/theme.dart';
 import 'widgets/common/pilot_countdown_banner.dart';
@@ -72,6 +73,10 @@ class _AgriTraceAppState extends ConsumerState<AgriTraceApp>
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+
+    // v1.12.0 — keep OS reminder notifications in sync with the local
+    // alerts table for the whole app lifetime (CU-18 / RF-09).
+    ref.watch(reminderNotificationsBindingProvider);
 
     // v1.9.8 — P1 fix. Listen for the explicit "inactivity logout" signal
     // from `AuthNotifier._handleInactivityTimeout`. Using a dedicated

@@ -7,6 +7,7 @@ import '../repositories/alert_repository.dart';
 import '../services/alert_service.dart';
 import 'auth_provider.dart';
 import 'database_provider.dart';
+import 'reminder_notifications_provider.dart';
 
 /// Wires [AlertService] with the shared [apiServiceProvider] so the
 /// Bearer-token interceptor is reused.
@@ -82,6 +83,23 @@ class AlertsNotifier extends AsyncNotifier<List<Alert>> {
     });
     if (state.hasError) return;
     _autoSyncPush('createReminder');
+    _requestNotificationPermission();
+  }
+
+  /// v1.12.0 — asks for POST_NOTIFICATIONS (Android 13+) the first time a
+  /// reminder is saved, so the OS notification can actually fire. Contextual
+  /// on purpose: the dialog appears right after the producer creates a
+  /// reminder, not on app launch. A no-op once granted or denied; failures
+  /// are logged and never block the save.
+  void _requestNotificationPermission() {
+    unawaited(
+      Future(() => ref.read(reminderNotificationSyncProvider).requestPermission())
+          .then((_) {})
+          .catchError((Object e) {
+        dev.log('notification permission request failed: $e',
+            name: 'notifications');
+      }),
+    );
   }
 
   Future<void> dismiss(String id) async {

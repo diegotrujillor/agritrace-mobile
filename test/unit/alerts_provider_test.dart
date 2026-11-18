@@ -8,12 +8,16 @@ import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/services/alert_service.dart';
 import 'package:agritrace_mobile/services/sync_orchestrator.dart';
 import 'package:agritrace_mobile/services/sync_service.dart';
+import 'package:agritrace_mobile/providers/reminder_notifications_provider.dart';
+import 'package:agritrace_mobile/services/reminder_notifications.dart';
 
 class MockAlertRepository extends Mock implements AlertRepository {}
 
 class MockAlertService extends Mock implements AlertService {}
 
 class MockSyncOrchestrator extends Mock implements SyncOrchestrator {}
+
+class MockNotificationGateway extends Mock implements NotificationGateway {}
 
 SyncResult _emptySyncResult() => SyncResult(
       synced: 0,
@@ -45,11 +49,14 @@ void main() {
   late MockAlertRepository mockRepo;
   late MockAlertService mockService;
   late MockSyncOrchestrator mockOrchestrator;
+  late MockNotificationGateway mockGateway;
 
   setUp(() {
     mockRepo = MockAlertRepository();
     mockService = MockAlertService();
     mockOrchestrator = MockSyncOrchestrator();
+    mockGateway = MockNotificationGateway();
+    when(() => mockGateway.requestPermission()).thenAnswer((_) async => true);
     // v1.9.9 — every mutation now fires `unawaited(orchestrator.run())`.
     when(() => mockOrchestrator.run(since: any(named: 'since')))
         .thenAnswer((_) async => _emptySyncResult());
@@ -60,6 +67,7 @@ void main() {
           alertRepositoryProvider.overrideWithValue(mockRepo),
           alertServiceProvider.overrideWithValue(mockService),
           syncOrchestratorProvider.overrideWithValue(mockOrchestrator),
+          notificationGatewayProvider.overrideWithValue(mockGateway),
         ],
       );
 
@@ -108,6 +116,55 @@ void main() {
           body: null,
           plotId: null,
         )).called(1);
+  });
+
+  test('createReminder() asks for notification permission (Android 13+)',
+      () async {
+    // Arrange
+    stubRepoDefaults([]);
+    when(() => mockRepo.createReminder(
+          title: any(named: 'title'),
+          scheduledFor: any(named: 'scheduledFor'),
+          body: any(named: 'body'),
+          plotId: any(named: 'plotId'),
+        )).thenAnswer((_) async => _alert());
+    final container = makeContainer();
+    addTearDown(container.dispose);
+    await container.read(alertsProvider.future);
+
+    // Act
+    await container.read(alertsProvider.notifier).createReminder(
+          title: 'Regar lote',
+          scheduledFor: DateTime.utc(2026, 4, 2, 8),
+        );
+    await pumpEventQueue();
+
+    // Assert
+    verify(() => mockGateway.requestPermission()).called(1);
+  });
+
+  test('createReminder() still succeeds when the permission request fails',
+      () async {
+    stubRepoDefaults([]);
+    when(() => mockRepo.createReminder(
+          title: any(named: 'title'),
+          scheduledFor: any(named: 'scheduledFor'),
+          body: any(named: 'body'),
+          plotId: any(named: 'plotId'),
+        )).thenAnswer((_) async => _alert());
+    when(() => mockGateway.requestPermission())
+        .thenThrow(StateError('plugin unavailable'));
+    final container = makeContainer();
+    addTearDown(container.dispose);
+    await container.read(alertsProvider.future);
+
+    await container.read(alertsProvider.notifier).createReminder(
+          title: 'Regar lote',
+          scheduledFor: DateTime.utc(2026, 4, 2, 8),
+        );
+    await pumpEventQueue();
+
+    expect(container.read(alertsProvider).hasError, isFalse);
   });
 
   test('dismiss() updates the alert status then refreshes', () async {
