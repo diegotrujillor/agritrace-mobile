@@ -184,7 +184,8 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   /// token has already expired client-side. Behaviour:
   ///  - success: persists rotated tokens, seeds Drift in background, arms
   ///    session services, returns `AuthAuthenticated`.
-  ///  - 401/403: refresh token rejected — delete tokens, return
+  ///  - 401/403: refresh token rejected — [StorageService.clearSession]
+  ///    (keeps Drift + `last_user_id`, v1.12.4), return
   ///    `AuthUnauthenticated`.
   ///  - other DioException (5xx / network / timeout): preserve tokens,
   ///    return `AuthUnauthenticated` for this cold start; the next launch
@@ -200,13 +201,13 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       if (status == 401 || status == 403) {
-        await storage.deleteAll();
+        await storage.clearSession();
       }
       return const AuthUnauthenticated();
     } on StateError {
       return const AuthUnauthenticated();
     } catch (_) {
-      await storage.deleteAll();
+      await storage.clearSession();
       return const AuthUnauthenticated();
     }
   }
@@ -217,7 +218,9 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   ///     also fire a background sync so the dashboard catches up with the
   ///     server in the same session.
   ///   - 401/403: refresh token rejected by the server — flip state to
-  ///     `AuthUnauthenticated`, wipe storage, stop session services.
+  ///     `AuthUnauthenticated`, [StorageService.clearSession] (keeps Drift
+  ///     + `last_user_id` so reminder alarms survive — v1.12.4), stop
+  ///     session services.
   ///   - other DioException (network/5xx/timeout): keep current state.
   ///     The user is offline or the backend is having a moment; the next
   ///     authenticated request will retry through the Dio interceptor.
@@ -231,7 +234,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       if (status == 401 || status == 403) {
-        await storage.deleteAll();
+        await storage.clearSession();
         state = const AsyncData(AuthUnauthenticated());
         ref.read(inactivityMonitorProvider).stop();
         ref.read(connectivitySyncBridgeProvider).stop();
@@ -246,7 +249,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     } on StateError {
       // No refresh token in storage. `build()` already guarded against
       // this, but treat defensively as a dead session.
-      await storage.deleteAll();
+      await storage.clearSession();
       state = const AsyncData(AuthUnauthenticated());
     } catch (e) {
       dev.log(

@@ -304,8 +304,7 @@ class AuthService {
       // unexpected exception above (the inner `try` only swallows the
       // `_api.client.post` failure).
       if (keepLocalData) {
-        await _storage.deleteTokens();
-        await _storage.deleteUserSnapshot();
+        await _storage.clearSession();
       } else {
         await _storage.deleteAll();
         final wiper = _wipeLocalData;

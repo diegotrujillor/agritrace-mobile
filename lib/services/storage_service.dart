@@ -9,13 +9,13 @@ class StorageService {
 
   final FlutterSecureStorage _storage;
 
-  static const _accessTokenKey  = 'access_token';
+  static const _accessTokenKey = 'access_token';
   static const _refreshTokenKey = 'refresh_token';
   // v1.9.3 — P0 fix. Persists the id of the last user that authenticated
   // on this device so the auth notifier can detect a cross-account login
   // (different user id than the cached one) and wipe the local Drift DB
   // before mounting the new session.
-  static const _lastUserIdKey   = 'last_user_id';
+  static const _lastUserIdKey = 'last_user_id';
   // v1.9.11 — Offline-friendly cold start. Persists the most recently
   // authenticated [User] alongside the tokens so [AuthNotifier.build] can
   // hand the dashboard a populated user object on the first frame even
@@ -29,12 +29,12 @@ class StorageService {
     required String refreshToken,
   }) async {
     await Future.wait([
-      _storage.write(key: _accessTokenKey,  value: accessToken),
+      _storage.write(key: _accessTokenKey, value: accessToken),
       _storage.write(key: _refreshTokenKey, value: refreshToken),
     ]);
   }
 
-  Future<String?> getAccessToken()  => _storage.read(key: _accessTokenKey);
+  Future<String?> getAccessToken() => _storage.read(key: _accessTokenKey);
   Future<String?> getRefreshToken() => _storage.read(key: _refreshTokenKey);
 
   Future<void> deleteTokens() async {
@@ -64,8 +64,7 @@ class StorageService {
   /// network round trip. Written on every successful login / register /
   /// cold-start refresh so the snapshot stays in lock-step with the
   /// tokens. Encrypted at rest by `flutter_secure_storage`.
-  Future<void> saveUserSnapshot(User user) =>
-      _storage.write(
+  Future<void> saveUserSnapshot(User user) => _storage.write(
         key: _userSnapshotKey,
         value: jsonEncode(user.toJson()),
       );
@@ -93,8 +92,7 @@ class StorageService {
   /// callers that need to invalidate the snapshot without touching the
   /// tokens (none today) can do so without a race against the rest of the
   /// keychain.
-  Future<void> deleteUserSnapshot() =>
-      _storage.delete(key: _userSnapshotKey);
+  Future<void> deleteUserSnapshot() => _storage.delete(key: _userSnapshotKey);
 
   /// Persists pilot-privacy consent acceptance for [email].
   ///
@@ -113,6 +111,22 @@ class StorageService {
       key: 'pilot_consent_${email.toLowerCase()}',
     );
     return v != null && v.isNotEmpty;
+  }
+
+  /// Ends the session but keeps `last_user_id`: deletes the tokens and the
+  /// user snapshot only.
+  ///
+  /// v1.12.4 — used for every NON-explicit logout (20-min inactivity,
+  /// refresh token rejected on cold start). Local Drift data stays so
+  /// scheduled reminder notifications survive; keeping `last_user_id`
+  /// lets `AuthService._wipeIfCrossUser` still wipe if a different
+  /// account logs in next.
+  Future<void> clearSession() async {
+    await Future.wait([
+      _storage.delete(key: _accessTokenKey),
+      _storage.delete(key: _refreshTokenKey),
+      _storage.delete(key: _userSnapshotKey),
+    ]);
   }
 
   /// Clears every key owned by the app (tokens + `last_user_id` +

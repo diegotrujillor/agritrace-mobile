@@ -134,6 +134,7 @@ void main() {
     // not throw on the verify-side checks.
     when(() => mockStorage.deleteTokens()).thenAnswer((_) async {});
     when(() => mockStorage.deleteAll()).thenAnswer((_) async {});
+    when(() => mockStorage.clearSession()).thenAnswer((_) async {});
     // v1.9.11 — default: no user snapshot stored. Tests that exercise the
     // offline-friendly fast path explicitly override this. The legacy
     // active-probe path is the default behavior with this stub.
@@ -225,9 +226,11 @@ void main() {
 
     await container.read(authProvider.future);
     expect(container.read(authProvider).value, isA<AuthUnauthenticated>());
-    // v1.9.11 — strict probe wipes the entire keychain (tokens + snapshot
-    // + last_user_id), not just the tokens.
-    verify(() => mockStorage.deleteAll()).called(1);
+    // v1.12.4 — session expiry clears tokens + snapshot but KEEPS
+    // last_user_id (and Drift), so reminder alarms survive and a different
+    // account logging in next is still wiped by the cross-user check.
+    verify(() => mockStorage.clearSession()).called(1);
+    verifyNever(() => mockStorage.deleteAll());
   });
 
   test(
@@ -394,7 +397,8 @@ void main() {
         await Future<void>.delayed(Duration.zero);
 
         expect(container.read(authProvider).value, isA<AuthUnauthenticated>());
-        verify(() => mockStorage.deleteAll()).called(1);
+        verify(() => mockStorage.clearSession()).called(1);
+        verifyNever(() => mockStorage.deleteAll());
       },
     );
 

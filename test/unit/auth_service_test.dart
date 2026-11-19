@@ -67,6 +67,7 @@ void main() {
     when(() => storage.saveLastUserId(any())).thenAnswer((_) async {});
     when(() => storage.getLastUserId()).thenAnswer((_) async => null);
     when(() => storage.deleteAll()).thenAnswer((_) async {});
+    when(() => storage.clearSession()).thenAnswer((_) async {});
     // v1.9.11 — login/register/refresh now persist a user snapshot
     // alongside the tokens. Stub the new method so the legacy auth-service
     // tests don't fail when mocktail sees an unstubbed invocation.
@@ -285,7 +286,6 @@ void main() {
       Future<void> wiper() async => wipeCalls++;
       final svc = AuthService(api, storage, wipeLocalData: wiper);
       when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R-X');
-      when(() => storage.deleteUserSnapshot()).thenAnswer((_) async {});
       when(() => dio.post('/auth/logout', data: any(named: 'data')))
           .thenAnswer((_) async => Response(
                 requestOptions: RequestOptions(path: '/auth/logout'),
@@ -297,8 +297,7 @@ void main() {
 
       // Assert
       expect(wipeCalls, 0, reason: 'same user, same phone: keep Drift');
-      verify(() => storage.deleteTokens()).called(1);
-      verify(() => storage.deleteUserSnapshot()).called(1);
+      verify(() => storage.clearSession()).called(1);
       verifyNever(() => storage.deleteAll());
       verify(() => dio.post('/auth/logout', data: any(named: 'data')))
           .called(1);
@@ -311,7 +310,6 @@ void main() {
       Future<void> wiper() async => wipeCalls++;
       final svc = AuthService(api, storage, wipeLocalData: wiper);
       when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R-X');
-      when(() => storage.deleteUserSnapshot()).thenAnswer((_) async {});
       when(() => dio.post('/auth/logout', data: any(named: 'data'))).thenThrow(
           DioException(requestOptions: RequestOptions(path: '/auth/logout')));
 
@@ -320,7 +318,7 @@ void main() {
 
       // Assert
       expect(wipeCalls, 0);
-      verify(() => storage.deleteTokens()).called(1);
+      verify(() => storage.clearSession()).called(1);
     });
 
     test('logout always invokes the wiper, even on server failure', () async {

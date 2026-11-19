@@ -131,6 +131,25 @@ void main() {
     });
   });
 
+  group('clearSession', () {
+    test(
+        'deletes tokens and user_snapshot but keeps last_user_id so the '
+        'cross-account wipe still detects a different user', () async {
+      // Arrange
+      when(() => backing.delete(key: any(named: 'key')))
+          .thenAnswer((_) async {});
+
+      // Act
+      await service.clearSession();
+
+      // Assert
+      verify(() => backing.delete(key: 'access_token')).called(1);
+      verify(() => backing.delete(key: 'refresh_token')).called(1);
+      verify(() => backing.delete(key: 'user_snapshot')).called(1);
+      verifyNever(() => backing.delete(key: 'last_user_id'));
+    });
+  });
+
   group('deleteAll', () {
     test('deletes tokens, last_user_id, and user_snapshot keys', () async {
       when(() => backing.delete(key: any(named: 'key')))

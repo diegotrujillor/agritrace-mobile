@@ -4,6 +4,30 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.12.4] - 2026-11-19 — fix: la sesión vencida conserva recordatorios y cierra un hueco entre cuentas
+
+### Fixed
+- **Sesión vencida (refresh token rechazado al abrir la app).** Ya no se
+  borraba la base local, pero `deleteAll()` sí borraba el `last_user_id`:
+  si después entraba **otra cuenta**, el borrado entre cuentas no se
+  activaba (no había usuario anterior con qué comparar) y la nueva cuenta
+  podía ver fincas y recordatorios de la anterior. Ahora todo cierre de
+  sesión no explícito (inactividad y sesión vencida) usa
+  `StorageService.clearSession()`: borra tokens y la foto de usuario,
+  conserva datos locales y `last_user_id`. Los recordatorios siguen
+  sonando y otra cuenta sigue disparando el borrado. "Cerrar sesión"
+  explícito no cambia (borra todo). Dónde:
+  `lib/services/storage_service.dart` (`clearSession`, nuevo),
+  `lib/providers/auth_provider.dart` (`_probeAndReturn`,
+  `_backgroundProbe`), `lib/services/auth_service.dart` (usa
+  `clearSession` en `logout(keepLocalData: true)`).
+
+### Tests
+- `clearSession` conserva `last_user_id`
+  (`test/unit/storage_service_test.dart`); las sondas de arranque en frío
+  con 401 usan `clearSession` y nunca `deleteAll`
+  (`test/unit/auth_provider_test.dart`). Suite completa 474/474.
+
 ## [1.12.3] - 2026-11-19 — fix: el cierre de sesión por inactividad cancelaba los recordatorios
 
 ### Fixed
