@@ -276,6 +276,53 @@ void main() {
   // counter to assert the wipe ran (or didn't) without dragging Drift
   // into the unit-test build.
   group('cross-user data wipe (P0)', () {
+    test(
+        'inactivity logout (keepLocalData) clears tokens but keeps local '
+        'data and last_user_id so scheduled reminders survive', () async {
+      // Arrange — v1.12.2: the 20-min inactivity logout wiped Drift, which
+      // emptied the alerts list and cancelled every reminder alarm.
+      int wipeCalls = 0;
+      Future<void> wiper() async => wipeCalls++;
+      final svc = AuthService(api, storage, wipeLocalData: wiper);
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R-X');
+      when(() => storage.deleteUserSnapshot()).thenAnswer((_) async {});
+      when(() => dio.post('/auth/logout', data: any(named: 'data')))
+          .thenAnswer((_) async => Response(
+                requestOptions: RequestOptions(path: '/auth/logout'),
+                statusCode: 200,
+              ));
+
+      // Act
+      await svc.logout(keepLocalData: true);
+
+      // Assert
+      expect(wipeCalls, 0, reason: 'same user, same phone: keep Drift');
+      verify(() => storage.deleteTokens()).called(1);
+      verify(() => storage.deleteUserSnapshot()).called(1);
+      verifyNever(() => storage.deleteAll());
+      verify(() => dio.post('/auth/logout', data: any(named: 'data')))
+          .called(1);
+    });
+
+    test('keepLocalData logout still clears tokens when the server fails',
+        () async {
+      // Arrange
+      int wipeCalls = 0;
+      Future<void> wiper() async => wipeCalls++;
+      final svc = AuthService(api, storage, wipeLocalData: wiper);
+      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'R-X');
+      when(() => storage.deleteUserSnapshot()).thenAnswer((_) async {});
+      when(() => dio.post('/auth/logout', data: any(named: 'data'))).thenThrow(
+          DioException(requestOptions: RequestOptions(path: '/auth/logout')));
+
+      // Act
+      await svc.logout(keepLocalData: true);
+
+      // Assert
+      expect(wipeCalls, 0);
+      verify(() => storage.deleteTokens()).called(1);
+    });
+
     test('logout always invokes the wiper, even on server failure', () async {
       int wipeCalls = 0;
       Future<void> wiper() async => wipeCalls++;

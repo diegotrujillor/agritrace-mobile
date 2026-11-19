@@ -250,7 +250,16 @@ class AuthService {
     return auth;
   }
 
-  Future<void> logout() async {
+  /// Ends the session: final push, server-side revoke, local teardown.
+  ///
+  /// [keepLocalData] (v1.12.2 — inactivity logout only): clears the tokens
+  /// and user snapshot but KEEPS the Drift data and `last_user_id`. Wiping
+  /// on the 20-min inactivity timeout emptied the alerts table, which
+  /// cancelled every scheduled reminder notification. The privacy
+  /// invariant still holds: a different account logging in next triggers
+  /// [_wipeIfCrossUser] (it compares against the kept `last_user_id`), and
+  /// an explicit "Cerrar sesión" (default `false`) wipes as before.
+  Future<void> logout({bool keepLocalData = false}) async {
     try {
       // v1.9.9 — P0 fix (continuation of v1.9.8). Push any local pending
       // changes BEFORE wiping the Drift DB. Without this, a farm/plot/
@@ -294,9 +303,14 @@ class AuthService {
       // reading the refresh token or the server round-trip throws an
       // unexpected exception above (the inner `try` only swallows the
       // `_api.client.post` failure).
-      await _storage.deleteAll();
-      final wiper = _wipeLocalData;
-      if (wiper != null) await wiper();
+      if (keepLocalData) {
+        await _storage.deleteTokens();
+        await _storage.deleteUserSnapshot();
+      } else {
+        await _storage.deleteAll();
+        final wiper = _wipeLocalData;
+        if (wiper != null) await wiper();
+      }
     }
   }
 

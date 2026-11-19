@@ -84,8 +84,7 @@ final authServiceProvider = Provider<AuthService>(
     // v1.9.3 — P0 fix. Inject a DataWiper that delegates to the shared
     // [AppDatabase]. Keeping the binding here (provider layer) means
     // [AuthService] never imports Drift and stays pure-Dart-testable.
-    wipeLocalData: () =>
-        ref.read(appDatabaseProvider).wipeAllUserData(),
+    wipeLocalData: () => ref.read(appDatabaseProvider).wipeAllUserData(),
     // v1.9.8 — P0 fix. Inject a RemotePuller that delegates to the
     // shared [SyncOrchestrator]. AuthService awaits this BEFORE the
     // notifier flips to `AuthAuthenticated`, so the dashboard rebuild
@@ -116,6 +115,7 @@ class AuthUnauthenticated extends AuthState {
 class AuthAuthenticated extends AuthState {
   const AuthAuthenticated(this.user, {this.pilotConsentGiven = false});
   final User user;
+
   /// True when the producer has accepted the Política de Privacidad
   /// (Ley 1581) on this device via [AuthNotifier.markPilotConsentGiven].
   /// The router redirects to [Routes.pilotConsent] when false.
@@ -261,7 +261,11 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   /// Used to seed the local DB after authentication without blocking the
   /// login/cold-start flow.  Errors are logged but not surfaced.
   void _seedInBackground(String context) {
-    ref.read(syncOrchestratorProvider).run().then((_) {}).catchError((Object e) {
+    ref
+        .read(syncOrchestratorProvider)
+        .run()
+        .then((_) {})
+        .catchError((Object e) {
       dev.log('AuthNotifier: $context sync failed: $e', name: 'auth');
     });
   }
@@ -308,8 +312,9 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       final auth = await ref
           .read(authServiceProvider)
           .login(email: email, password: password);
-      final consentGiven =
-          await ref.read(storageServiceProvider).getPilotConsent(auth.user.email);
+      final consentGiven = await ref
+          .read(storageServiceProvider)
+          .getPilotConsent(auth.user.email);
       _armSessionBackgroundServices();
       return AuthAuthenticated(auth.user, pilotConsentGiven: consentGiven);
     });
@@ -336,14 +341,17 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
             password: password,
             privacyConsent: privacyConsent,
           );
-      final consentGiven =
-          await ref.read(storageServiceProvider).getPilotConsent(auth.user.email);
+      final consentGiven = await ref
+          .read(storageServiceProvider)
+          .getPilotConsent(auth.user.email);
       _armSessionBackgroundServices();
       return AuthAuthenticated(auth.user, pilotConsentGiven: consentGiven);
     });
   }
 
-  Future<void> logout() async {
+  /// Logs out. [keepLocalData] is passed only by the inactivity timeout —
+  /// see [AuthService.logout] (v1.12.2: keeps reminder alarms alive).
+  Future<void> logout({bool keepLocalData = false}) async {
     // Stop the inactivity monitor BEFORE flipping the auth state so the
     // post-logout login screen never has a stale timer that could trigger
     // a second logout via [InactivityMonitor]'s callback. The same applies
@@ -366,7 +374,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     // v1.10.1 (inactivity timeout fires, but the UI stays on the active
     // screen until the next tap triggers a 401 banner).
     state = const AsyncData(AuthUnauthenticated());
-    await ref.read(authServiceProvider).logout();
+    await ref.read(authServiceProvider).logout(keepLocalData: keepLocalData);
   }
 
   /// Arms ALL session-scoped background services in one place so the
@@ -415,7 +423,9 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     // we cannot await here. Errors are intentionally swallowed: a logout
     // network failure must not crash the lifecycle observer / gesture
     // wrapper thread.
-    logout().catchError((Object e) {
+    // v1.12.2 — same user on the same phone: keep local data so scheduled
+    // reminder notifications survive (wiping cancelled them all).
+    logout(keepLocalData: true).catchError((Object e) {
       dev.log('AuthNotifier: inactivity logout failed: $e', name: 'auth');
     });
   }

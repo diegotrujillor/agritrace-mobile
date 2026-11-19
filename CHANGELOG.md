@@ -4,6 +4,32 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.12.3] - 2026-11-19 — fix: el cierre de sesión por inactividad cancelaba los recordatorios
+
+### Fixed
+- **Los recordatorios no sonaban si la app cerraba la sesión por
+  inactividad.** El cierre automático (20 min) borraba los datos locales;
+  la lista de alertas quedaba vacía y eso cancelaba todas las notificaciones
+  programadas. Al volver a entrar, el recordatorio se recuperaba del
+  servidor, pero si la hora ya había pasado no volvía a programarse
+  (reproducido en el Pixel: recordatorio de las 7:00 sin aviso). Ahora el
+  cierre por inactividad conserva los datos locales y el `last_user_id`
+  (solo borra tokens y la foto de usuario), y las alarmas siguen vivas.
+  **Se mantiene la protección de teléfonos compartidos:** "Cerrar sesión"
+  explícito sigue borrando todo, y si entra **otra cuenta**, el
+  `last_user_id` conservado dispara el borrado entre cuentas. Dónde:
+  `lib/services/auth_service.dart` (`logout(keepLocalData:)`),
+  `lib/providers/auth_provider.dart` (`_handleInactivityTimeout`).
+
+### Verified
+- En emulador (build release, app cerrada) la notificación programada se
+  muestra a la hora exacta con el ícono nuevo: el plugin y la programación
+  funcionan; la causa era la cancelación por el borrado.
+
+### Tests
+- 3 tests nuevos (`test/unit/auth_service_test.dart`,
+  `test/unit/auth_provider_test.dart`). Suite completa 473/473.
+
 ## [1.12.2] - 2026-11-19 — fix: las notificaciones de recordatorio no se veían
 
 ### Fixed

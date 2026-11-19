@@ -9,13 +9,16 @@ import 'package:agritrace_mobile/providers/auth_provider.dart';
 import 'package:agritrace_mobile/providers/database_provider.dart';
 import 'package:agritrace_mobile/services/auth_service.dart';
 import 'package:agritrace_mobile/services/connectivity_sync_bridge.dart';
+import 'package:agritrace_mobile/services/inactivity_monitor.dart';
 import 'package:agritrace_mobile/services/storage_service.dart';
 import 'package:agritrace_mobile/services/sync_orchestrator.dart';
 import 'package:agritrace_mobile/services/sync_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class MockAuthService extends Mock implements AuthService {}
+
 class MockStorageService extends Mock implements StorageService {}
+
 class MockSyncOrchestrator extends Mock implements SyncOrchestrator {}
 
 /// v1.9.10 — `AuthNotifier` arms a `ConnectivitySyncBridge` on every
@@ -96,8 +99,7 @@ String _jwtValid() => _jwt({
 
 String _jwtExpired() => _jwt({
       'sub': 'user-1',
-      'exp':
-          DateTime.utc(2020, 1, 1).millisecondsSinceEpoch ~/ 1000,
+      'exp': DateTime.utc(2020, 1, 1).millisecondsSinceEpoch ~/ 1000,
     });
 
 /// v1.9.12 — refresh-token JWT with a 7-day-shaped TTL (matches the
@@ -115,8 +117,7 @@ String _refreshJwtFresh() => _jwt({
 /// force the cold-start gate to fall back to the legacy active probe.
 String _refreshJwtExpired() => _jwt({
       'sub': 'user-1',
-      'exp':
-          DateTime.utc(2020, 1, 1).millisecondsSinceEpoch ~/ 1000,
+      'exp': DateTime.utc(2020, 1, 1).millisecondsSinceEpoch ~/ 1000,
     });
 
 void main() {
@@ -125,7 +126,7 @@ void main() {
   late MockSyncOrchestrator mockOrchestrator;
 
   setUp(() {
-    mockAuth    = MockAuthService();
+    mockAuth = MockAuthService();
     mockStorage = MockStorageService();
     mockOrchestrator = MockSyncOrchestrator();
     // deleteTokens() / deleteAll() are called whenever the cold-start probe
@@ -139,7 +140,8 @@ void main() {
     when(() => mockStorage.getUserSnapshot()).thenAnswer((_) async => null);
     // Pilot consent defaults false. Tests verifying post-consent behaviour
     // override per-test.
-    when(() => mockStorage.getPilotConsent(any())).thenAnswer((_) async => false);
+    when(() => mockStorage.getPilotConsent(any()))
+        .thenAnswer((_) async => false);
     when(() => mockStorage.savePilotConsent(any())).thenAnswer((_) async {});
     // Background seed sync — fire-and-forget. Stub to no-op so tests that
     // exercise login/register/cold-start succeed without hitting the real DB.
@@ -152,8 +154,10 @@ void main() {
             ));
   });
 
-  ProviderContainer makeContainer() => ProviderContainer(
+  ProviderContainer makeContainer([List<Override> extra = const []]) =>
+      ProviderContainer(
         overrides: [
+          ...extra,
           authServiceProvider.overrideWithValue(mockAuth),
           storageServiceProvider.overrideWithValue(mockStorage),
           syncOrchestratorProvider.overrideWithValue(mockOrchestrator),
@@ -165,7 +169,8 @@ void main() {
         ],
       );
 
-  test('initial state is unauthenticated when no access token stored', () async {
+  test('initial state is unauthenticated when no access token stored',
+      () async {
     when(() => mockStorage.getAccessToken()).thenAnswer((_) async => null);
     final container = makeContainer();
     addTearDown(container.dispose);
@@ -176,8 +181,10 @@ void main() {
     verifyNever(() => mockAuth.refresh());
   });
 
-  test('initial state is unauthenticated when no refresh token stored', () async {
-    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => 'access-X');
+  test('initial state is unauthenticated when no refresh token stored',
+      () async {
+    when(() => mockStorage.getAccessToken())
+        .thenAnswer((_) async => 'access-X');
     when(() => mockStorage.getRefreshToken()).thenAnswer((_) async => null);
     final container = makeContainer();
     addTearDown(container.dispose);
@@ -187,9 +194,12 @@ void main() {
     verifyNever(() => mockAuth.refresh());
   });
 
-  test('initial state is authenticated when the refresh probe succeeds', () async {
-    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => 'access-X');
-    when(() => mockStorage.getRefreshToken()).thenAnswer((_) async => 'refresh-X');
+  test('initial state is authenticated when the refresh probe succeeds',
+      () async {
+    when(() => mockStorage.getAccessToken())
+        .thenAnswer((_) async => 'access-X');
+    when(() => mockStorage.getRefreshToken())
+        .thenAnswer((_) async => 'refresh-X');
     when(() => mockAuth.refresh()).thenAnswer((_) async => _testAuth);
 
     final container = makeContainer();
@@ -202,9 +212,12 @@ void main() {
     verify(() => mockAuth.refresh()).called(1);
   });
 
-  test('initial state is unauthenticated when refresh probe returns 401', () async {
-    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => 'access-X');
-    when(() => mockStorage.getRefreshToken()).thenAnswer((_) async => 'refresh-X');
+  test('initial state is unauthenticated when refresh probe returns 401',
+      () async {
+    when(() => mockStorage.getAccessToken())
+        .thenAnswer((_) async => 'access-X');
+    when(() => mockStorage.getRefreshToken())
+        .thenAnswer((_) async => 'refresh-X');
     when(() => mockAuth.refresh()).thenThrow(_refreshHttpError(401));
 
     final container = makeContainer();
@@ -220,8 +233,10 @@ void main() {
   test(
       'initial state is unauthenticated when refresh probe returns 5xx '
       '(transient — tokens NOT cleared)', () async {
-    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => 'access-X');
-    when(() => mockStorage.getRefreshToken()).thenAnswer((_) async => 'refresh-X');
+    when(() => mockStorage.getAccessToken())
+        .thenAnswer((_) async => 'access-X');
+    when(() => mockStorage.getRefreshToken())
+        .thenAnswer((_) async => 'refresh-X');
     when(() => mockAuth.refresh()).thenThrow(_refreshHttpError(503));
 
     final container = makeContainer();
@@ -452,8 +467,10 @@ void main() {
   });
 
   test('markUnauthenticated() flips state to AuthUnauthenticated', () async {
-    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => 'access-X');
-    when(() => mockStorage.getRefreshToken()).thenAnswer((_) async => 'refresh-X');
+    when(() => mockStorage.getAccessToken())
+        .thenAnswer((_) async => 'access-X');
+    when(() => mockStorage.getRefreshToken())
+        .thenAnswer((_) async => 'refresh-X');
     when(() => mockAuth.refresh()).thenAnswer((_) async => _testAuth);
 
     final container = makeContainer();
@@ -469,10 +486,9 @@ void main() {
   test('login sets authenticated state on success', () async {
     when(() => mockStorage.getAccessToken()).thenAnswer((_) async => null);
     when(() => mockAuth.login(
-              email: any(named: 'email'),
-              password: any(named: 'password'),
-            ))
-        .thenAnswer((_) async => _testAuth);
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        )).thenAnswer((_) async => _testAuth);
 
     final container = makeContainer();
     addTearDown(container.dispose);
@@ -488,8 +504,10 @@ void main() {
   });
 
   test('logout sets unauthenticated state', () async {
-    when(() => mockStorage.getAccessToken()).thenAnswer((_) async => 'access-X');
-    when(() => mockStorage.getRefreshToken()).thenAnswer((_) async => 'refresh-X');
+    when(() => mockStorage.getAccessToken())
+        .thenAnswer((_) async => 'access-X');
+    when(() => mockStorage.getRefreshToken())
+        .thenAnswer((_) async => 'refresh-X');
     when(() => mockAuth.refresh()).thenAnswer((_) async => _testAuth);
     when(() => mockAuth.logout()).thenAnswer((_) async {});
 
@@ -502,16 +520,46 @@ void main() {
     expect(container.read(authProvider).value, isA<AuthUnauthenticated>());
   });
 
+  test(
+      'inactivity timeout logs out keeping local data (reminder alarms '
+      'survive); explicit logout still wipes', () async {
+    // Arrange
+    final monitor = _CapturingInactivityMonitor();
+    when(() => mockStorage.getAccessToken())
+        .thenAnswer((_) async => 'access-X');
+    when(() => mockStorage.getRefreshToken())
+        .thenAnswer((_) async => 'refresh-X');
+    when(() => mockAuth.refresh()).thenAnswer((_) async => _testAuth);
+    when(() => mockAuth.logout(keepLocalData: any(named: 'keepLocalData')))
+        .thenAnswer((_) async {});
+    final container = makeContainer(
+      [inactivityMonitorProvider.overrideWithValue(monitor)],
+    );
+    addTearDown(container.dispose);
+    await container.read(authProvider.future);
+
+    // Act — the monitor fires its timeout callback.
+    monitor.fire();
+    await pumpEventQueue();
+
+    // Assert
+    expect(container.read(authProvider).value, isA<AuthUnauthenticated>());
+    verify(() => mockAuth.logout(keepLocalData: true)).called(1);
+
+    // Explicit logout keeps the wipe contract.
+    await container.read(authProvider.notifier).logout();
+    verify(() => mockAuth.logout(keepLocalData: false)).called(1);
+  });
+
   test('register sets authenticated state on success', () async {
     when(() => mockStorage.getAccessToken()).thenAnswer((_) async => null);
     when(() => mockAuth.register(
-              fullName: any(named: 'fullName'),
-              phone: any(named: 'phone'),
-              email: any(named: 'email'),
-              password: any(named: 'password'),
-              privacyConsent: any(named: 'privacyConsent'),
-            ))
-        .thenAnswer((_) async => _testAuth);
+          fullName: any(named: 'fullName'),
+          phone: any(named: 'phone'),
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          privacyConsent: any(named: 'privacyConsent'),
+        )).thenAnswer((_) async => _testAuth);
 
     final container = makeContainer();
     addTearDown(container.dispose);
@@ -527,4 +575,18 @@ void main() {
 
     expect(container.read(authProvider).value, isA<AuthAuthenticated>());
   });
+}
+
+/// Records the timeout callback so a test can trigger the inactivity
+/// logout without waiting 20 minutes.
+class _CapturingInactivityMonitor extends InactivityMonitor {
+  void Function()? _onTimeout;
+
+  @override
+  void start(void Function() onTimeout) => _onTimeout = onTimeout;
+
+  @override
+  void stop() {}
+
+  void fire() => _onTimeout?.call();
 }
