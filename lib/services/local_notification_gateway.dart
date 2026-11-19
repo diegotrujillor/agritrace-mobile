@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import '../utils/constants.dart';
 import 'reminder_notifications.dart';
 
 /// Android channel for reminder notifications (CU-18). Users can mute it
@@ -10,9 +11,17 @@ const String kReminderChannelName = 'Recordatorios';
 const String kReminderChannelDescription =
     'Avisos de los recordatorios que programas en AgriTrace';
 
-/// Small icon shown in the status bar. Reuses the launcher icon so no extra
-/// drawable asset is needed.
-const String _kNotificationIcon = '@mipmap/ic_launcher';
+/// Monochrome status-bar icon (`res/drawable/ic_stat_reminder.xml`).
+///
+/// v1.12.2 — was `@mipmap/ic_launcher`, a full-colour adaptive icon: on a
+/// Pixel the alarm fired and the channel was created, yet nothing appeared.
+/// Android requires a white-on-transparent small icon. Kept from R8
+/// resource shrinking by `res/raw/keep.xml` (looked up by name at runtime).
+const String kReminderSmallIcon = 'ic_stat_reminder';
+
+/// Fixed id for the "Probar notificación" check. Re-tapping replaces the
+/// previous test notification instead of stacking new ones.
+const int kTestNotificationId = 0;
 
 /// [NotificationGateway] backed by `flutter_local_notifications`.
 ///
@@ -37,6 +46,8 @@ class LocalNotificationGateway implements NotificationGateway {
       channelDescription: kReminderChannelDescription,
       importance: Importance.high,
       priority: Priority.high,
+      icon: kReminderSmallIcon,
+      color: AppColors.primaryGreen,
     ),
   );
 
@@ -44,7 +55,7 @@ class LocalNotificationGateway implements NotificationGateway {
   Future<void> _ensureInitialized() => _initialized ??= _plugin
       .initialize(
         settings: const InitializationSettings(
-          android: AndroidInitializationSettings(_kNotificationIcon),
+          android: AndroidInitializationSettings(kReminderSmallIcon),
         ),
       )
       .then((_) {});
@@ -81,5 +92,24 @@ class LocalNotificationGateway implements NotificationGateway {
     final android = _android;
     if (android == null) return true;
     return await android.requestNotificationsPermission() ?? false;
+  }
+
+  @override
+  Future<bool> areEnabled() async {
+    await _ensureInitialized();
+    final android = _android;
+    if (android == null) return true;
+    return await android.areNotificationsEnabled() ?? false;
+  }
+
+  @override
+  Future<void> showTest() async {
+    await _ensureInitialized();
+    await _plugin.show(
+      id: kTestNotificationId,
+      title: 'AgriTrace',
+      body: 'Así se verán tus recordatorios.',
+      notificationDetails: _details,
+    );
   }
 }

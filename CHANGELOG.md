@@ -4,6 +4,44 @@ Formato [Keep a Changelog](https://keepachangelog.com/). Cada versión =
 tag git `vX.Y.Z` → APK firmado adjunto al GitHub Release vía CI
 (`.github/workflows/build-apk.yml`). "Dónde" indica archivos tocados.
 
+## [1.12.2] - 2026-11-19 — fix: las notificaciones de recordatorio no se veían
+
+### Fixed
+- **El recordatorio sonaba pero no aparecía nada.** En un Pixel, la alarma
+  de las 7:00 se disparó (el canal "Recordatorios" se crea solo al mostrar
+  la notificación) pero no se vio ninguna. El ícono pequeño era el ícono de
+  la app a color (`@mipmap/ic_launcher`, adaptativo); Android exige un ícono
+  monocromo para la barra de estado. Nuevo vector blanco
+  `res/drawable/ic_stat_reminder.xml` (campana) con tinte verde AgriTrace, y
+  `res/raw/keep.xml` para que el shrinker de recursos de R8 no lo borre (el
+  plugin lo busca por nombre en tiempo de ejecución). Dónde:
+  `lib/services/local_notification_gateway.dart`.
+- **Los errores al programar avisos eran invisibles.** Solo se registraban
+  con `dev.log`, que no existe en builds release. Ahora
+  `ReminderNotificationSync` reporta el resultado (`onStatus`) y la pantalla
+  de Alertas muestra "Avisos no programados" si falló. Dónde:
+  `lib/services/reminder_notifications.dart`,
+  `lib/providers/reminder_notifications_provider.dart`.
+- **CI "Release to Google Play" fallaba en cada tag desde v1.11.0.** El paso
+  de tests corría `flutter test` sin `--dart-define=API_BASE_URL`, y 4 widget
+  tests (guardar/eliminar → volver) fallaban por el `StateError` de
+  `ApiService`. Dónde: `.github/workflows/release-play.yml`.
+
+### Added
+- **Aviso "Notificaciones desactivadas"** en Alertas, con botón **Activar**
+  que abre los ajustes de la app. Se vuelve a comprobar al regresar a la app
+  y después de pedir el permiso al guardar un recordatorio. Dónde:
+  `lib/widgets/domain/notification_status_banner.dart` (nuevo),
+  `lib/screens/alerts/alerts_screen.dart`, `lib/providers/alerts_provider.dart`.
+- **Botón "Probar notificación"** (campana en la barra de Alertas): muestra
+  una notificación al instante para comprobar que los avisos se ven en el
+  teléfono; si están desactivadas, ofrece activarlas.
+
+### Tests
+- 9 tests nuevos (`test/unit/notification_icon_test.dart`,
+  `test/widget/notification_status_banner_test.dart`, `onStatus` en
+  `test/unit/reminder_notifications_test.dart`). Suite completa 470/470.
+
 ## [1.12.1] - 2026-11-18 — fix: el recordatorio tiene hora (antes sonaba a medianoche)
 
 ### Fixed

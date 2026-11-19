@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- flutter_local_notifications resolves the small icon by name at runtime,
+     which R8 resource shrinking cannot see. Without this, release builds may
+     strip it and notifications silently fail to show (plugin README,
+     "Release build configuration"). -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_reminder" />

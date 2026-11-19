@@ -89,12 +89,16 @@ class AlertsNotifier extends AsyncNotifier<List<Alert>> {
   /// v1.12.0 — asks for POST_NOTIFICATIONS (Android 13+) the first time a
   /// reminder is saved, so the OS notification can actually fire. Contextual
   /// on purpose: the dialog appears right after the producer creates a
-  /// reminder, not on app launch. A no-op once granted or denied; failures
+  /// reminder, not on app launch. Re-asked on every save (no-op once granted;
+  /// Android stops prompting after two denials, and the Alertas banner then
+  /// links to system settings). Failures
   /// are logged and never block the save.
   void _requestNotificationPermission() {
     unawaited(
-      Future(() => ref.read(reminderNotificationSyncProvider).requestPermission())
-          .then((_) {})
+      Future(() =>
+              ref.read(reminderNotificationSyncProvider).requestPermission())
+          // v1.12.2 — refresh the Alertas banner with the user's answer.
+          .then((_) => ref.invalidate(notificationsEnabledProvider))
           .catchError((Object e) {
         dev.log('notification permission request failed: $e',
             name: 'notifications');
@@ -128,8 +132,7 @@ class AlertsNotifier extends AsyncNotifier<List<Alert>> {
   /// to local DB and refreshes. Returns the provider name so the UI can tell
   /// the user when weather is disabled server-side.
   Future<String> runWeatherCheck(String plotId) async {
-    final result =
-        await ref.read(alertServiceProvider).checkWeather(plotId);
+    final result = await ref.read(alertServiceProvider).checkWeather(plotId);
     if (result.alert != null) {
       await _repo.upsertFromServer({
         ...result.alert!.toJson(),

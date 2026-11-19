@@ -37,6 +37,19 @@ class FakeGateway implements NotificationGateway {
     calls.add('requestPermission');
     return permissionResult;
   }
+
+  bool enabled = true;
+
+  @override
+  Future<bool> areEnabled() async {
+    calls.add('areEnabled');
+    return enabled;
+  }
+
+  @override
+  Future<void> showTest() async {
+    calls.add('showTest');
+  }
 }
 
 final _now = DateTime.utc(2026, 11, 18, 12);
@@ -205,6 +218,31 @@ void main() {
       gateway.throwOnSchedule = false;
       await sync.apply(alerts);
       expect(gateway.scheduled.map((n) => n.alertId), ['a']);
+    });
+
+    test('reports the failure through onStatus, then clears it on success',
+        () async {
+      // Arrange
+      final statuses = <String?>[];
+      final reporting = ReminderNotificationSync(
+        gateway,
+        clock: () => _now,
+        onStatus: statuses.add,
+      );
+      final alerts = [
+        _alert('a', scheduledFor: _now.add(const Duration(hours: 1))),
+      ];
+
+      // Act
+      gateway.throwOnSchedule = true;
+      await reporting.apply(alerts);
+      gateway.throwOnSchedule = false;
+      await reporting.apply(alerts);
+
+      // Assert
+      expect(statuses, hasLength(2));
+      expect(statuses.first, contains('plugin unavailable'));
+      expect(statuses.last, isNull);
     });
 
     test('requestPermission delegates to the gateway', () async {

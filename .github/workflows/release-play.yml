@@ -84,7 +84,10 @@ jobs:
         run: flutter analyze --no-fatal-infos
 
       - name: Run tests
-        run: flutter test
+        # ApiService reads API_BASE_URL via String.fromEnvironment and throws
+        # StateError without it; 4 widget tests that save/delete then pop
+        # failed on every tag since v1.11.0 because of this (see CLAUDE.md).
+        run: flutter test --dart-define=API_BASE_URL=http://localhost:3000/v1
 
       - name: Build signed AAB
         run: >

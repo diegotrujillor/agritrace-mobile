@@ -14,6 +14,7 @@ import '../../widgets/common/error_state.dart';
 import '../../widgets/common/offline_indicator.dart';
 import '../../widgets/common/sync_status_badge.dart';
 import '../../widgets/domain/alert_list_item.dart';
+import '../../widgets/domain/notification_status_banner.dart';
 
 /// Producer-wide list of alerts (weather notices + scheduled reminders).
 /// Surfaces the offline + sync status, supports dismiss/delete, and routes
@@ -60,12 +61,13 @@ class AlertsScreen extends ConsumerWidget {
           onPressed: () => context.go(Routes.dashboard),
         ),
         title: const Text('Alertas'),
-        actions: const [_WeatherCheckButton()],
+        actions: const [TestNotificationButton(), _WeatherCheckButton()],
       ),
       body: Column(
         children: [
           const OfflineIndicator(),
           const SyncStatusBadge(),
+          const NotificationStatusBanner(),
           Expanded(
             child: alertsAsync.when(
               data: (alerts) => alerts.isEmpty
